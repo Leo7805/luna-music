@@ -6,6 +6,8 @@ export interface ShortcutHandlers {
   adjustVolume: (deltaPercent: number) => void;
   toggleMute: () => void;
   toggleLyrics: () => void;
+  toggleHelp?: () => void;
+  closeHelp?: () => void;
 }
 
 export interface ShortcutTarget {
@@ -114,6 +116,28 @@ export function handlePlayerKeydown(
     event.preventDefault?.();
     handlers.toggleLyrics();
     return true;
+  }
+
+  // ?: Toggle shortcuts modal (help)
+  if (
+    (event.key === '?' || (event.key === '/' && (event as any).shiftKey)) &&
+    !isMetaOrCtrl &&
+    !event.altKey
+  ) {
+    if (handlers.toggleHelp) {
+      event.preventDefault?.();
+      handlers.toggleHelp();
+      return true;
+    }
+  }
+
+  // Escape: Close shortcuts modal if open
+  if (event.key === 'Escape' || event.code === 'Escape') {
+    if (handlers.closeHelp) {
+      event.preventDefault?.();
+      handlers.closeHelp();
+      return true;
+    }
   }
 
   return false;

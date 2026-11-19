@@ -49,10 +49,9 @@ export async function storePlaybackState(state: Partial<StoredPlaybackState>): P
 }
 
 /**
- * Loads stored playback state, falling back to defaults.
+ * Synchronously retrieves stored playback state from localStorage cache for instant hydration.
  */
-export async function getStoredPlaybackState(): Promise<StoredPlaybackState> {
-  // 1. Try localStorage for zero-latency retrieval
+export function getStoredPlaybackStateSync(): StoredPlaybackState {
   try {
     if (typeof localStorage !== 'undefined') {
       const raw = localStorage.getItem(LOCAL_STORAGE_STATE_KEY);
@@ -67,6 +66,19 @@ export async function getStoredPlaybackState(): Promise<StoredPlaybackState> {
     }
   } catch {
     // Ignore localStorage parse error
+  }
+  return DEFAULT_STATE;
+}
+
+/**
+ * Loads stored playback state, falling back to defaults.
+ */
+export async function getStoredPlaybackState(): Promise<StoredPlaybackState> {
+  // 1. Try localStorage for zero-latency retrieval
+  const localCache = getStoredPlaybackStateSync();
+  if (typeof localStorage !== 'undefined' && localStorage.getItem(LOCAL_STORAGE_STATE_KEY)) {
+    // If local cache is populated, return it directly but also verify with IndexedDB if needed
+    return localCache;
   }
 
   // 2. Fallback to IndexedDB

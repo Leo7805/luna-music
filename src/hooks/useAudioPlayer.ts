@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TrackItem, RepeatMode, FileStatus } from '../types/music';
-import { storePlaybackState } from '../services/idbStorage';
+import {
+  storePlaybackState,
+  getStoredPlaybackStateSync,
+  getStoredPlaybackState,
+} from '../services/idbStorage';
 import { useArtworkColors } from './useArtworkColors';
 import { useTrackLyrics } from './useTrackLyrics';
 import { usePlaybackQueue } from './usePlaybackQueue';
@@ -31,17 +35,41 @@ export interface UseAudioPlayerProps {
 export function useAudioPlayer({
   playlist,
   initialQueue,
-  initialVolume = 0.8,
-  initialMuted = false,
-  initialRepeatMode = 'off',
-  initialShuffle = false,
+  initialVolume,
+  initialMuted,
+  initialRepeatMode,
+  initialShuffle,
   initialTrackId = null,
   initialPosition = 0,
   onTrackStatusChanged,
 }: UseAudioPlayerProps = {}) {
+  // Synchronous restoration from localStorage cache for instant hydration
+  const syncState = getStoredPlaybackStateSync();
+  const effectiveInitialVolume =
+    initialVolume !== undefined ? initialVolume : (syncState.volume ?? 0.8);
+  const effectiveInitialMuted =
+    initialMuted !== undefined ? initialMuted : (syncState.isMuted ?? false);
+  const effectiveInitialRepeat =
+    initialRepeatMode !== undefined ? initialRepeatMode : (syncState.repeatMode ?? 'off');
+  const effectiveInitialShuffle =
+    initialShuffle !== undefined ? initialShuffle : (syncState.shuffle ?? false);
+
   const [currentTrack, setCurrentTrack] = useState<TrackItem | null>(null);
-  const [repeatMode, setRepeatMode] = useState<RepeatMode>(initialRepeatMode);
-  const [shuffle, setShuffle] = useState<boolean>(initialShuffle);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>(effectiveInitialRepeat);
+  const [shuffle, setShuffle] = useState<boolean>(effectiveInitialShuffle);
+
+  // Track user manual changes in current session to prevent async storage hydration overwriting them
+  const userInteractedRef = useRef<{
+    volume: boolean;
+    repeatMode: boolean;
+    shuffle: boolean;
+    isMuted: boolean;
+  }>({
+    volume: false,
+    repeatMode: false,
+    shuffle: false,
+    isMuted: false,
+  });
 
   const currentTrackRef = useRef<TrackItem | null>(null);
   currentTrackRef.current = currentTrack;
@@ -78,8 +106,8 @@ export function useAudioPlayer({
 
   // Audio element and engine controls
   const audioEngine = useAudioEngine({
-    initialVolume,
-    initialMuted,
+    initialVolume: effectiveInitialVolume,
+    initialMuted: effectiveInitialMuted,
     initialPosition,
     currentTrack,
     onTrackStatusChanged,
@@ -211,8 +239,69 @@ export function useAudioPlayer({
     queueControls.clearQueue(currentTrackRef.current);
   }, [queueControls]);
 
+  // Asynchronously hydrate persistent settings from IndexedDB (fallback / verification)
+  useEffect(() => {
+    let isCancelled = false;
+    getStoredPlaybackState()
+      .then((stored) => {
+        if (isCancelled || !stored) return;
+
+        // Apply volume & mute if user hasn't modified them in this session
+        if (!userInteractedRef.current.volume && typeof stored.volume === 'number') {
+          audioEngine.applyHydratedSettings({
+            volume: stored.volume,
+            isMuted:
+              !userInteractedRef.current.isMuted && typeof stored.isMuted === 'boolean'
+                ? stored.isMuted
+                : undefined,
+          });
+        } else if (!userInteractedRef.current.isMuted && typeof stored.isMuted === 'boolean') {
+          audioEngine.applyHydratedSettings({ isMuted: stored.isMuted });
+        }
+
+        // Apply repeat mode & shuffle if user hasn't modified them in this session
+        if (!userInteractedRef.current.repeatMode && stored.repeatMode) {
+          setRepeatMode(stored.repeatMode);
+        }
+        if (!userInteractedRef.current.shuffle && typeof stored.shuffle === 'boolean') {
+          setShuffle(stored.shuffle);
+        }
+      })
+      .catch(() => {
+        // Safe fallback: keep existing settings
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  const changeVolume = useCallback(
+    (newVol: number) => {
+      userInteractedRef.current.volume = true;
+      userInteractedRef.current.isMuted = true;
+      audioEngine.changeVolume(newVol);
+    },
+    [audioEngine]
+  );
+
+  const adjustVolume = useCallback(
+    (delta: number) => {
+      userInteractedRef.current.volume = true;
+      userInteractedRef.current.isMuted = true;
+      audioEngine.adjustVolume(delta);
+    },
+    [audioEngine]
+  );
+
+  const toggleMute = useCallback(() => {
+    userInteractedRef.current.isMuted = true;
+    audioEngine.toggleMute();
+  }, [audioEngine]);
+
   // Cycle repeat modes: off -> all -> one -> off
   const cycleRepeatMode = useCallback(() => {
+    userInteractedRef.current.repeatMode = true;
     setRepeatMode((prev) => {
       const next: RepeatMode = prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off';
       storePlaybackState({ repeatMode: next });
@@ -222,6 +311,7 @@ export function useAudioPlayer({
 
   // Toggle shuffle
   const toggleShuffle = useCallback(() => {
+    userInteractedRef.current.shuffle = true;
     setShuffle((prev) => {
       const next = !prev;
       storePlaybackState({ shuffle: next });
@@ -272,9 +362,9 @@ export function useAudioPlayer({
     prevTrack,
     seekTo: audioEngine.seekTo,
     seekRelative: audioEngine.seekRelative,
-    changeVolume: audioEngine.changeVolume,
-    adjustVolume: audioEngine.adjustVolume,
-    toggleMute: audioEngine.toggleMute,
+    changeVolume,
+    adjustVolume,
+    toggleMute,
     cycleRepeatMode,
     toggleShuffle,
   };

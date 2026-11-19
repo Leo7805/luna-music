@@ -115,6 +115,54 @@ describe('shortcuts', () => {
     expect(handlers.toggleLyrics).toHaveBeenCalledOnce();
   });
 
+  it('triggers help toggle on ? or Shift+/', () => {
+    const handlers = {
+      togglePlay: vi.fn(),
+      seekRelative: vi.fn(),
+      nextTrack: vi.fn(),
+      prevTrack: vi.fn(),
+      adjustVolume: vi.fn(),
+      toggleMute: vi.fn(),
+      toggleLyrics: vi.fn(),
+      toggleHelp: vi.fn(),
+    };
+
+    const e1 = makeEvent({ key: '?' });
+    const handled1 = handlePlayerKeydown(e1, handlers);
+    expect(handled1).toBe(true);
+    expect(handlers.toggleHelp).toHaveBeenCalledTimes(1);
+    expect(e1.preventDefault).toHaveBeenCalled();
+
+    const e2 = makeEvent({ key: '/', shiftKey: true } as any);
+    const handled2 = handlePlayerKeydown(e2, handlers);
+    expect(handled2).toBe(true);
+    expect(handlers.toggleHelp).toHaveBeenCalledTimes(2);
+
+    // Should not trigger if meta, ctrl, or alt is pressed
+    const eCmd = makeEvent({ key: '?', metaKey: true });
+    expect(handlePlayerKeydown(eCmd, handlers)).toBe(false);
+    expect(handlers.toggleHelp).toHaveBeenCalledTimes(2);
+  });
+
+  it('triggers closeHelp on Escape', () => {
+    const handlers = {
+      togglePlay: vi.fn(),
+      seekRelative: vi.fn(),
+      nextTrack: vi.fn(),
+      prevTrack: vi.fn(),
+      adjustVolume: vi.fn(),
+      toggleMute: vi.fn(),
+      toggleLyrics: vi.fn(),
+      closeHelp: vi.fn(),
+    };
+
+    const e = makeEvent({ key: 'Escape' });
+    const handled = handlePlayerKeydown(e, handlers);
+    expect(handled).toBe(true);
+    expect(handlers.closeHelp).toHaveBeenCalledOnce();
+    expect(e.preventDefault).toHaveBeenCalled();
+  });
+
   it('ignores shortcuts if focused on an input element', () => {
     const handlers = {
       togglePlay: vi.fn(),
@@ -124,6 +172,8 @@ describe('shortcuts', () => {
       adjustVolume: vi.fn(),
       toggleMute: vi.fn(),
       toggleLyrics: vi.fn(),
+      toggleHelp: vi.fn(),
+      closeHelp: vi.fn(),
     };
 
     const event = makeEvent({ code: 'Space', target: { tagName: 'INPUT' } });
@@ -131,5 +181,11 @@ describe('shortcuts', () => {
 
     expect(handled).toBe(false);
     expect(handlers.togglePlay).not.toHaveBeenCalled();
+
+    // Verify typing ? into search input does not open help
+    const questionEvent = makeEvent({ key: '?', target: { tagName: 'INPUT' } });
+    expect(handlePlayerKeydown(questionEvent, handlers)).toBe(false);
+    expect(handlers.toggleHelp).not.toHaveBeenCalled();
+    expect(questionEvent.preventDefault).not.toHaveBeenCalled();
   });
 });

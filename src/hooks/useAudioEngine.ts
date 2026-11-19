@@ -36,6 +36,7 @@ export interface UseAudioEngineReturn {
   changeVolume: (newVol: number) => void;
   adjustVolume: (delta: number) => void;
   toggleMute: () => void;
+  applyHydratedSettings: (settings: { volume?: number; isMuted?: boolean }) => void;
   clearPlaybackError: () => void;
 }
 
@@ -299,6 +300,26 @@ export function useAudioEngine({
     storePlaybackState({ isMuted: nextMuted });
   }, [isMuted, volume]);
 
+  // Apply hydrated settings from storage without re-persisting
+  const applyHydratedSettings = useCallback(
+    (settings: { volume?: number; isMuted?: boolean }) => {
+      let effVol = volume;
+      if (typeof settings.volume === 'number') {
+        effVol = Math.max(0, Math.min(1, settings.volume));
+        setVolume(effVol);
+      }
+      let effMuted = isMuted;
+      if (typeof settings.isMuted === 'boolean') {
+        effMuted = settings.isMuted;
+        setIsMuted(effMuted);
+      }
+      if (audioRef.current) {
+        audioRef.current.volume = effMuted ? 0 : effVol;
+      }
+    },
+    [isMuted, volume]
+  );
+
   const clearPlaybackError = useCallback(() => {
     setPlaybackError(null);
   }, []);
@@ -407,6 +428,7 @@ export function useAudioEngine({
     changeVolume,
     adjustVolume,
     toggleMute,
+    applyHydratedSettings,
     clearPlaybackError,
   };
 }

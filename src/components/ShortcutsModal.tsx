@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { X, Keyboard } from 'lucide-react';
 
 interface ShortcutsModalProps {
@@ -7,18 +6,6 @@ interface ShortcutsModalProps {
 }
 
 export function ShortcutsModal({ isOpen, onClose }: ShortcutsModalProps) {
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    }
-    if (isOpen) {
-      window.addEventListener('keydown', onKeyDown);
-      return () => window.removeEventListener('keydown', onKeyDown);
-    }
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   const shortcuts = [

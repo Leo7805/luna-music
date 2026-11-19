@@ -38,6 +38,8 @@ export function App() {
       adjustVolume: audioPlayer.adjustVolume,
       toggleMute: audioPlayer.toggleMute,
       toggleLyrics: () => setIsNowPlayingOpen((prev) => !prev),
+      toggleHelp: () => setIsShortcutsOpen((prev) => !prev),
+      closeHelp: () => setIsShortcutsOpen(false),
     }),
     [audioPlayer]
   );
