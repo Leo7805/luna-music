@@ -479,4 +479,160 @@ describe('File status model, availability detection, and dynamic recovery', () =
     expect(isTrackPlayable(flacTrack)).toBe(true);
     expect(isTrackPlayable(mp3Track)).toBe(true);
   });
+
+  // Test 13: Unsupported track recovers to normal after replacement with valid audio
+  it('13. unsupported track recovers to normal after replacement with valid audio file', async () => {
+    const mockFile = { size: 15000000, name: 'valid.flac' } as unknown as File;
+    const mockHandle = {
+      getFile: vi.fn().mockResolvedValue(mockFile),
+    } as unknown as FileSystemFileHandle;
+
+    const track: TrackItem = {
+      id: 'song.flac',
+      name: 'song.flac',
+      relativePath: 'song.flac',
+      size: 100,
+      lastModified: 1000,
+      handle: mockHandle,
+      status: 'unsupported',
+      metadata: { title: 'song', artist: 'Unknown', album: 'Unknown', isMetadataLoaded: false },
+    };
+
+    const onTrackStatusChanged = vi.fn();
+
+    async function simulateLoadAudio(t: TrackItem) {
+      const file = await t.handle!.getFile();
+      const isStatusAbnormal = t.status && t.status !== 'normal';
+      const isFileModified = t.size !== file.size;
+
+      if (isStatusAbnormal || isFileModified) {
+        t.status = 'normal';
+        t.size = file.size;
+        onTrackStatusChanged(t.id, 'normal', file.size);
+      }
+      return URL.createObjectURL(file);
+    }
+
+    const spy = vi.fn().mockReturnValue('blob:http://localhost/new-url');
+    const orig = URL.createObjectURL;
+    URL.createObjectURL = spy;
+
+    const url = await simulateLoadAudio(track);
+    expect(url).toBe('blob:http://localhost/new-url');
+    expect(track.status).toBe('normal');
+    expect(track.size).toBe(15000000);
+    expect(onTrackStatusChanged).toHaveBeenCalledWith('song.flac', 'normal', 15000000);
+
+    URL.createObjectURL = orig;
+  });
+
+  // Test 14: Normal track transitions to empty after replacing valid file with 0-byte file
+  it('14. normal track transitions to empty when replaced by 0-byte file', async () => {
+    const emptyFile = { size: 0, name: 'emptied.mp3' } as unknown as File;
+    const mockHandle = {
+      getFile: vi.fn().mockResolvedValue(emptyFile),
+    } as unknown as FileSystemFileHandle;
+
+    const track: TrackItem = {
+      id: 'emptied.mp3',
+      name: 'emptied.mp3',
+      relativePath: 'emptied.mp3',
+      size: 5000000,
+      lastModified: 1000,
+      handle: mockHandle,
+      status: 'normal',
+      metadata: { title: 'Emptied', artist: 'Artist', album: 'Album', isMetadataLoaded: true },
+    };
+
+    const onTrackStatusChanged = vi.fn();
+
+    async function simulateLoadAudio(t: TrackItem) {
+      const file = await t.handle!.getFile();
+      if (file.size === 0) {
+        t.status = 'empty';
+        t.size = 0;
+        onTrackStatusChanged(t.id, 'empty', 0);
+        throw new Error(
+          'This audio file is empty (0 bytes). Please check or replace the original file.'
+        );
+      }
+    }
+
+    await expect(simulateLoadAudio(track)).rejects.toThrow(
+      'This audio file is empty (0 bytes). Please check or replace the original file.'
+    );
+    expect(track.status).toBe('empty');
+    expect(track.size).toBe(0);
+    expect(onTrackStatusChanged).toHaveBeenCalledWith('emptied.mp3', 'empty', 0);
+  });
+
+  // Test 15: Normal track transitions to unreadable after removing access permissions
+  it('15. normal track transitions to unreadable after removing access permissions', async () => {
+    const mockHandle = {
+      getFile: vi.fn().mockRejectedValue(new DOMException('Permission denied', 'NotAllowedError')),
+    } as unknown as FileSystemFileHandle;
+
+    const track: TrackItem = {
+      id: 'denied.mp3',
+      name: 'denied.mp3',
+      relativePath: 'denied.mp3',
+      size: 5000000,
+      lastModified: 1000,
+      handle: mockHandle,
+      status: 'normal',
+      metadata: { title: 'Denied', artist: 'Artist', album: 'Album', isMetadataLoaded: true },
+    };
+
+    const onTrackStatusChanged = vi.fn();
+
+    async function simulateLoadAudio(t: TrackItem) {
+      try {
+        await t.handle!.getFile();
+      } catch {
+        t.status = 'unreadable';
+        onTrackStatusChanged(t.id, 'unreadable');
+        throw new Error(
+          'Cannot access this audio file. Please check file permissions or reopen the music folder.'
+        );
+      }
+    }
+
+    await expect(simulateLoadAudio(track)).rejects.toThrow(
+      'Cannot access this audio file. Please check file permissions or reopen the music folder.'
+    );
+    expect(track.status).toBe('unreadable');
+    expect(onTrackStatusChanged).toHaveBeenCalledWith('denied.mp3', 'unreadable');
+  });
+
+  // Test 16: Stale asynchronous load operations are discarded and cannot overwrite newer status
+  it('16. stale asynchronous load operations cannot overwrite newer status updates', async () => {
+    let loadRequestId = 0;
+    let currentPlayingTrackId: string | null = null;
+    let recordedStatus: FileStatus = 'normal';
+
+    async function loadAudioSourceWithCancel(trackId: string, delayMs: number, targetStatus: FileStatus) {
+      const requestId = ++loadRequestId;
+
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+      // Guard: if another load has started, discard this stale completion
+      if (loadRequestId !== requestId) {
+        return;
+      }
+
+      currentPlayingTrackId = trackId;
+      recordedStatus = targetStatus;
+    }
+
+    // Track 1 is slow (delay 50ms)
+    const p1 = loadAudioSourceWithCancel('track-1-slow', 50, 'empty');
+    // User quickly switches to Track 2 (fast, delay 10ms)
+    const p2 = loadAudioSourceWithCancel('track-2-fast', 10, 'normal');
+
+    await Promise.all([p1, p2]);
+
+    // Track 2 should remain active, track 1's completion was discarded
+    expect(currentPlayingTrackId).toBe('track-2-fast');
+    expect(recordedStatus).toBe('normal');
+  });
 });

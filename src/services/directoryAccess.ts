@@ -1,4 +1,4 @@
-import { MusicLibrary, TrackItem } from '../types/music';
+import { MusicLibrary, TrackItem, FileStatus } from '../types/music';
 import {
   isSupportedAudioFile,
   isLrcFile,
@@ -62,6 +62,7 @@ export async function scanDirectoryHandle(
     handle: FileSystemFileHandle;
     size: number;
     lastModified: number;
+    status: FileStatus;
   }[] = [];
 
   // Map of dirPath -> Map<lowerBaseName, FileSystemFileHandle> for .lrc files
@@ -86,13 +87,24 @@ export async function scanDirectoryHandle(
               handle: fileHandle,
               size: file.size,
               lastModified: file.lastModified,
+              status: file.size === 0 ? 'empty' : 'normal',
             });
 
             if (onProgress && discoveredAudio.length % 25 === 0) {
               onProgress(discoveredAudio.length);
             }
           } catch {
-            // Ignore locked or unreadable files
+            // Keep locked or unreadable files visible in library marked as unreadable
+            discoveredAudio.push({
+              name,
+              relativePath,
+              dirPath: currentPath,
+              baseName: stripExtension(name).toLowerCase(),
+              handle: fileHandle,
+              size: 0,
+              lastModified: Date.now(),
+              status: 'unreadable',
+            });
           }
         } else if (isLrcFile(name)) {
           const base = stripExtension(name).toLowerCase();
@@ -131,7 +143,7 @@ export async function scanDirectoryHandle(
       handle: item.handle,
       metadata: createFallbackMetadata(item.name, item.relativePath),
       lrcHandle,
-      status: item.size === 0 ? 'empty' : 'normal',
+      status: item.status,
     };
   });
 

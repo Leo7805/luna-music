@@ -3,6 +3,7 @@ import { TrackItem, RepeatMode, LrcLine, FileStatus } from '../types/music';
 import { parseLrc } from '../utils/lrcParser';
 import { extractDominantColor } from '../utils/colorExtractor';
 import { extractAudioMetadata } from '../utils/metadata';
+import { isFormatSupportedByBrowser } from '../utils/musicTree';
 import { storePlaybackState } from '../services/idbStorage';
 
 interface UseAudioPlayerProps {
@@ -55,6 +56,7 @@ export function useAudioPlayer({
   playlistRef.current = playlist;
   const onTrackStatusChangedRef = useRef(onTrackStatusChanged);
   onTrackStatusChangedRef.current = onTrackStatusChanged;
+  const loadRequestIdRef = useRef<number>(0);
 
   // Initialize native HTMLAudioElement without assigning invalid empty src
   if (!audioRef.current && typeof Audio !== 'undefined') {
@@ -140,6 +142,7 @@ export function useAudioPlayer({
     const audio = audioRef.current;
     if (!audio) return;
 
+    const requestId = ++loadRequestIdRef.current;
     setPlaybackError(null);
 
     // Revoke previous blob object URL to free memory safely
@@ -154,6 +157,7 @@ export function useAudioPlayer({
         try {
           file = await track.handle.getFile();
         } catch {
+          if (loadRequestIdRef.current !== requestId) return;
           track.status = 'unreadable';
           if (onTrackStatusChangedRef.current) {
             onTrackStatusChangedRef.current(track.id, 'unreadable');
@@ -169,6 +173,8 @@ export function useAudioPlayer({
       } else if (track.file) {
         file = track.file;
       }
+
+      if (loadRequestIdRef.current !== requestId) return;
 
       if (!file) {
         track.status = 'unreadable';
@@ -186,6 +192,7 @@ export function useAudioPlayer({
 
       if (file.size === 0) {
         track.status = 'empty';
+        track.size = 0;
         if (onTrackStatusChangedRef.current) {
           onTrackStatusChangedRef.current(track.id, 'empty', 0);
         }
@@ -198,15 +205,32 @@ export function useAudioPlayer({
         );
       }
 
-      // If the file was previously empty or unreadable, it is now valid after hydration or access restoration
-      if (track.status === 'empty' || track.status === 'unreadable' || track.size === 0) {
+      // If the file was previously abnormal, or modified/replaced on disk, refresh status and metadata
+      const isStatusAbnormal = track.status && track.status !== 'normal';
+      const isFileModified =
+        (track.lastModified && 'lastModified' in file && track.lastModified !== (file as File).lastModified) ||
+        track.size !== file.size;
+
+      if (isStatusAbnormal || isFileModified) {
         track.status = 'normal';
         track.size = file.size;
+        if ('lastModified' in file) {
+          track.lastModified = (file as File).lastModified;
+        }
 
         let freshMetadata: Partial<TrackItem['metadata']> | undefined;
         try {
           const extracted = await extractAudioMetadata(file, track.name);
-          if (extracted) {
+          if (extracted && loadRequestIdRef.current === requestId) {
+            // Revoke previous artwork if new artwork was generated
+            if (
+              track.metadata.artworkUrl &&
+              extracted.artworkUrl &&
+              track.metadata.artworkUrl !== extracted.artworkUrl
+            ) {
+              URL.revokeObjectURL(track.metadata.artworkUrl);
+            }
+
             freshMetadata = extracted;
             track.metadata = {
               ...track.metadata,
@@ -219,10 +243,14 @@ export function useAudioPlayer({
           // Ignore metadata parse error on raw audio
         }
 
+        if (loadRequestIdRef.current !== requestId) return;
+
         if (onTrackStatusChangedRef.current) {
           onTrackStatusChangedRef.current(track.id, 'normal', file.size, freshMetadata);
         }
       }
+
+      if (loadRequestIdRef.current !== requestId) return;
 
       const objectUrl = URL.createObjectURL(file);
       activeUrlRef.current = objectUrl;
@@ -467,10 +495,13 @@ export function useAudioPlayer({
           case MediaError.MEDIA_ERR_DECODE:
             message = 'Audio decode failed. The audio codec or file may be corrupted.';
             break;
-          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-            if (err.message && /open context failed|DEMUXER_ERROR/i.test(err.message)) {
-              message = 'Audio decode failed. The audio codec or file may be corrupted.';
-            } else {
+          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED: {
+            const trackName = currentTrackRef.current?.name || '';
+            const isConfirmedUnsupported =
+              Boolean(err.message && /unsupported_codec|no decoder|codec not supported/i.test(err.message)) ||
+              Boolean(trackName && !isFormatSupportedByBrowser(trackName));
+
+            if (isConfirmedUnsupported) {
               message = 'This audio format or codec may not be supported by your browser.';
               if (currentTrackRef.current) {
                 currentTrackRef.current.status = 'unsupported';
@@ -478,8 +509,12 @@ export function useAudioPlayer({
                   onTrackStatusChangedRef.current(currentTrackRef.current.id, 'unsupported');
                 }
               }
+            } else {
+              // Ambiguous Code 4 / demuxer / corrupted stream errors default to decode failure, not unsupported
+              message = 'Audio decode failed. The audio codec or file may be corrupted.';
             }
             break;
+          }
           default:
             message = err.message || 'Unable to play this audio file.';
             break;
