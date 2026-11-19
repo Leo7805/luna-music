@@ -28,15 +28,15 @@ export function useMusicLibrary() {
 
   const flatPlaylist = useMemo(() => library?.flatPlaylist || [], [library?.flatPlaylist]);
 
-  // Domain 1: Navigation
-  const navigation = useLibraryNavigation(library);
+  // Aggregate albums & artists
+  const albums = useMemo(() => deriveAlbums(flatPlaylist), [flatPlaylist]);
+  const artists = useMemo(() => deriveArtists(flatPlaylist), [flatPlaylist]);
+
+  // Domain 1: Navigation (restores tab-scoped state)
+  const navigation = useLibraryNavigation(library, { albums, artists });
 
   // Domain 2: Favourites
   const favouritesManager = useLibraryFavourites({ flatPlaylist });
-
-  // Domain 3: Aggregate albums & artists
-  const albums = useMemo(() => deriveAlbums(flatPlaylist), [flatPlaylist]);
-  const artists = useMemo(() => deriveArtists(flatPlaylist), [flatPlaylist]);
 
   // Domain 4: Displayed tracks derived selector
   const displayedTracks = useMemo(

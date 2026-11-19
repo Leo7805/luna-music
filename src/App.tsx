@@ -58,8 +58,11 @@ export function App() {
       if (view === 'folder' && library.currentView === 'folder') {
         library.selectFolder('');
       }
+      if (view === 'playlists' && library.currentView === 'playlists') {
+        playlists.selectPlaylist(null);
+      }
     },
-    [library]
+    [library, playlists]
   );
 
   // Compute breadcrumbs for folder view

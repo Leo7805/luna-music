@@ -1,22 +1,39 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Playlist, TrackItem, PlaylistTrackReference } from '../types/music';
 import { getStoredPlaylists, storePlaylists } from '../services/idbStorage';
+import { getStoredNavigation, storeNavigation } from '../utils/navigationStorage';
 
 export function usePlaylists() {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(
+    () => getStoredNavigation()?.selectedPlaylistId || null
+  );
+  const [isLoaded, setIsLoaded] = useState(false);
 
   // Load playlists on mount
   useEffect(() => {
     let isMounted = true;
     getStoredPlaylists().then((stored) => {
-      if (isMounted && stored) {
-        setPlaylists(stored);
+      if (isMounted) {
+        if (stored) setPlaylists(stored);
+        setIsLoaded(true);
       }
     });
-    return () => {
-      isMounted = false;
-    };
+    return () => { isMounted = false; };
+  }, []);
+
+  // Fallback if stored selected playlist does not exist once playlists are loaded
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (selectedPlaylistId && !playlists.some((p) => p.id === selectedPlaylistId)) {
+      setSelectedPlaylistId(null);
+      storeNavigation({ selectedPlaylistId: null });
+    }
+  }, [isLoaded, selectedPlaylistId, playlists]);
+
+  const selectPlaylist = useCallback((id: string | null) => {
+    setSelectedPlaylistId(id);
+    storeNavigation({ selectedPlaylistId: id });
   }, []);
 
   const selectedPlaylist = useMemo(() => {
@@ -48,13 +65,7 @@ export function usePlaylists() {
       }
     }
 
-    const newPlaylist: Playlist = {
-      id,
-      name: trimmed,
-      tracks: trackRefs,
-      createdAt: now,
-      updatedAt: now,
-    };
+    const newPlaylist: Playlist = { id, name: trimmed, tracks: trackRefs, createdAt: now, updatedAt: now };
 
     setPlaylists((prev) => {
       const next = [...prev, newPlaylist];
@@ -87,7 +98,13 @@ export function usePlaylists() {
       return next;
     });
 
-    setSelectedPlaylistId((prev) => (prev === playlistId ? null : prev));
+    setSelectedPlaylistId((prev) => {
+      if (prev === playlistId) {
+        storeNavigation({ selectedPlaylistId: null });
+        return null;
+      }
+      return prev;
+    });
   }, []);
 
   // Add track to playlist (prevents duplicates by default)
@@ -189,17 +206,12 @@ export function usePlaylists() {
       setPlaylists((prev) => {
         const next = prev.map((p) => {
           if (p.id !== playlistId) return p;
-
-          let newTracks: PlaylistTrackReference[];
-          if (index !== undefined && index >= 0 && index < p.tracks.length) {
-            newTracks = p.tracks.filter((_, idx) => idx !== index);
-          } else {
-            newTracks = p.tracks.filter((ref) => ref.trackId !== trackId);
-          }
-
+          const newTracks =
+            index !== undefined && index >= 0 && index < p.tracks.length
+              ? p.tracks.filter((_, idx) => idx !== index)
+              : p.tracks.filter((ref) => ref.trackId !== trackId);
           return { ...p, tracks: newTracks, updatedAt: Date.now() };
         });
-
         storePlaylists(next);
         return next;
       });
@@ -219,7 +231,6 @@ export function usePlaylists() {
           const newTracks = p.tracks.filter((ref) => !targetIds.has(ref.trackId));
           return { ...p, tracks: newTracks, updatedAt: Date.now() };
         });
-
         storePlaylists(next);
         return next;
       });
@@ -262,10 +273,10 @@ export function usePlaylists() {
   const saveQueueAsPlaylist = useCallback(
     (name: string, queueTracks: TrackItem[]): Playlist => {
       const pl = createPlaylist(name, queueTracks);
-      setSelectedPlaylistId(pl.id);
+      selectPlaylist(pl.id);
       return pl;
     },
-    [createPlaylist]
+    [createPlaylist, selectPlaylist]
   );
 
   return {
@@ -281,7 +292,7 @@ export function usePlaylists() {
     removeTracksFromPlaylist,
     reorderPlaylistTracks,
     saveQueueAsPlaylist,
-    selectPlaylist: setSelectedPlaylistId,
+    selectPlaylist,
     setPlaylists,
   };
 }
