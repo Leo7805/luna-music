@@ -123,3 +123,20 @@ export interface StoredPlaybackState {
   lastPosition: number;
   favourites: string[];
 }
+
+export interface PlaylistTrackReference {
+  trackId: string;
+  name: string;
+  artist?: string;
+  album?: string;
+  duration?: number;
+  addedAt: number;
+}
+
+export interface Playlist {
+  id: string; // e.g. "pl_<timestamp>_<random>"
+  name: string;
+  tracks: PlaylistTrackReference[];
+  createdAt: number;
+  updatedAt: number;
+}

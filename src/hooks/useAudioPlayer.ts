@@ -46,14 +46,15 @@ export function useAudioPlayer({
     primary: 'rgba(56, 189, 248, 0.15)',
     glow: 'rgba(99, 102, 241, 0.12)',
   });
+  const [queue, setQueue] = useState<TrackItem[]>(() => playlist || []);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeUrlRef = useRef<string | null>(null);
   const currentTrackRef = useRef<TrackItem | null>(null);
   currentTrackRef.current = currentTrack;
   const pendingSeekRef = useRef<number | null>(initialPosition > 0 ? initialPosition : null);
-  const playlistRef = useRef<TrackItem[]>(playlist);
-  playlistRef.current = playlist;
+  const queueRef = useRef<TrackItem[]>(queue);
+  queueRef.current = queue;
   const onTrackStatusChangedRef = useRef(onTrackStatusChanged);
   onTrackStatusChangedRef.current = onTrackStatusChanged;
   const loadRequestIdRef = useRef<number>(0);
@@ -66,15 +67,23 @@ export function useAudioPlayer({
     audioRef.current = audio;
   }
 
-  // Restore initial track on first playlist load without auto-initiating playback
+  // Populate queue on first load if queue is empty and playlist is supplied
   useEffect(() => {
-    if (!currentTrack && playlist.length > 0) {
-      const match = initialTrackId ? playlist.find((t) => t.id === initialTrackId) : null;
+    if (queue.length === 0 && playlist.length > 0) {
+      setQueue(playlist);
+      queueRef.current = playlist;
+    }
+  }, [playlist, queue.length]);
+
+  // Restore initial track on first load without auto-initiating playback
+  useEffect(() => {
+    if (!currentTrack && queue.length > 0) {
+      const match = initialTrackId ? queue.find((t) => t.id === initialTrackId) : null;
       if (match) {
         setCurrentTrack(match);
       }
     }
-  }, [playlist, initialTrackId, currentTrack]);
+  }, [queue, initialTrackId, currentTrack]);
 
   // Handle ambient color updates when track artwork changes
   useEffect(() => {
@@ -273,14 +282,118 @@ export function useAudioPlayer({
     }
   }, []);
 
-  // Play a specific track
+  // Play a specific track, optionally providing a new playback queue
   const playTrack = useCallback(
-    (track: TrackItem, autoPlay = true) => {
+    (track: TrackItem, newQueue?: TrackItem[], autoPlay = true) => {
+      if (newQueue && newQueue.length > 0) {
+        setQueue(newQueue);
+        queueRef.current = newQueue;
+      } else if (!queueRef.current.some((t) => t.id === track.id)) {
+        const nextQ = [...queueRef.current, track];
+        setQueue(nextQ);
+        queueRef.current = nextQ;
+      }
       setCurrentTrack(track);
       loadAudioSource(track, autoPlay);
     },
     [loadAudioSource]
   );
+
+  // Play an entire queue starting from startIndex or 0
+  const playQueue = useCallback(
+    (tracks: TrackItem[], startIndex = 0, autoPlay = true) => {
+      if (tracks.length === 0) return;
+      setQueue(tracks);
+      queueRef.current = tracks;
+      const target = tracks[startIndex] || tracks[0];
+      setCurrentTrack(target);
+      loadAudioSource(target, autoPlay);
+    },
+    [loadAudioSource]
+  );
+
+  // Insert track immediately after currentTrack in queue (Play Next)
+  const playNext = useCallback(
+    (track: TrackItem) => {
+      if (!currentTrackRef.current) {
+        playTrack(track, [track], true);
+        return;
+      }
+      setQueue((prevQueue) => {
+        const curIdx = prevQueue.findIndex((t) => t.id === currentTrackRef.current?.id);
+        const nextQueue = [...prevQueue];
+        if (curIdx >= 0) {
+          nextQueue.splice(curIdx + 1, 0, track);
+        } else {
+          nextQueue.push(track);
+        }
+        queueRef.current = nextQueue;
+        return nextQueue;
+      });
+    },
+    [playTrack]
+  );
+
+  // Append track(s) to end of queue (Add to Queue)
+  const addToQueue = useCallback(
+    (trackOrTracks: TrackItem | TrackItem[]) => {
+      const incoming = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
+      if (incoming.length === 0) return;
+
+      if (!currentTrackRef.current && queueRef.current.length === 0) {
+        playTrack(incoming[0], incoming, true);
+        return;
+      }
+
+      setQueue((prevQueue) => {
+        const nextQueue = [...prevQueue, ...incoming];
+        queueRef.current = nextQueue;
+        return nextQueue;
+      });
+    },
+    [playTrack]
+  );
+
+  // Remove track at index from queue
+  const removeFromQueue = useCallback((index: number) => {
+    setQueue((prevQueue) => {
+      if (index < 0 || index >= prevQueue.length) return prevQueue;
+      const nextQueue = prevQueue.filter((_, idx) => idx !== index);
+      queueRef.current = nextQueue;
+      return nextQueue;
+    });
+  }, []);
+
+  // Clear upcoming items in queue (preserving current track)
+  const clearQueue = useCallback(() => {
+    if (currentTrackRef.current) {
+      setQueue([currentTrackRef.current]);
+      queueRef.current = [currentTrackRef.current];
+    } else {
+      setQueue([]);
+      queueRef.current = [];
+    }
+  }, []);
+
+  // Reorder queue items
+  const reorderQueue = useCallback((fromIndex: number, toIndex: number) => {
+    setQueue((prevQueue) => {
+      if (
+        fromIndex < 0 ||
+        fromIndex >= prevQueue.length ||
+        toIndex < 0 ||
+        toIndex >= prevQueue.length ||
+        fromIndex === toIndex
+      ) {
+        return prevQueue;
+      }
+      const nextQueue = [...prevQueue];
+      const [moved] = nextQueue.splice(fromIndex, 1);
+      nextQueue.splice(toIndex, 0, moved);
+      queueRef.current = nextQueue;
+      return nextQueue;
+    });
+  }, []);
 
   // Toggle play/pause
   const togglePlay = useCallback(() => {
@@ -288,15 +401,15 @@ export function useAudioPlayer({
     if (!audio) return;
 
     if (!currentTrack) {
-      if (playlistRef.current.length > 0) {
-        playTrack(playlistRef.current[0], true);
+      if (queueRef.current.length > 0) {
+        playTrack(queueRef.current[0], undefined, true);
       }
       return;
     }
 
     // If track is selected but audio source hasn't loaded yet
     if (!activeUrlRef.current && currentTrack) {
-      playTrack(currentTrack, true);
+      playTrack(currentTrack, undefined, true);
       return;
     }
 
@@ -311,13 +424,13 @@ export function useAudioPlayer({
     }
   }, [currentTrack, playTrack]);
 
-  // Advance to next track
+  // Advance to next track in queue
   const nextTrack = useCallback(() => {
-    const currentList = playlistRef.current;
+    const currentList = queueRef.current;
     if (currentList.length === 0) return;
 
     if (!currentTrack) {
-      playTrack(currentList[0], true);
+      playTrack(currentList[0], undefined, true);
       return;
     }
 
@@ -329,25 +442,25 @@ export function useAudioPlayer({
         otherIndices.length > 0
           ? otherIndices[Math.floor(Math.random() * otherIndices.length)]
           : 0;
-      playTrack(currentList[nextIndex], true);
+      playTrack(currentList[nextIndex], undefined, true);
       return;
     }
 
     const currentIndex = currentList.findIndex((t) => t.id === currentTrack.id);
     if (currentIndex === -1 || currentIndex === currentList.length - 1) {
       if (repeatMode === 'all') {
-        playTrack(currentList[0], true);
+        playTrack(currentList[0], undefined, true);
       } else {
         setIsPlaying(false);
       }
     } else {
-      playTrack(currentList[currentIndex + 1], true);
+      playTrack(currentList[currentIndex + 1], undefined, true);
     }
   }, [currentTrack, shuffle, repeatMode, playTrack]);
 
-  // Return to previous track
+  // Return to previous track in queue
   const prevTrack = useCallback(() => {
-    const currentList = playlistRef.current;
+    const currentList = queueRef.current;
     if (currentList.length === 0) return;
 
     const audio = audioRef.current;
@@ -357,15 +470,15 @@ export function useAudioPlayer({
     }
 
     if (!currentTrack) {
-      playTrack(currentList[0], true);
+      playTrack(currentList[0], undefined, true);
       return;
     }
 
     const currentIndex = currentList.findIndex((t) => t.id === currentTrack.id);
     if (currentIndex > 0) {
-      playTrack(currentList[currentIndex - 1], true);
+      playTrack(currentList[currentIndex - 1], undefined, true);
     } else if (repeatMode === 'all') {
-      playTrack(currentList[currentList.length - 1], true);
+      playTrack(currentList[currentList.length - 1], undefined, true);
     } else {
       if (audio) audio.currentTime = 0;
     }
@@ -593,7 +706,14 @@ export function useAudioPlayer({
     clearPlaybackError,
     lyrics,
     ambientColors,
+    queue,
     playTrack,
+    playQueue,
+    playNext,
+    addToQueue,
+    removeFromQueue,
+    clearQueue,
+    reorderQueue,
     togglePlay,
     nextTrack,
     prevTrack,

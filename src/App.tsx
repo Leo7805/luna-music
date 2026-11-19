@@ -14,15 +14,30 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { ErrorToast } from './components/ErrorToast';
 import { useMusicLibrary } from './hooks/useMusicLibrary';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
+import { usePlaylists } from './hooks/usePlaylists';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
-import { getBreadcrumbs } from './utils/musicTree';
-import { LibraryView } from './types/music';
+import { getBreadcrumbs, resolvePlaylistTracks } from './utils/musicTree';
+import { LibraryView, TrackItem } from './types/music';
 
 export function App() {
   const { theme, toggleTheme } = useTheme();
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState<boolean>(true);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
+
+  // Playlists state and actions
+  const {
+    playlists,
+    selectedPlaylistId,
+    createPlaylist,
+    renamePlaylist,
+    deletePlaylist,
+    addTrackToPlaylist,
+    removeTrackFromPlaylist,
+    reorderPlaylistTracks,
+    saveQueueAsPlaylist,
+    selectPlaylist,
+  } = usePlaylists();
 
   // Music Library state and actions
   const {
@@ -71,7 +86,13 @@ export function App() {
     clearPlaybackError,
     lyrics,
     ambientColors,
+    queue,
     playTrack,
+    playQueue,
+    playNext,
+    addToQueue,
+    removeFromQueue,
+    clearQueue,
     togglePlay,
     nextTrack,
     prevTrack,
@@ -155,9 +176,11 @@ export function App() {
 
   const viewSubtitle = useMemo(() => {
     if (!hasLibrary) return '';
-    if (currentView === 'playlists') return '0 playlists';
+    if (currentView === 'playlists') {
+      return `${playlists.length} ${playlists.length === 1 ? 'playlist' : 'playlists'}`;
+    }
     return `${displayedTracks.length} ${displayedTracks.length === 1 ? 'track' : 'tracks'}`;
-  }, [hasLibrary, currentView, displayedTracks.length]);
+  }, [hasLibrary, currentView, displayedTracks.length, playlists.length]);
 
   return (
     <div
@@ -193,6 +216,8 @@ export function App() {
           selectedFolderPath={selectedFolderPath}
           folderTree={library?.tree || null}
           folders={folders}
+          playlists={playlists}
+          selectedPlaylistId={selectedPlaylistId}
           favouritesCount={favourites.size}
           totalTracksCount={library?.flatPlaylist.length || 0}
           hasLibrary={hasLibrary}
@@ -200,6 +225,10 @@ export function App() {
           scanCount={scanProgress}
           onSelectView={handleSelectView}
           onSelectFolder={selectFolder}
+          onSelectPlaylist={selectPlaylist}
+          onCreatePlaylist={createPlaylist}
+          onRenamePlaylist={renamePlaylist}
+          onDeletePlaylist={deletePlaylist}
           onOpenFolder={openFolderPicker}
           onRefreshFolder={refreshFolder}
           onRemoveFolder={removeFolder}
@@ -249,9 +278,13 @@ export function App() {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}
+                    playlists={playlists}
                     onPlayTrack={playTrack}
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
+                    onPlayNext={playNext}
+                    onAddToQueue={addToQueue}
+                    onAddToPlaylist={addTrackToPlaylist}
                   />
                 )}
 
@@ -261,14 +294,42 @@ export function App() {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}
+                    playlists={playlists}
                     onPlayTrack={playTrack}
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
+                    onPlayNext={playNext}
+                    onAddToQueue={addToQueue}
+                    onAddToPlaylist={addTrackToPlaylist}
                   />
                 )}
 
                 {currentView === 'playlists' && (
-                  <PlaylistsView />
+                  <PlaylistsView
+                    playlists={playlists}
+                    selectedPlaylistId={selectedPlaylistId}
+                    libraryTracks={library?.flatPlaylist || []}
+                    currentTrackId={currentTrack?.id}
+                    isPlaying={isPlaying}
+                    favourites={favourites}
+                    onSelectPlaylist={selectPlaylist}
+                    onCreatePlaylist={createPlaylist}
+                    onRenamePlaylist={renamePlaylist}
+                    onDeletePlaylist={deletePlaylist}
+                    onPlayPlaylist={(pl, startIndex, shuffle) => {
+                      const resolved = resolvePlaylistTracks(pl.tracks, library?.flatPlaylist || []);
+                      if (resolved.length === 0) return;
+                      playQueue(resolved, startIndex, shuffle);
+                    }}
+                    onPlayTrack={playTrack}
+                    onTogglePlay={togglePlay}
+                    onToggleFavourite={toggleFavourite}
+                    onPlayNext={playNext}
+                    onAddToQueue={addToQueue}
+                    onAddToPlaylist={addTrackToPlaylist}
+                    onRemoveTrackFromPlaylist={removeTrackFromPlaylist}
+                    onReorderPlaylistTracks={reorderPlaylistTracks}
+                  />
                 )}
 
                 {currentView === 'folder' && (
@@ -277,10 +338,14 @@ export function App() {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}
+                    playlists={playlists}
                     onSelectFolder={selectFolder}
                     onPlayTrack={playTrack}
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
+                    onPlayNext={playNext}
+                    onAddToQueue={addToQueue}
+                    onAddToPlaylist={addTrackToPlaylist}
                   />
                 )}
 
@@ -291,10 +356,14 @@ export function App() {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}
+                    playlists={playlists}
                     onSelectAlbum={selectAlbum}
                     onPlayTrack={playTrack}
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
+                    onPlayNext={playNext}
+                    onAddToQueue={addToQueue}
+                    onAddToPlaylist={addTrackToPlaylist}
                   />
                 )}
 
@@ -305,10 +374,14 @@ export function App() {
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}
+                    playlists={playlists}
                     onSelectArtist={selectArtist}
                     onPlayTrack={playTrack}
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
+                    onPlayNext={playNext}
+                    onAddToQueue={addToQueue}
+                    onAddToPlaylist={addTrackToPlaylist}
                   />
                 )}
               </>
@@ -323,8 +396,13 @@ export function App() {
           lyrics={lyrics}
           ambientColors={ambientColors}
           isOpen={isNowPlayingOpen}
+          queue={queue}
           onClose={() => setIsNowPlayingOpen(false)}
           onSeekTo={seekTo}
+          onPlayTrack={(track: TrackItem) => playTrack(track, queue)}
+          onRemoveFromQueue={removeFromQueue}
+          onClearQueue={clearQueue}
+          onSaveQueueAsPlaylist={(name) => saveQueueAsPlaylist(name, queue)}
         />
       </div>
 

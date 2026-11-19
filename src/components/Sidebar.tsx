@@ -15,16 +15,21 @@ import {
   Key,
   Loader2,
   ListMusic,
+  Plus,
+  Edit2,
 } from 'lucide-react';
-import { FolderNode, ImportedFolder, LibraryView } from '../types/music';
+import { FolderNode, ImportedFolder, LibraryView, Playlist } from '../types/music';
 import { OpenMusicControl } from './OpenMusicControl';
 import { ConfirmModal } from './ConfirmModal';
+import { PlaylistModal } from './PlaylistModal';
 
 interface SidebarProps {
   currentView: LibraryView;
   selectedFolderPath: string;
   folderTree?: FolderNode | null;
   folders?: ImportedFolder[];
+  playlists?: Playlist[];
+  selectedPlaylistId?: string | null;
   favouritesCount: number;
   totalTracksCount: number;
   hasLibrary: boolean;
@@ -32,6 +37,10 @@ interface SidebarProps {
   scanCount?: number;
   onSelectView: (view: LibraryView) => void;
   onSelectFolder: (path: string) => void;
+  onSelectPlaylist?: (playlistId: string | null) => void;
+  onCreatePlaylist?: (name: string) => void;
+  onRenamePlaylist?: (id: string, newName: string) => void;
+  onDeletePlaylist?: (id: string) => void;
   onOpenFolder: () => void;
   onRefreshFolder?: (folderId: string) => void;
   onRemoveFolder?: (folderId: string) => void;
@@ -45,6 +54,8 @@ export function Sidebar({
   selectedFolderPath,
   folderTree,
   folders = [],
+  playlists = [],
+  selectedPlaylistId,
   favouritesCount,
   totalTracksCount,
   hasLibrary,
@@ -52,6 +63,10 @@ export function Sidebar({
   scanCount,
   onSelectView,
   onSelectFolder,
+  onSelectPlaylist,
+  onCreatePlaylist,
+  onRenamePlaylist,
+  onDeletePlaylist,
   onOpenFolder,
   onRefreshFolder,
   onRemoveFolder,
@@ -62,20 +77,32 @@ export function Sidebar({
   const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<ImportedFolder | null>(null);
 
+  const [activeMenuPlaylistId, setActiveMenuPlaylistId] = useState<string | null>(null);
+  const [playlistModal, setPlaylistModal] = useState<{
+    isOpen: boolean;
+    mode: 'create' | 'rename';
+    playlist?: Playlist;
+  }>({ isOpen: false, mode: 'create' });
+  const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
+
   // Close context menu on outside click or escape
   useEffect(() => {
-    if (!activeMenuFolderId) return;
+    if (!activeMenuFolderId && !activeMenuPlaylistId) return;
 
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
       if (!target.closest('[data-folder-menu]')) {
         setActiveMenuFolderId(null);
       }
+      if (!target.closest('[data-playlist-menu]')) {
+        setActiveMenuPlaylistId(null);
+      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setActiveMenuFolderId(null);
+        setActiveMenuPlaylistId(null);
       }
     };
 
@@ -85,13 +112,20 @@ export function Sidebar({
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [activeMenuFolderId]);
+  }, [activeMenuFolderId, activeMenuPlaylistId]);
 
   const handleConfirmRemove = () => {
     if (folderToRemove && onRemoveFolder) {
       onRemoveFolder(folderToRemove.id);
     }
     setFolderToRemove(null);
+  };
+
+  const handleConfirmDeletePlaylist = () => {
+    if (playlistToDelete && onDeletePlaylist) {
+      onDeletePlaylist(playlistToDelete.id);
+    }
+    setPlaylistToDelete(null);
   };
 
   return (
@@ -163,6 +197,11 @@ export function Sidebar({
             <ListMusic className="w-4 h-4 text-amber-500 dark:text-amber-400" />
             <span>Playlists</span>
           </div>
+          {playlists.length > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-200 dark:bg-white/[0.06] text-slate-600 dark:text-slate-400">
+              {playlists.length}
+            </span>
+          )}
         </button>
 
         {/* 4. Albums */}
@@ -275,15 +314,121 @@ export function Sidebar({
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
               My Playlists
             </span>
+            <button
+              type="button"
+              onClick={() => setPlaylistModal({ isOpen: true, mode: 'create' })}
+              title="Create Playlist"
+              aria-label="Create Playlist"
+              className="p-1 rounded-lg hover:bg-slate-200/80 dark:hover:bg-white/[0.08] text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Clean Empty State */}
-          <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 text-center text-slate-400 dark:text-slate-500">
-            <ListMusic className="w-8 h-8 mx-auto mb-2 opacity-40 text-amber-500" />
-            <p className="text-xs font-medium text-slate-600 dark:text-slate-400">No playlists yet</p>
-            <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 max-w-[180px] leading-relaxed">
-              Playlists will be available in an upcoming update
-            </p>
+          {/* Playlist List or Clean Empty State */}
+          <div className="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar text-sm space-y-0.5">
+            {playlists.length > 0 ? (
+              playlists.map((pl) => (
+                <div
+                  key={pl.id}
+                  className="select-none relative"
+                  data-testid={`sidebar-playlist-${pl.id}`}
+                >
+                  <div
+                    className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer transition-all ${
+                      selectedPlaylistId === pl.id
+                        ? 'bg-indigo-600/20 dark:bg-indigo-600/25 text-indigo-700 dark:text-white font-medium border border-indigo-500/30 shadow-sm'
+                        : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+                    }`}
+                    onClick={() => {
+                      onSelectView('playlists');
+                      onSelectPlaylist?.(pl.id);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <ListMusic className="w-3.5 h-3.5 shrink-0 text-amber-500 dark:text-amber-400" />
+                      <span className="truncate text-xs font-medium" title={pl.name}>
+                        {pl.name}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                      <span className="text-[10px] text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/[0.04] shrink-0">
+                        {pl.tracks.length}
+                      </span>
+
+                      <div className="relative" data-playlist-menu>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveMenuPlaylistId((prev) => (prev === pl.id ? null : pl.id));
+                          }}
+                          aria-label={`Options for ${pl.name}`}
+                          title="Playlist options"
+                          className={`p-1 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity cursor-pointer ${
+                            activeMenuPlaylistId === pl.id
+                              ? 'opacity-100 bg-slate-300/60 dark:bg-white/[0.1]'
+                              : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
+                          }`}
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+
+                        {activeMenuPlaylistId === pl.id && (
+                          <div
+                            className="absolute right-0 top-full mt-1 w-36 py-1 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-white/[0.08] z-50 text-xs animate-fade-in"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuPlaylistId(null);
+                                setPlaylistModal({ isOpen: true, mode: 'rename', playlist: pl });
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                            >
+                              <Edit2 className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Rename</span>
+                            </button>
+                            <div className="my-1 border-t border-slate-100 dark:border-white/[0.06]" />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveMenuPlaylistId(null);
+                                setPlaylistToDelete(pl);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 text-center text-slate-400 dark:text-slate-500">
+                <ListMusic className="w-8 h-8 mx-auto mb-2 opacity-40 text-amber-500" />
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-400">No playlists yet</p>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1 max-w-[180px] leading-relaxed">
+                  Create a playlist to organize your favorite tracks
+                </p>
+                {onCreatePlaylist && (
+                  <button
+                    type="button"
+                    onClick={() => setPlaylistModal({ isOpen: true, mode: 'create' })}
+                    className="mt-3 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Create Playlist</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -322,6 +467,37 @@ export function Sidebar({
         isDanger={true}
         onConfirm={handleConfirmRemove}
         onCancel={() => setFolderToRemove(null)}
+      />
+
+      {/* Playlist Deletion Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(playlistToDelete)}
+        title="Delete Playlist"
+        message={
+          playlistToDelete
+            ? `Are you sure you want to delete the playlist "${playlistToDelete.name}"? Audio files will remain in your library.`
+            : ''
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        isDanger={true}
+        onConfirm={handleConfirmDeletePlaylist}
+        onCancel={() => setPlaylistToDelete(null)}
+      />
+
+      {/* Playlist Create/Rename Modal */}
+      <PlaylistModal
+        isOpen={playlistModal.isOpen}
+        mode={playlistModal.mode}
+        initialName={playlistModal.playlist ? playlistModal.playlist.name : ''}
+        onClose={() => setPlaylistModal({ isOpen: false, mode: 'create' })}
+        onSubmitName={(name) => {
+          if (playlistModal.mode === 'create') {
+            onCreatePlaylist?.(name);
+          } else if (playlistModal.mode === 'rename' && playlistModal.playlist) {
+            onRenamePlaylist?.(playlistModal.playlist.id, name);
+          }
+        }}
       />
     </aside>
   );

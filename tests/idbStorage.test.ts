@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
-import { getStoredPlaybackState, storePlaybackState } from '../src/services/idbStorage';
+import {
+  getStoredPlaybackState,
+  storePlaybackState,
+  getStoredPlaylists,
+  storePlaylists,
+} from '../src/services/idbStorage';
+import { Playlist } from '../src/types/music';
 
 const createLocalStorageMock = () => {
   let store: Record<string, string> = {};
@@ -91,5 +97,28 @@ describe('idbStorage preferences', () => {
     expect(res2.migrated).toBe(false);
     expect(res2.folders).toHaveLength(1);
     expect(res2.folders[0].id).toBe('fsa_legacy');
+  });
+
+  it('stores and retrieves user playlists via localStorage cache and IDB fallback', async () => {
+    const empty = await getStoredPlaylists();
+    expect(empty).toEqual([]);
+
+    const mockPlaylists: Playlist[] = [
+      {
+        id: 'pl_test_1',
+        name: 'Chill Vibes',
+        tracks: [
+          { trackId: 'track_1', name: 'Song 1.mp3', artist: 'Artist 1', addedAt: 100 },
+          { trackId: 'track_2', name: 'Song 2.flac', artist: 'Artist 2', addedAt: 200 },
+        ],
+        createdAt: 1000,
+        updatedAt: 2000,
+      },
+    ];
+
+    await storePlaylists(mockPlaylists);
+    const retrieved = await getStoredPlaylists();
+    expect(retrieved).toEqual(mockPlaylists);
+    expect(retrieved[0].tracks).toHaveLength(2);
   });
 });

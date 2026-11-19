@@ -1,6 +1,6 @@
 import React from 'react';
 import { Play, ArrowLeft, Mic2, User } from 'lucide-react';
-import { ArtistGroup, TrackItem } from '../types/music';
+import { ArtistGroup, Playlist, TrackItem } from '../types/music';
 import { TrackList } from './TrackList';
 import { formatDuration } from '../utils/formatters';
 
@@ -10,10 +10,14 @@ interface ArtistsViewProps {
   currentTrackId?: string | null;
   isPlaying: boolean;
   favourites: Set<string>;
+  playlists?: Playlist[];
   onSelectArtist: (artistName: string | null) => void;
   onPlayTrack: (track: TrackItem) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
+  onPlayNext?: (track: TrackItem) => void;
+  onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => void;
+  onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
 }
 
 export const ArtistsView: React.FC<ArtistsViewProps> = ({
@@ -22,10 +26,14 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
   currentTrackId,
   isPlaying,
   favourites,
+  playlists,
   onSelectArtist,
   onPlayTrack,
   onTogglePlay,
   onToggleFavourite,
+  onPlayNext,
+  onAddToQueue,
+  onAddToPlaylist,
 }) => {
   const selectedArtist = selectedArtistName
     ? artists.find((a) => a.name === selectedArtistName)
@@ -94,9 +102,13 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
           currentTrackId={currentTrackId}
           isPlaying={isPlaying}
           favourites={favourites}
+          playlists={playlists}
           onPlayTrack={onPlayTrack}
           onTogglePlay={onTogglePlay}
           onToggleFavourite={onToggleFavourite}
+          onPlayNext={onPlayNext}
+          onAddToQueue={onAddToQueue}
+          onAddToPlaylist={onAddToPlaylist}
         />
       </div>
     );

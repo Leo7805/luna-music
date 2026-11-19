@@ -1,6 +1,6 @@
 import React from 'react';
 import { Folder, ArrowUpLeft } from 'lucide-react';
-import { FolderNode, TrackItem } from '../types/music';
+import { FolderNode, Playlist, TrackItem } from '../types/music';
 import { TrackList } from './TrackList';
 
 interface FolderViewProps {
@@ -8,10 +8,14 @@ interface FolderViewProps {
   currentTrackId?: string | null;
   isPlaying: boolean;
   favourites: Set<string>;
+  playlists?: Playlist[];
   onSelectFolder: (path: string) => void;
   onPlayTrack: (track: TrackItem) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
+  onPlayNext?: (track: TrackItem) => void;
+  onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => void;
+  onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
 }
 
 export const FolderView: React.FC<FolderViewProps> = ({
@@ -19,10 +23,14 @@ export const FolderView: React.FC<FolderViewProps> = ({
   currentTrackId,
   isPlaying,
   favourites,
+  playlists,
   onSelectFolder,
   onPlayTrack,
   onTogglePlay,
   onToggleFavourite,
+  onPlayNext,
+  onAddToQueue,
+  onAddToPlaylist,
 }) => {
   if (!currentNode) {
     return (
@@ -99,9 +107,13 @@ export const FolderView: React.FC<FolderViewProps> = ({
           currentTrackId={currentTrackId}
           isPlaying={isPlaying}
           favourites={favourites}
+          playlists={playlists}
           onPlayTrack={onPlayTrack}
           onTogglePlay={onTogglePlay}
           onToggleFavourite={onToggleFavourite}
+          onPlayNext={onPlayNext}
+          onAddToQueue={onAddToQueue}
+          onAddToPlaylist={onAddToPlaylist}
         />
       </div>
     </div>

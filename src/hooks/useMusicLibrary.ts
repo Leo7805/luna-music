@@ -22,6 +22,8 @@ import {
   getStoredRegisteredFolders,
   storePlaybackState,
   getStoredPlaybackState,
+  getStoredPlaylists,
+  storePlaylists,
 } from '../services/idbStorage';
 import {
   findFolderNodeByPath,
@@ -631,6 +633,29 @@ export function useMusicLibrary() {
           }
           storePlaybackState({ favourites: Array.from(next) });
           return next;
+        });
+
+        // Migrate stored playlist track references
+        getStoredPlaylists().then((storedPlaylists) => {
+          let playlistsChanged = false;
+          const updated = storedPlaylists.map((pl) => {
+            let changed = false;
+            const newTracks = pl.tracks.map((ref) => {
+              if (idMigrations.has(ref.trackId)) {
+                changed = true;
+                return { ...ref, trackId: idMigrations.get(ref.trackId)! };
+              }
+              return ref;
+            });
+            if (changed) {
+              playlistsChanged = true;
+              return { ...pl, tracks: newTracks, updatedAt: Date.now() };
+            }
+            return pl;
+          });
+          if (playlistsChanged) {
+            storePlaylists(updated);
+          }
         });
       }
 
