@@ -3,7 +3,13 @@ import { TrackItem, RepeatMode, LrcLine, FileStatus } from '../types/music';
 import { parseLrc } from '../utils/lrcParser';
 import { extractDominantColor } from '../utils/colorExtractor';
 import { extractAudioMetadata } from '../utils/metadata';
-import { isFormatSupportedByBrowser } from '../utils/musicTree';
+import {
+  isFormatSupportedByBrowser,
+  isSameTrack,
+  applyPlayNext,
+  applyAddToQueue,
+  getNextTrackToPlay,
+} from '../utils/musicTree';
 import { storePlaybackState } from '../services/idbStorage';
 
 interface UseAudioPlayerProps {
@@ -58,6 +64,7 @@ export function useAudioPlayer({
   const onTrackStatusChangedRef = useRef(onTrackStatusChanged);
   onTrackStatusChangedRef.current = onTrackStatusChanged;
   const loadRequestIdRef = useRef<number>(0);
+  const playNextTrackIdRef = useRef<string | null>(null);
 
   // Initialize native HTMLAudioElement without assigning invalid empty src
   if (!audioRef.current && typeof Audio !== 'undefined') {
@@ -285,10 +292,11 @@ export function useAudioPlayer({
   // Play a specific track, optionally providing a new playback queue
   const playTrack = useCallback(
     (track: TrackItem, newQueue?: TrackItem[], autoPlay = true) => {
+      playNextTrackIdRef.current = null;
       if (newQueue && newQueue.length > 0) {
         setQueue(newQueue);
         queueRef.current = newQueue;
-      } else if (!queueRef.current.some((t) => t.id === track.id)) {
+      } else if (!queueRef.current.some((t) => isSameTrack(t, track))) {
         const nextQ = [...queueRef.current, track];
         setQueue(nextQ);
         queueRef.current = nextQ;
@@ -302,6 +310,7 @@ export function useAudioPlayer({
   // Play an entire queue starting from startIndex or 0
   const playQueue = useCallback(
     (tracks: TrackItem[], startIndex = 0, autoPlay = true) => {
+      playNextTrackIdRef.current = null;
       if (tracks.length === 0) return;
       setQueue(tracks);
       queueRef.current = tracks;
@@ -313,43 +322,61 @@ export function useAudioPlayer({
   );
 
   // Insert track immediately after currentTrack in queue (Play Next)
+  // - If already in upcoming queue, move existing occurrence to immediately after current track
+  // - If multiple duplicate occurrences already exist in upcoming queue, consolidate into one
+  // - If selected track is currently playing, allow one additional occurrence immediately after current track
+  // - Preserve relative order of unrelated tracks
   const playNext = useCallback(
-    (track: TrackItem) => {
-      if (!currentTrackRef.current) {
+    (track: TrackItem): 'added' | 'moved' => {
+      if (!currentTrackRef.current && queueRef.current.length === 0) {
         playTrack(track, [track], true);
-        return;
+        playNextTrackIdRef.current = null;
+        return 'added';
       }
-      setQueue((prevQueue) => {
-        const curIdx = prevQueue.findIndex((t) => t.id === currentTrackRef.current?.id);
-        const nextQueue = [...prevQueue];
-        if (curIdx >= 0) {
-          nextQueue.splice(curIdx + 1, 0, track);
-        } else {
-          nextQueue.push(track);
-        }
-        queueRef.current = nextQueue;
-        return nextQueue;
-      });
+
+      const { nextQueue, outcome } = applyPlayNext(
+        queueRef.current,
+        currentTrackRef.current,
+        track
+      );
+
+      setQueue(nextQueue);
+      queueRef.current = nextQueue;
+
+      // Override shuffle for the very next track
+      playNextTrackIdRef.current = track.id;
+      return outcome;
     },
     [playTrack]
   );
 
   // Append track(s) to end of queue (Add to Queue)
+  // - If track is already in upcoming queue, do not append another occurrence
+  // - If track is not in upcoming queue, append it normally
+  // - Return boolean indicating whether any track was added
   const addToQueue = useCallback(
-    (trackOrTracks: TrackItem | TrackItem[]) => {
+    (trackOrTracks: TrackItem | TrackItem[]): boolean => {
       const incoming = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
-      if (incoming.length === 0) return;
+      if (incoming.length === 0) return false;
 
       if (!currentTrackRef.current && queueRef.current.length === 0) {
         playTrack(incoming[0], incoming, true);
-        return;
+        return true;
       }
 
-      setQueue((prevQueue) => {
-        const nextQueue = [...prevQueue, ...incoming];
+      const { nextQueue, addedCount } = applyAddToQueue(
+        queueRef.current,
+        currentTrackRef.current,
+        incoming
+      );
+
+      if (addedCount > 0) {
+        setQueue(nextQueue);
         queueRef.current = nextQueue;
-        return nextQueue;
-      });
+        return true;
+      }
+
+      return false;
     },
     [playTrack]
   );
@@ -429,32 +456,22 @@ export function useAudioPlayer({
     const currentList = queueRef.current;
     if (currentList.length === 0) return;
 
-    if (!currentTrack) {
-      playTrack(currentList[0], undefined, true);
-      return;
+    const { nextTrack: targetTrack, shouldClearOverride } = getNextTrackToPlay(
+      currentList,
+      currentTrack,
+      shuffle,
+      repeatMode,
+      playNextTrackIdRef.current
+    );
+
+    if (shouldClearOverride) {
+      playNextTrackIdRef.current = null;
     }
 
-    if (shuffle) {
-      const otherIndices = currentList
-        .map((_, i) => i)
-        .filter((i) => currentList[i].id !== currentTrack.id);
-      const nextIndex =
-        otherIndices.length > 0
-          ? otherIndices[Math.floor(Math.random() * otherIndices.length)]
-          : 0;
-      playTrack(currentList[nextIndex], undefined, true);
-      return;
-    }
-
-    const currentIndex = currentList.findIndex((t) => t.id === currentTrack.id);
-    if (currentIndex === -1 || currentIndex === currentList.length - 1) {
-      if (repeatMode === 'all') {
-        playTrack(currentList[0], undefined, true);
-      } else {
-        setIsPlaying(false);
-      }
+    if (targetTrack) {
+      playTrack(targetTrack, undefined, true);
     } else {
-      playTrack(currentList[currentIndex + 1], undefined, true);
+      setIsPlaying(false);
     }
   }, [currentTrack, shuffle, repeatMode, playTrack]);
 
@@ -474,7 +491,7 @@ export function useAudioPlayer({
       return;
     }
 
-    const currentIndex = currentList.findIndex((t) => t.id === currentTrack.id);
+    const currentIndex = currentList.findIndex((t) => isSameTrack(t, currentTrack));
     if (currentIndex > 0) {
       playTrack(currentList[currentIndex - 1], undefined, true);
     } else if (repeatMode === 'all') {

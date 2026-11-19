@@ -33,8 +33,8 @@ interface PlaylistsViewProps {
   onPlayTrack: (track: TrackItem, queue?: TrackItem[]) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
-  onPlayNext?: (track: TrackItem) => void;
-  onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => void;
+  onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
+  onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => boolean | void;
   onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
   onRemoveTrackFromPlaylist: (playlistId: string, trackId: string, index?: number) => void;
   onReorderPlaylistTracks: (playlistId: string, fromIndex: number, toIndex: number) => void;

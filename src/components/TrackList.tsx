@@ -27,8 +27,8 @@ interface TrackListProps {
   onPlayTrack: (track: TrackItem) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
-  onPlayNext?: (track: TrackItem) => void;
-  onAddToQueue?: (track: TrackItem) => void;
+  onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
+  onAddToQueue?: (track: TrackItem) => boolean | void;
   onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
   onCreateAndAddToPlaylist?: (playlistName: string, track: TrackItem) => void;
   onRemoveFromPlaylist?: (trackId: string, index: number) => void;
@@ -324,8 +324,12 @@ export const TrackList: React.FC<TrackListProps> = ({
                           type="button"
                           onClick={() => {
                             setActiveMenuTrackId(null);
-                            onPlayNext(track);
-                            showToast('Added to play next');
+                            const res = onPlayNext(track);
+                            if (res === 'moved') {
+                              showToast('Moved to play next');
+                            } else {
+                              showToast('Added to play next');
+                            }
                           }}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                         >
@@ -339,8 +343,12 @@ export const TrackList: React.FC<TrackListProps> = ({
                           type="button"
                           onClick={() => {
                             setActiveMenuTrackId(null);
-                            onAddToQueue(track);
-                            showToast('Added to queue');
+                            const added = onAddToQueue(track);
+                            if (added === false) {
+                              showToast('Already in queue');
+                            } else {
+                              showToast('Added to queue');
+                            }
                           }}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                         >
