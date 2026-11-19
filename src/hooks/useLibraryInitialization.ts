@@ -71,13 +71,12 @@ export function useLibraryInitialization({
 
       if (isFileSystemAccessSupported()) {
         const storedFolders = await getStoredRegisteredFolders();
-        // Check for legacy migration: remove any legacy folder with sourceType === 'files' or name === 'Selected Audio'
-        const legacyFolders = storedFolders.filter(
-          (f) => f.sourceType === 'files' || f.name === 'Selected Audio'
-        );
-        const validStoredFolders = storedFolders.filter(
-          (f) => f.sourceType !== 'files' && f.name !== 'Selected Audio'
-        );
+        // Check for legacy migration: remove legacy pseudo-folders (sourceType === 'files' or lacking handle with name 'Selected Audio')
+        // Legitimate physical folders named 'Selected Audio' with valid handles are strictly preserved.
+        const isLegacyFolder = (f: StoredFolderRecord) =>
+          f.sourceType === 'files' || (!f.handle && f.name === 'Selected Audio');
+        const legacyFolders = storedFolders.filter(isLegacyFolder);
+        const validStoredFolders = storedFolders.filter((f) => !isLegacyFolder(f));
         if (legacyFolders.length > 0) {
           await storeRegisteredFolders(validStoredFolders);
         }

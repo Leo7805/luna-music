@@ -94,6 +94,8 @@ export function TrackRow({
       onTouchMove={onTouchEnd}
       data-testid={`track-row-${track.id}`}
       className={`group grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 items-center rounded-xl transition-all cursor-pointer select-none text-xs relative ${
+        isMenuOpen ? 'z-30' : 'z-0'
+      } ${
         isSelected
           ? 'bg-indigo-600/20 dark:bg-indigo-600/25 border border-indigo-500/40 shadow-sm'
           : isCurrent
