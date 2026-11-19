@@ -249,3 +249,78 @@ export function updateTrackMetadataInLibrary(
     flatPlaylist: updatedFlat,
   };
 }
+
+/**
+ * Computes display title and subtitle for the central header based on current view and state.
+ */
+export function deriveViewHeaderInfo(params: {
+  hasLibrary: boolean;
+  currentView: LibraryView;
+  searchQuery: string;
+  selectedFolderPath: string;
+  currentFolderNode: FolderNode | null;
+  selectedAlbumId: string | null;
+  selectedArtistName: string | null;
+  displayedTracksCount: number;
+  playlistsCount: number;
+}): { title: string; subtitle: string } {
+  const {
+    hasLibrary,
+    currentView,
+    searchQuery,
+    selectedFolderPath,
+    currentFolderNode,
+    selectedAlbumId,
+    selectedArtistName,
+    displayedTracksCount,
+    playlistsCount,
+  } = params;
+
+  let title = 'Music';
+  if (searchQuery) {
+    title = `Search Results: "${searchQuery}"`;
+  } else if (!hasLibrary) {
+    title = 'Music Library';
+  } else {
+    switch (currentView) {
+      case 'all':
+        title = 'All Tracks';
+        break;
+      case 'folder':
+        title = !selectedFolderPath
+          ? 'Music Folders'
+          : currentFolderNode
+          ? currentFolderNode.name
+          : 'Folder Browser';
+        break;
+      case 'playlists':
+        title = 'Playlists';
+        break;
+      case 'albums':
+        title = selectedAlbumId ? 'Album' : 'Albums';
+        break;
+      case 'artists':
+        title = selectedArtistName ? 'Artist' : 'Artists';
+        break;
+      case 'favourites':
+        title = 'Favourites';
+        break;
+      case 'imported-files':
+        title = 'Imported Files';
+        break;
+      default:
+        title = 'Music';
+    }
+  }
+
+  let subtitle = '';
+  if (hasLibrary) {
+    if (currentView === 'playlists') {
+      subtitle = `${playlistsCount} ${playlistsCount === 1 ? 'playlist' : 'playlists'}`;
+    } else {
+      subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
+    }
+  }
+
+  return { title, subtitle };
+}

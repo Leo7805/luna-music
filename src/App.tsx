@@ -1,14 +1,9 @@
 import { useState, useMemo, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
-import { TrackList } from './components/TrackList';
-import { PlaylistsView } from './components/PlaylistsView';
-import { FolderView } from './components/FolderView';
-import { AlbumsView } from './components/AlbumsView';
-import { ArtistsView } from './components/ArtistsView';
+import { LibraryContent } from './components/LibraryContent';
 import { NowPlayingPanel } from './components/NowPlayingPanel';
 import { BottomPlayer } from './components/BottomPlayer';
-import { EmptyState } from './components/EmptyState';
 import { RecoveryBanner } from './components/RecoveryBanner';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { ErrorToast } from './components/ErrorToast';
@@ -17,7 +12,8 @@ import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { usePlaylists } from './hooks/usePlaylists';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
-import { getBreadcrumbs, resolvePlaylistTracks } from './utils/musicTree';
+import { getBreadcrumbs } from './utils/musicTree';
+import { deriveViewHeaderInfo } from './utils/libraryAggregation';
 import { LibraryView, TrackItem } from './types/music';
 
 export function App() {
@@ -25,172 +21,77 @@ export function App() {
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState<boolean>(true);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
 
-  // Playlists state and actions
-  const {
-    playlists,
-    selectedPlaylistId,
-    createPlaylist,
-    renamePlaylist,
-    deletePlaylist,
-    addTrackToPlaylist,
-    addTracksToPlaylist,
-    removeTrackFromPlaylist,
-    removeTracksFromPlaylist,
-    reorderPlaylistTracks,
-    saveQueueAsPlaylist,
-    selectPlaylist,
-  } = usePlaylists();
-
-  // Music Library state and actions
-  const {
-    library,
-    folders,
-    currentView,
-    selectedFolderPath,
-    selectedArtistName,
-    selectedAlbumId,
-    searchQuery,
-    favourites,
-    favouritesCount,
-    isLoading,
-    scanProgress,
-    needsPermission,
-    currentFolderNode,
-    displayedTracks,
-    albums,
-    artists,
-    setCurrentView,
-    selectFolder,
-    selectArtist,
-    selectAlbum,
-    setSearchQuery,
-    toggleFavourite,
-    addTracksToFavourites,
-    removeTracksFromFavourites,
-    openFolderPicker,
-    openFilesPicker,
-    refreshFolder,
-    removeFolder,
-    removeImportedFiles,
-    removeAllImportedFiles,
-    requestPermissionForFolder,
-    handleFallbackFolderSelect,
-    handleOpenFilesSelect,
-    requestPermissionAndLoad,
-    updateTrackStatus,
-  } = useMusicLibrary();
-
-  // Audio Player state and actions
-  const {
-    currentTrack,
-    isPlaying,
-    currentTime,
-    duration,
-    volume,
-    isMuted,
-    repeatMode,
-    shuffle,
-    playbackError,
-    clearPlaybackError,
-    lyrics,
-    ambientColors,
-    queue,
-    playTrack,
-    playQueue,
-    playNext,
-    playNextBulk,
-    addToQueue,
-    removeFromQueue,
-    clearQueue,
-    togglePlay,
-    nextTrack,
-    prevTrack,
-    seekTo,
-    seekRelative,
-    changeVolume,
-    adjustVolume,
-    toggleMute,
-    cycleRepeatMode,
-    toggleShuffle,
-  } = useAudioPlayer({
-    onTrackStatusChanged: updateTrackStatus,
+  // Authoritative state hooks
+  const playlists = usePlaylists();
+  const library = useMusicLibrary();
+  const audioPlayer = useAudioPlayer({
+    onTrackStatusChanged: library.updateTrackStatus,
   });
 
   // Keyboard shortcuts dispatcher
   const shortcutHandlers = useMemo(
     () => ({
-      togglePlay,
-      seekRelative,
-      nextTrack,
-      prevTrack,
-      adjustVolume,
-      toggleMute,
+      togglePlay: audioPlayer.togglePlay,
+      seekRelative: audioPlayer.seekRelative,
+      nextTrack: audioPlayer.nextTrack,
+      prevTrack: audioPlayer.prevTrack,
+      adjustVolume: audioPlayer.adjustVolume,
+      toggleMute: audioPlayer.toggleMute,
       toggleLyrics: () => setIsNowPlayingOpen((prev) => !prev),
     }),
-    [
-      togglePlay,
-      seekRelative,
-      nextTrack,
-      prevTrack,
-      adjustVolume,
-      toggleMute,
-    ]
+    [audioPlayer]
   );
 
   useShortcuts(shortcutHandlers);
 
   const hasLibrary = Boolean(
-    library && (library.flatPlaylist.length > 0 || (library.folders && library.folders.length > 0))
+    library.library &&
+      (library.library.flatPlaylist.length > 0 ||
+        (library.library.folders && library.library.folders.length > 0))
   );
 
   const handleSelectView = useCallback(
     (view: LibraryView) => {
-      setCurrentView(view);
-      if (view === 'folder' && currentView === 'folder') {
-        selectFolder('');
+      library.setCurrentView(view);
+      if (view === 'folder' && library.currentView === 'folder') {
+        library.selectFolder('');
       }
     },
-    [currentView, setCurrentView, selectFolder]
+    [library]
   );
 
   // Compute breadcrumbs for folder view
   const breadcrumbs = useMemo(() => {
-    if (!library) return [];
-    return getBreadcrumbs(library.name, selectedFolderPath, library.folders);
-  }, [library, selectedFolderPath]);
+    if (!library.library) return [];
+    return getBreadcrumbs(library.library.name, library.selectedFolderPath, library.library.folders);
+  }, [library.library, library.selectedFolderPath]);
 
-  // Compute view title (Neutral "Music Library" when empty)
-  const viewTitle = useMemo(() => {
-    if (searchQuery) return `Search Results: "${searchQuery}"`;
-    if (!hasLibrary) return 'Music Library';
-    switch (currentView) {
-      case 'all':
-        return 'All Tracks';
-      case 'folder':
-        if (!selectedFolderPath) return 'Music Folders';
-        return currentFolderNode ? currentFolderNode.name : 'Folder Browser';
-      case 'playlists':
-        return 'Playlists';
-      case 'albums':
-        return selectedAlbumId ? 'Album' : 'Albums';
-      case 'artists':
-        return selectedArtistName ? 'Artist' : 'Artists';
-      case 'favourites':
-        return 'Favourites';
-      case 'imported-files':
-        return 'Imported Files';
-      default:
-        return 'Music';
-    }
-  }, [hasLibrary, currentView, currentFolderNode, selectedFolderPath, selectedAlbumId, selectedArtistName, searchQuery]);
-
-  const viewSubtitle = useMemo(() => {
-    if (!hasLibrary) return '';
-    if (currentView === 'playlists') {
-      return `${playlists.length} ${playlists.length === 1 ? 'playlist' : 'playlists'}`;
-    }
-    return `${displayedTracks.length} ${displayedTracks.length === 1 ? 'track' : 'tracks'}`;
-  }, [hasLibrary, currentView, displayedTracks.length, playlists.length]);
+  // Compute view title & subtitle
+  const { title: viewTitle, subtitle: viewSubtitle } = useMemo(
+    () =>
+      deriveViewHeaderInfo({
+        hasLibrary,
+        currentView: library.currentView,
+        searchQuery: library.searchQuery,
+        selectedFolderPath: library.selectedFolderPath,
+        currentFolderNode: library.currentFolderNode,
+        selectedAlbumId: library.selectedAlbumId,
+        selectedArtistName: library.selectedArtistName,
+        displayedTracksCount: library.displayedTracks.length,
+        playlistsCount: playlists.playlists.length,
+      }),
+    [
+      hasLibrary,
+      library.currentView,
+      library.searchQuery,
+      library.selectedFolderPath,
+      library.currentFolderNode,
+      library.selectedAlbumId,
+      library.selectedArtistName,
+      library.displayedTracks.length,
+      playlists.playlists.length,
+    ]
+  );
 
   return (
     <div
@@ -209,44 +110,47 @@ export function App() {
       />
 
       {/* Recovery Banner if handle needs permissions */}
-      {needsPermission && (
+      {library.needsPermission && (
         <div className="relative z-20">
-          <RecoveryBanner onRestore={requestPermissionAndLoad} />
+          <RecoveryBanner onRestore={library.requestPermissionAndLoad} />
         </div>
       )}
 
-      {/* Unobtrusive Dismissible Playback Error Toast (Replaces large red banner) */}
-      <ErrorToast message={playbackError} onDismiss={clearPlaybackError} />
+      {/* Unobtrusive Dismissible Playback Error Toast */}
+      <ErrorToast
+        message={audioPlayer.playbackError}
+        onDismiss={audioPlayer.clearPlaybackError}
+      />
 
       {/* Main Workspace: Left Sidebar + Central Content + Right Now Playing */}
       <div className="flex-1 flex min-h-0 relative z-10 overflow-hidden">
         {/* Left Sidebar */}
         <Sidebar
-          currentView={currentView}
-          selectedFolderPath={selectedFolderPath}
-          folderTree={library?.tree || null}
-          folders={folders}
-          playlists={playlists}
-          selectedPlaylistId={selectedPlaylistId}
-          favouritesCount={favouritesCount}
-          totalTracksCount={library?.flatPlaylist.length || 0}
+          currentView={library.currentView}
+          selectedFolderPath={library.selectedFolderPath}
+          folderTree={library.library?.tree || null}
+          folders={library.folders}
+          playlists={playlists.playlists}
+          selectedPlaylistId={playlists.selectedPlaylistId}
+          favouritesCount={library.favouritesCount}
+          totalTracksCount={library.library?.flatPlaylist.length || 0}
           hasLibrary={hasLibrary}
-          isScanning={isLoading}
-          scanCount={scanProgress}
+          isScanning={library.isLoading}
+          scanCount={library.scanProgress}
           onSelectView={handleSelectView}
-          onSelectFolder={selectFolder}
-          onSelectPlaylist={selectPlaylist}
-          onCreatePlaylist={createPlaylist}
-          onRenamePlaylist={renamePlaylist}
-          onDeletePlaylist={deletePlaylist}
-          onOpenFolder={openFolderPicker}
-          onOpenFiles={openFilesPicker}
-          onRefreshFolder={refreshFolder}
-          onRemoveFolder={removeFolder}
-          onRemoveAllImportedFiles={removeAllImportedFiles}
-          onRequestFolderPermission={requestPermissionForFolder}
-          onFallbackFolderSelect={handleFallbackFolderSelect}
-          onOpenFilesSelect={handleOpenFilesSelect}
+          onSelectFolder={library.selectFolder}
+          onSelectPlaylist={playlists.selectPlaylist}
+          onCreatePlaylist={playlists.createPlaylist}
+          onRenamePlaylist={playlists.renamePlaylist}
+          onDeletePlaylist={playlists.deletePlaylist}
+          onOpenFolder={library.openFolderPicker}
+          onOpenFiles={library.openFilesPicker}
+          onRefreshFolder={library.refreshFolder}
+          onRemoveFolder={library.removeFolder}
+          onRemoveAllImportedFiles={library.removeAllImportedFiles}
+          onRequestFolderPermission={library.requestPermissionForFolder}
+          onFallbackFolderSelect={library.handleFallbackFolderSelect}
+          onOpenFilesSelect={library.handleOpenFilesSelect}
         />
 
         {/* Central Content Area */}
@@ -255,259 +159,71 @@ export function App() {
           <Header
             title={viewTitle}
             subtitle={viewSubtitle}
-            searchQuery={searchQuery}
-            breadcrumbs={hasLibrary && currentView === 'folder' ? breadcrumbs : undefined}
+            searchQuery={library.searchQuery}
+            breadcrumbs={hasLibrary && library.currentView === 'folder' ? breadcrumbs : undefined}
             theme={theme}
-            onSearchChange={setSearchQuery}
-            onBreadcrumbClick={selectFolder}
+            onSearchChange={library.setSearchQuery}
+            onBreadcrumbClick={library.selectFolder}
             onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
             onToggleTheme={toggleTheme}
           />
 
-          {/* View Container */}
+          {/* Central View Container */}
           <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center h-64 text-center">
-                <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Scanning local library...
-                </p>
-              </div>
-            ) : !hasLibrary ? (
-              /* Requirement 3 & 4: Single prominent Open Music split button in center */
-              <EmptyState
-                isScanning={isLoading}
-                scanCount={scanProgress}
-                onOpenFolder={openFolderPicker}
-                onOpenFiles={openFilesPicker}
-                onFallbackFolderSelect={handleFallbackFolderSelect}
-                onOpenFilesSelect={handleOpenFilesSelect}
-              />
-            ) : (
-              <>
-                {currentView === 'all' && (
-                  <TrackList
-                    tracks={displayedTracks}
-                    libraryTracks={library?.flatPlaylist || []}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    favourites={favourites}
-                    playlists={playlists}
-                    onPlayTrack={playTrack}
-                    onTogglePlay={togglePlay}
-                    onToggleFavourite={toggleFavourite}
-                    onPlayNext={playNext}
-                    onPlayNextBulk={playNextBulk}
-                    onAddToQueue={addToQueue}
-                    onAddToPlaylist={addTrackToPlaylist}
-                    onAddTracksToPlaylist={addTracksToPlaylist}
-                    onCreateAndAddToPlaylist={(name, t) =>
-                      createPlaylist(name, Array.isArray(t) ? t : [t])
-                    }
-                    onAddTracksToFavourites={addTracksToFavourites}
-                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
-                    emptyVariant={searchQuery ? 'search' : 'default'}
-                  />
-                )}
-
-                {currentView === 'favourites' && (
-                  <TrackList
-                    tracks={displayedTracks}
-                    libraryTracks={library?.flatPlaylist || []}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    favourites={favourites}
-                    playlists={playlists}
-                    onPlayTrack={playTrack}
-                    onTogglePlay={togglePlay}
-                    onToggleFavourite={toggleFavourite}
-                    onPlayNext={playNext}
-                    onPlayNextBulk={playNextBulk}
-                    onAddToQueue={addToQueue}
-                    onAddToPlaylist={addTrackToPlaylist}
-                    onAddTracksToPlaylist={addTracksToPlaylist}
-                    onCreateAndAddToPlaylist={(name, t) =>
-                      createPlaylist(name, Array.isArray(t) ? t : [t])
-                    }
-                    onAddTracksToFavourites={addTracksToFavourites}
-                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
-                    emptyVariant="favourites"
-                  />
-                )}
-
-                {currentView === 'imported-files' && (
-                  <TrackList
-                    tracks={displayedTracks}
-                    libraryTracks={library?.flatPlaylist || []}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    favourites={favourites}
-                    playlists={playlists}
-                    onPlayTrack={playTrack}
-                    onTogglePlay={togglePlay}
-                    onToggleFavourite={toggleFavourite}
-                    onPlayNext={playNext}
-                    onPlayNextBulk={playNextBulk}
-                    onAddToQueue={addToQueue}
-                    onAddToPlaylist={addTrackToPlaylist}
-                    onAddTracksToPlaylist={addTracksToPlaylist}
-                    onCreateAndAddToPlaylist={(name, t) =>
-                      createPlaylist(name, Array.isArray(t) ? t : [t])
-                    }
-                    onAddTracksToFavourites={addTracksToFavourites}
-                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
-                    onRemoveImportedFiles={removeImportedFiles}
-                    isImportedFilesView={true}
-                    emptyVariant={searchQuery ? 'search' : 'default'}
-                    emptyMessage="No imported files found."
-                  />
-                )}
-
-                {currentView === 'playlists' && (
-                  <PlaylistsView
-                    playlists={playlists}
-                    selectedPlaylistId={selectedPlaylistId}
-                    libraryTracks={library?.flatPlaylist || []}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    favourites={favourites}
-                    onSelectPlaylist={selectPlaylist}
-                    onCreatePlaylist={createPlaylist}
-                    onRenamePlaylist={renamePlaylist}
-                    onDeletePlaylist={deletePlaylist}
-                    onPlayPlaylist={(pl, startIndex, shuffle) => {
-                      const resolved = resolvePlaylistTracks(pl.tracks, library?.flatPlaylist || []);
-                      if (resolved.length === 0) return;
-                      playQueue(resolved, startIndex, shuffle);
-                    }}
-                    onPlayTrack={playTrack}
-                    onTogglePlay={togglePlay}
-                    onToggleFavourite={toggleFavourite}
-                    onPlayNext={playNext}
-                    onPlayNextBulk={playNextBulk}
-                    onAddToQueue={addToQueue}
-                    onAddToPlaylist={addTrackToPlaylist}
-                    onAddTracksToPlaylist={addTracksToPlaylist}
-                    onCreateAndAddToPlaylist={(name, t) =>
-                      createPlaylist(name, Array.isArray(t) ? t : [t])
-                    }
-                    onRemoveTrackFromPlaylist={removeTrackFromPlaylist}
-                    onRemoveTracksFromPlaylist={removeTracksFromPlaylist}
-                    onAddTracksToFavourites={addTracksToFavourites}
-                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
-                    onReorderPlaylistTracks={reorderPlaylistTracks}
-                  />
-                )}
-
-                {currentView === 'folder' && (
-                  <FolderView
-                    currentNode={currentFolderNode}
-                    libraryTracks={library?.flatPlaylist || []}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    favourites={favourites}
-                    playlists={playlists}
-                    onSelectFolder={selectFolder}
-                    onPlayTrack={playTrack}
-                    onTogglePlay={togglePlay}
-                    onToggleFavourite={toggleFavourite}
-                    onPlayNext={playNext}
-                    onPlayNextBulk={playNextBulk}
-                    onAddToQueue={addToQueue}
-                    onAddToPlaylist={addTrackToPlaylist}
-                    onAddTracksToPlaylist={addTracksToPlaylist}
-                    onCreateAndAddToPlaylist={(name, t) =>
-                      createPlaylist(name, Array.isArray(t) ? t : [t])
-                    }
-                    onAddTracksToFavourites={addTracksToFavourites}
-                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
-                  />
-                )}
-
-                {currentView === 'albums' && (
-                  <AlbumsView
-                    albums={albums}
-                    selectedAlbumId={selectedAlbumId}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    favourites={favourites}
-                    playlists={playlists}
-                    onSelectAlbum={selectAlbum}
-                    onPlayTrack={playTrack}
-                    onTogglePlay={togglePlay}
-                    onToggleFavourite={toggleFavourite}
-                    onPlayNext={playNext}
-                    onAddToQueue={addToQueue}
-                    onAddToPlaylist={addTrackToPlaylist}
-                  />
-                )}
-
-                {currentView === 'artists' && (
-                  <ArtistsView
-                    artists={artists}
-                    selectedArtistName={selectedArtistName}
-                    currentTrackId={currentTrack?.id}
-                    isPlaying={isPlaying}
-                    favourites={favourites}
-                    playlists={playlists}
-                    onSelectArtist={selectArtist}
-                    onPlayTrack={playTrack}
-                    onTogglePlay={togglePlay}
-                    onToggleFavourite={toggleFavourite}
-                    onPlayNext={playNext}
-                    onAddToQueue={addToQueue}
-                    onAddToPlaylist={addTrackToPlaylist}
-                  />
-                )}
-              </>
-            )}
+            <LibraryContent
+              library={library}
+              playlists={playlists}
+              audioPlayer={audioPlayer}
+            />
           </div>
         </main>
 
         {/* Right Now Playing Panel */}
         <NowPlayingPanel
-          currentTrack={currentTrack}
-          currentTime={currentTime}
-          lyrics={lyrics}
-          ambientColors={ambientColors}
+          currentTrack={audioPlayer.currentTrack}
+          currentTime={audioPlayer.currentTime}
+          lyrics={audioPlayer.lyrics}
+          ambientColors={audioPlayer.ambientColors}
           isOpen={isNowPlayingOpen}
-          queue={queue}
+          queue={audioPlayer.queue}
           onClose={() => setIsNowPlayingOpen(false)}
-          onSeekTo={seekTo}
-          onPlayTrack={(track: TrackItem) => playTrack(track, queue)}
-          onRemoveFromQueue={removeFromQueue}
-          onClearQueue={clearQueue}
-          onSaveQueueAsPlaylist={(name) => saveQueueAsPlaylist(name, queue)}
+          onSeekTo={audioPlayer.seekTo}
+          onPlayTrack={(track: TrackItem) => audioPlayer.playTrack(track, audioPlayer.queue)}
+          onRemoveFromQueue={audioPlayer.removeFromQueue}
+          onClearQueue={audioPlayer.clearQueue}
+          onSaveQueueAsPlaylist={(name) => playlists.saveQueueAsPlaylist(name, audioPlayer.queue)}
         />
       </div>
 
       {/* Persistent Bottom Audio Player */}
       <BottomPlayer
-        currentTrack={currentTrack}
-        isPlaying={isPlaying}
-        currentTime={currentTime}
-        duration={duration}
-        volume={volume}
-        isMuted={isMuted}
-        repeatMode={repeatMode}
-        shuffle={shuffle}
+        currentTrack={audioPlayer.currentTrack}
+        isPlaying={audioPlayer.isPlaying}
+        currentTime={audioPlayer.currentTime}
+        duration={audioPlayer.duration}
+        volume={audioPlayer.volume}
+        isMuted={audioPlayer.isMuted}
+        repeatMode={audioPlayer.repeatMode}
+        shuffle={audioPlayer.shuffle}
         isFavourite={
-          currentTrack
-            ? favourites.has(currentTrack.id) ||
-              Boolean(currentTrack.aliases?.some((a) => favourites.has(a)))
+          audioPlayer.currentTrack
+            ? library.favourites.has(audioPlayer.currentTrack.id) ||
+              Boolean(audioPlayer.currentTrack.aliases?.some((a) => library.favourites.has(a)))
             : false
         }
         isNowPlayingOpen={isNowPlayingOpen}
-        hasLyrics={lyrics.length > 0}
-        onTogglePlay={togglePlay}
-        onNextTrack={nextTrack}
-        onPrevTrack={prevTrack}
-        onSeek={seekTo}
-        onVolumeChange={changeVolume}
-        onToggleMute={toggleMute}
-        onCycleRepeat={cycleRepeatMode}
-        onToggleShuffle={toggleShuffle}
-        onToggleFavourite={() => currentTrack && toggleFavourite(currentTrack.id)}
+        hasLyrics={audioPlayer.lyrics.length > 0}
+        onTogglePlay={audioPlayer.togglePlay}
+        onNextTrack={audioPlayer.nextTrack}
+        onPrevTrack={audioPlayer.prevTrack}
+        onSeek={audioPlayer.seekTo}
+        onVolumeChange={audioPlayer.changeVolume}
+        onToggleMute={audioPlayer.toggleMute}
+        onCycleRepeat={audioPlayer.cycleRepeatMode}
+        onToggleShuffle={audioPlayer.toggleShuffle}
+        onToggleFavourite={() =>
+          audioPlayer.currentTrack && library.toggleFavourite(audioPlayer.currentTrack.id)
+        }
         onToggleNowPlaying={() => setIsNowPlayingOpen((prev) => !prev)}
       />
 
