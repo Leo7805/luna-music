@@ -93,14 +93,14 @@ export function TrackRow({
       onTouchEnd={onTouchEnd}
       onTouchMove={onTouchEnd}
       data-testid={`track-row-${track.id}`}
-      className={`group grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 items-center rounded-xl transition-all cursor-pointer select-none text-xs relative ${
+      className={`group grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 items-center rounded-xl border transition-colors duration-150 cursor-pointer select-none text-xs relative ${
         isMenuOpen ? 'z-30' : 'z-0'
       } ${
         isSelected
-          ? 'bg-indigo-600/20 dark:bg-indigo-600/25 border border-indigo-500/40 shadow-sm'
+          ? 'bg-indigo-600/20 dark:bg-indigo-600/25 border-indigo-500/40 shadow-sm'
           : isCurrent
-          ? 'bg-indigo-600/15 border border-indigo-500/25 shadow-sm'
-          : 'hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+          ? 'bg-indigo-600/15 dark:bg-indigo-600/20 border-indigo-500/25 shadow-sm'
+          : 'border-transparent hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
       } ${isAbnormal ? 'opacity-85' : ''}`}
     >
       {/* Col 1: Number, Checkbox, Equalizer, or Play Button */}
@@ -109,7 +109,7 @@ export function TrackRow({
           <button
             type="button"
             onClick={(e) => onCheckboxClick(e, track)}
-            className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+            className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             data-testid={`track-checkbox-${track.id}`}
           >
             {isSelected ? (
@@ -240,10 +240,10 @@ export function TrackRow({
             e.stopPropagation();
             onToggleFavourite(track.id);
           }}
-          className={`p-1.5 rounded-full transition-all cursor-pointer ${
+          className={`p-1.5 rounded-full transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
             isFav
               ? 'text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300'
-              : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white opacity-0 group-hover:opacity-100'
+              : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white opacity-0 group-hover:opacity-100 focus:opacity-100'
           }`}
           title={isFav ? 'Remove from favourites' : 'Add to favourites'}
         >
@@ -261,8 +261,8 @@ export function TrackRow({
               onToggleMenu(track.id);
             }}
             title="Track actions"
-            className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.08] transition-opacity cursor-pointer ${
-              isMenuOpen ? 'opacity-100 bg-slate-200/80 dark:bg-white/[0.1]' : 'opacity-0 group-hover:opacity-100'
+            className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.08] transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+              isMenuOpen ? 'opacity-100 bg-slate-200/80 dark:bg-white/[0.1]' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
             }`}
           >
             <MoreHorizontal className="w-3.5 h-3.5" />

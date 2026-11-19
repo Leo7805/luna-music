@@ -102,7 +102,7 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('lyrics')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400 ${
                 activeTab === 'lyrics'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -113,7 +113,7 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('queue')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400 ${
                 activeTab === 'queue'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -124,7 +124,7 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
             <button
               type="button"
               onClick={() => setActiveTab('artwork')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-400 ${
                 activeTab === 'artwork'
                   ? 'bg-indigo-600 text-white shadow-sm'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -287,11 +287,19 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
                     return (
                       <div
                         key={`${track.id}-${idx}`}
+                        tabIndex={0}
+                        role="button"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            onPlayTrack?.(track);
+                          }
+                        }}
                         onClick={() => onPlayTrack?.(track)}
-                        className={`group flex items-center justify-between p-2 rounded-xl text-xs transition-all cursor-pointer ${
+                        className={`group flex items-center justify-between p-2 rounded-xl text-xs border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
                           isCurrent
-                            ? 'bg-indigo-600/15 dark:bg-indigo-600/25 border border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-medium'
-                            : 'hover:bg-slate-200/60 dark:hover:bg-white/[0.04] text-slate-700 dark:text-slate-300'
+                            ? 'bg-indigo-600/15 dark:bg-indigo-600/25 border-indigo-500/30 text-indigo-700 dark:text-indigo-300 font-medium shadow-sm'
+                            : 'border-transparent hover:bg-slate-200/60 dark:hover:bg-white/[0.04] text-slate-700 dark:text-slate-300'
                         }`}
                       >
                         <div className="flex items-center gap-2 min-w-0 flex-1">

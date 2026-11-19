@@ -18,16 +18,21 @@ export function SidebarNavigation({
   onSelectView,
   onSelectFolder,
 }: SidebarNavigationProps) {
+  const baseButtonClass =
+    'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent';
+
+  const activeClass =
+    'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 shadow-sm';
+  const inactiveClass =
+    'border-transparent text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]';
+
   return (
     <div className="p-3 space-y-1">
       {/* 1. All Tracks */}
       <button
+        type="button"
         onClick={() => onSelectView('all')}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-          currentView === 'all'
-            ? 'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
-        }`}
+        className={`${baseButtonClass} ${currentView === 'all' ? activeClass : inactiveClass}`}
       >
         <div className="flex items-center gap-3">
           <Music className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
@@ -40,14 +45,13 @@ export function SidebarNavigation({
 
       {/* 2. Folders */}
       <button
+        type="button"
         onClick={() => {
           onSelectView('folder');
           onSelectFolder('');
         }}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-          currentView === 'folder' || currentView === 'imported-files'
-            ? 'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+        className={`${baseButtonClass} ${
+          currentView === 'folder' || currentView === 'imported-files' ? activeClass : inactiveClass
         }`}
       >
         <div className="flex items-center gap-3">
@@ -58,12 +62,9 @@ export function SidebarNavigation({
 
       {/* 3. Playlists */}
       <button
+        type="button"
         onClick={() => onSelectView('playlists')}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-          currentView === 'playlists'
-            ? 'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
-        }`}
+        className={`${baseButtonClass} ${currentView === 'playlists' ? activeClass : inactiveClass}`}
       >
         <div className="flex items-center gap-3">
           <ListMusic className="w-4 h-4 text-amber-500 dark:text-amber-400" />
@@ -78,12 +79,9 @@ export function SidebarNavigation({
 
       {/* 4. Albums */}
       <button
+        type="button"
         onClick={() => onSelectView('albums')}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-          currentView === 'albums'
-            ? 'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
-        }`}
+        className={`${baseButtonClass} ${currentView === 'albums' ? activeClass : inactiveClass}`}
       >
         <div className="flex items-center gap-3">
           <Disc className="w-4 h-4 text-sky-500 dark:text-sky-400" />
@@ -93,12 +91,9 @@ export function SidebarNavigation({
 
       {/* 5. Artists */}
       <button
+        type="button"
         onClick={() => onSelectView('artists')}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-          currentView === 'artists'
-            ? 'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
-        }`}
+        className={`${baseButtonClass} ${currentView === 'artists' ? activeClass : inactiveClass}`}
       >
         <div className="flex items-center gap-3">
           <Mic2 className="w-4 h-4 text-purple-500 dark:text-purple-400" />
@@ -108,12 +103,9 @@ export function SidebarNavigation({
 
       {/* 6. Favourites */}
       <button
+        type="button"
         onClick={() => onSelectView('favourites')}
-        className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-          currentView === 'favourites'
-            ? 'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shadow-sm'
-            : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
-        }`}
+        className={`${baseButtonClass} ${currentView === 'favourites' ? activeClass : inactiveClass}`}
       >
         <div className="flex items-center gap-3">
           <Heart className="w-4 h-4 text-rose-500 dark:text-rose-400 fill-rose-500/20 dark:fill-rose-400/20" />

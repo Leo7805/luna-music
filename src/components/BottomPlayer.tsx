@@ -128,7 +128,7 @@ export function BottomPlayer({
             {/* Heart Button */}
             <button
               onClick={onToggleFavourite}
-              className={`p-2 rounded-full transition-all cursor-pointer ${
+              className={`p-2 rounded-full transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
                 isFavourite
                   ? 'text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300'
                   : 'text-slate-400 dark:text-slate-500 hover:text-slate-700 dark:hover:text-white'
@@ -152,7 +152,7 @@ export function BottomPlayer({
           {/* Shuffle */}
           <button
             onClick={onToggleShuffle}
-            className={`p-1.5 rounded-full transition-all relative cursor-pointer ${
+            className={`p-1.5 rounded-full transition-colors duration-150 relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
               shuffle
                 ? 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -169,7 +169,7 @@ export function BottomPlayer({
           <button
             onClick={onPrevTrack}
             disabled={!currentTrack}
-            className="p-1.5 rounded-full text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white disabled:opacity-40 disabled:hover:text-slate-300 transition-all active:scale-95 cursor-pointer"
+            className="p-1.5 rounded-full text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white disabled:opacity-40 disabled:hover:text-slate-300 transition-colors duration-150 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
             title="Previous track (Ctrl/Cmd + Left)"
           >
             <SkipBack className="w-5 h-5 fill-current" />
@@ -179,7 +179,7 @@ export function BottomPlayer({
           <button
             onClick={onTogglePlay}
             disabled={!currentTrack}
-            className="w-10 h-10 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-950 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 flex items-center justify-center shadow-lg shadow-black/10 dark:shadow-white/10 transition-all cursor-pointer"
+            className="w-10 h-10 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-950 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:hover:scale-100 flex items-center justify-center shadow-lg shadow-black/10 dark:shadow-white/10 transition-transform duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
             title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
           >
             {isPlaying ? (
@@ -193,7 +193,7 @@ export function BottomPlayer({
           <button
             onClick={onNextTrack}
             disabled={!currentTrack}
-            className="p-1.5 rounded-full text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white disabled:opacity-40 disabled:hover:text-slate-300 transition-all active:scale-95 cursor-pointer"
+            className="p-1.5 rounded-full text-slate-700 dark:text-slate-300 hover:text-slate-950 dark:hover:text-white disabled:opacity-40 disabled:hover:text-slate-300 transition-colors duration-150 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
             title="Next track (Ctrl/Cmd + Right)"
           >
             <SkipForward className="w-5 h-5 fill-current" />
@@ -202,7 +202,7 @@ export function BottomPlayer({
           {/* Repeat Mode */}
           <button
             onClick={onCycleRepeat}
-            className={`p-1.5 rounded-full transition-all relative cursor-pointer ${
+            className={`p-1.5 rounded-full transition-colors duration-150 relative cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
               repeatMode !== 'off'
                 ? 'text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300'
                 : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -249,11 +249,12 @@ export function BottomPlayer({
         {/* Lyrics Button */}
         {hasLyrics && (
           <button
+            type="button"
             onClick={onToggleNowPlaying}
-            className={`p-2 rounded-xl transition-all cursor-pointer ${
+            className={`p-2 rounded-xl border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 ${
               isNowPlayingOpen
-                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border border-emerald-500/30'
-                : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.06]'
+                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/30'
+                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.06]'
             }`}
             title="Toggle Synchronized Lyrics (L)"
           >
@@ -263,8 +264,9 @@ export function BottomPlayer({
 
         {/* Volume Mute/Unmute */}
         <button
+          type="button"
           onClick={onToggleMute}
-          className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
           title={isMuted ? 'Unmute (M)' : 'Mute (M)'}
         >
           {isMuted || volume === 0 ? (
@@ -299,10 +301,10 @@ export function BottomPlayer({
           aria-pressed={isNowPlayingOpen}
           aria-label={isNowPlayingOpen ? 'Collapse Now Playing panel' : 'Expand Now Playing panel'}
           data-testid="now-playing-toggle-button"
-          className={`p-2 rounded-xl transition-all cursor-pointer ${
+          className={`p-2 rounded-xl border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
             isNowPlayingOpen
-              ? 'bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border border-indigo-500/40 shadow-sm'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.06]'
+              ? 'bg-indigo-600/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/40 shadow-sm'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.06]'
           }`}
           title={isNowPlayingOpen ? 'Hide Now Playing panel' : 'Show Now Playing panel'}
         >

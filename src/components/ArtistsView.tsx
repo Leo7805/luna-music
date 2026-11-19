@@ -132,7 +132,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
           <div
             key={artist.id}
             onClick={() => onSelectArtist(artist.name)}
-            className="group p-4 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-purple-500/40 transition-all cursor-pointer select-none flex flex-col items-center text-center"
+            className="group p-4 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-purple-500/40 transition-colors duration-150 cursor-pointer select-none flex flex-col items-center text-center"
           >
             {/* Avatar */}
             <div className="w-28 h-28 rounded-full shadow-lg overflow-hidden relative mb-3 flex items-center justify-center bg-gradient-to-tr from-purple-600 via-indigo-600 to-sky-400 p-[2px]">

@@ -81,7 +81,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
               <div
                 key={sub.id}
                 onClick={() => onSelectFolder(sub.relativePath)}
-                className="group p-3 rounded-xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-all cursor-pointer flex items-center gap-3 select-none"
+                className="group p-3 rounded-xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-colors duration-150 cursor-pointer flex items-center gap-3 select-none"
               >
                 <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                   <Folder className="w-4 h-4 text-indigo-500 dark:text-indigo-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-300" />

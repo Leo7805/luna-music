@@ -131,7 +131,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
         <div
           key={album.id}
           onClick={() => onSelectAlbum(album.id)}
-          className="group p-3.5 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-all cursor-pointer select-none flex flex-col"
+          className="group p-3.5 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-colors duration-150 cursor-pointer select-none flex flex-col"
         >
           {/* Cover Art */}
           <div

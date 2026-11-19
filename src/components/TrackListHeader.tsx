@@ -29,10 +29,10 @@ export function TrackListHeader({
         <button
           type="button"
           onClick={onToggleSelectMode}
-          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
             isSelectMode
-              ? 'bg-indigo-600 text-white shadow-sm'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+              ? 'bg-indigo-600 text-white border-transparent shadow-sm'
+              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
           }`}
           data-testid="toggle-select-mode"
         >

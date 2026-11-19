@@ -268,7 +268,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
               {/* Create Playlist Action Card */}
               <div
                 onClick={() => setIsCreateModalOpen(true)}
-                className="group p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-white/[0.1] hover:border-indigo-500/50 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-all cursor-pointer flex flex-col items-center justify-center text-center min-h-[180px] select-none"
+                className="group p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-white/[0.1] hover:border-indigo-500/50 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-colors duration-150 cursor-pointer flex flex-col items-center justify-center text-center min-h-[180px] select-none"
               >
                 <div className="w-12 h-12 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <Plus className="w-6 h-6" />
@@ -284,7 +284,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 <div
                   key={pl.id}
                   onClick={() => onSelectPlaylist(pl.id)}
-                  className="group p-4 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-all cursor-pointer flex flex-col justify-between select-none relative min-h-[180px]"
+                  className="group p-4 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-colors duration-150 cursor-pointer flex flex-col justify-between select-none relative min-h-[180px]"
                 >
                   <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-indigo-500/80 to-purple-600/80 flex items-center justify-center shadow-md mb-3 group-hover:scale-[1.02] transition-transform relative overflow-hidden">
                     <ListMusic className="w-10 h-10 text-white/90" />
