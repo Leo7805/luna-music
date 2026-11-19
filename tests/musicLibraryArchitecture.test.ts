@@ -75,19 +75,39 @@ describe('Music Library Architecture & Decomposed Modules (Stage 6)', () => {
   });
 
   describe('2. Legacy Library & Folder Records Separation', () => {
-    it('filters out legacy folder records with sourceType === files or lacking handle with name === Selected Audio', () => {
+    it('filters out legacy folder records with sourceType === files, files: ID prefix, or missing sourceType with name === Selected Audio', () => {
       const records = [
         { id: 'f-1', name: 'Music', sourceType: 'fs-access' },
         { id: 'f-legacy-1', name: 'Selected Audio', sourceType: 'files' },
-        { id: 'f-legacy-2', name: 'Selected Audio', sourceType: 'input-fallback' },
+        { id: 'files:legacy-root', name: 'Imported Files', sourceType: 'files' },
+        { id: 'f-legacy-no-type', name: 'Selected Audio' },
+        { id: 'f-fallback', name: 'Selected Audio', sourceType: 'input-fallback' },
         { id: 'f-2', name: 'Jazz', sourceType: 'fs-access' },
       ];
 
-      const isLegacyFolder = (f: { sourceType: string; name: string; handle?: FileSystemDirectoryHandle }) =>
-        f.sourceType === 'files' || (!f.handle && f.name === 'Selected Audio');
+      const isLegacyFolder = (f: { id: string; sourceType?: string; name: string; handle?: FileSystemDirectoryHandle }) =>
+        f.sourceType === 'files' ||
+        f.id.startsWith('files:') ||
+        (!f.sourceType && f.name === 'Selected Audio');
 
       const valid = records.filter((r) => !isLegacyFolder(r));
-      expect(valid.map((r) => r.id)).toEqual(['f-1', 'f-2']);
+      expect(valid.map((r) => r.id)).toEqual(['f-1', 'f-fallback', 'f-2']);
+    });
+
+    it('strictly preserves legitimate fallback folders named Selected Audio lacking persistent handles', () => {
+      const records = [
+        { id: 'f-fallback-selected-audio', name: 'Selected Audio', sourceType: 'input-fallback' },
+        { id: 'f-physical-selected-audio', name: 'Selected Audio', sourceType: 'fs-access', handle: {} as unknown as FileSystemDirectoryHandle },
+        { id: 'f-legacy-files', name: 'Selected Audio', sourceType: 'files' },
+      ];
+
+      const isLegacyFolder = (f: { id: string; sourceType?: string; name: string; handle?: FileSystemDirectoryHandle }) =>
+        f.sourceType === 'files' ||
+        f.id.startsWith('files:') ||
+        (!f.sourceType && f.name === 'Selected Audio');
+
+      const valid = records.filter((r) => !isLegacyFolder(r));
+      expect(valid.map((r) => r.id)).toEqual(['f-fallback-selected-audio', 'f-physical-selected-audio']);
     });
 
     it('strictly preserves physical folders named Selected Audio with valid handles and fs-access sourceType', () => {
@@ -95,11 +115,13 @@ describe('Music Library Architecture & Decomposed Modules (Stage 6)', () => {
       const records = [
         { id: 'f-physical-selected-audio', name: 'Selected Audio', sourceType: 'fs-access', handle: mockHandle },
         { id: 'f-legacy-files', name: 'Selected Audio', sourceType: 'files' },
-        { id: 'f-legacy-no-handle', name: 'Selected Audio', sourceType: 'input-fallback' },
+        { id: 'f-legacy-missing-type', name: 'Selected Audio' },
       ];
 
-      const isLegacyFolder = (f: { sourceType: string; name: string; handle?: FileSystemDirectoryHandle }) =>
-        f.sourceType === 'files' || (!f.handle && f.name === 'Selected Audio');
+      const isLegacyFolder = (f: { id: string; sourceType?: string; name: string; handle?: FileSystemDirectoryHandle }) =>
+        f.sourceType === 'files' ||
+        f.id.startsWith('files:') ||
+        (!f.sourceType && f.name === 'Selected Audio');
 
       const valid = records.filter((r) => !isLegacyFolder(r));
       expect(valid.length).toBe(1);

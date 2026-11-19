@@ -71,10 +71,13 @@ export function useLibraryInitialization({
 
       if (isFileSystemAccessSupported()) {
         const storedFolders = await getStoredRegisteredFolders();
-        // Check for legacy migration: remove legacy pseudo-folders (sourceType === 'files' or lacking handle with name 'Selected Audio')
-        // Legitimate physical folders named 'Selected Audio' with valid handles are strictly preserved.
+        // Check for legacy migration: remove legacy pseudo-folders created for individual file fallback.
+        // Legitimate folders imported through FSA or HTML folder-input fallback (sourceType: 'input-fallback')
+        // are strictly preserved, even if named 'Selected Audio' without a persistent directory handle.
         const isLegacyFolder = (f: StoredFolderRecord) =>
-          f.sourceType === 'files' || (!f.handle && f.name === 'Selected Audio');
+          f.sourceType === 'files' ||
+          f.id.startsWith('files:') ||
+          (!f.sourceType && f.name === 'Selected Audio');
         const legacyFolders = storedFolders.filter(isLegacyFolder);
         const validStoredFolders = storedFolders.filter((f) => !isLegacyFolder(f));
         if (legacyFolders.length > 0) {
