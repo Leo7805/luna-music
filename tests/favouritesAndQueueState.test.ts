@@ -162,7 +162,7 @@ describe('Favourites State Synchronization (Bug A)', () => {
     expect(storedFavourites.has('APT.flac')).toBe(false);
     expect(storedFavourites.has('folderA:APT.flac')).toBe(true);
 
-    // Step 3: User unfavourites the track
+    // Step 3: User unfavourites the track using exact logical-track matching
     const canonicalId = track.id;
     const trackId = track.id;
     storedFavourites.delete(canonicalId);
@@ -170,12 +170,13 @@ describe('Favourites State Synchronization (Bug A)', () => {
     if (track.aliases) {
       track.aliases.forEach((a) => storedFavourites.delete(a));
     }
-    storedFavourites.delete(track.relativePath);
-    const relColon = ':' + track.relativePath;
-    const relSlash = '/' + track.relativePath;
-    for (const key of Array.from(storedFavourites)) {
-      if (key === track.relativePath || key.endsWith(relColon) || key.endsWith(relSlash)) {
-        storedFavourites.delete(key);
+    const sameRelPathTracks = lib.filter((t) => t.relativePath === track.relativePath);
+    if (sameRelPathTracks.length === 1) {
+      storedFavourites.delete(track.relativePath);
+    }
+    for (const [oldId, mappedCanonicalId] of resolution.migratedMap.entries()) {
+      if (mappedCanonicalId === canonicalId) {
+        storedFavourites.delete(oldId);
       }
     }
 
@@ -186,6 +187,112 @@ describe('Favourites State Synchronization (Bug A)', () => {
     expect(reloadResolution.resolvedTracks).toHaveLength(0);
     expect(reloadResolution.unresolvedIds).toHaveLength(0);
     expect(isFavouriteTrack(track, storedFavourites, lib)).toBe(false);
+  });
+
+  // Task 7: Two different files with identical relative paths, both favourited, then independently unfavourited
+  it('6c. allows two different files in independent folders with identical relative paths to be independently favourited and unfavourited', () => {
+    const trackA = createMockTrack('rootA:Jay/song.mp3', 'Jay/song.mp3', 'Song in Root A');
+    const trackB = createMockTrack('rootB:Jay/song.mp3', 'Jay/song.mp3', 'Song in Root B');
+    const lib = [trackA, trackB];
+
+    // Both tracks are favourited independently under their canonical IDs
+    let favourites = new Set(['rootA:Jay/song.mp3', 'rootB:Jay/song.mp3']);
+
+    // Verify both are recognized as favourite
+    expect(isFavouriteTrack(trackA, favourites, lib)).toBe(true);
+    expect(isFavouriteTrack(trackB, favourites, lib)).toBe(true);
+
+    const initialResolution = resolveFavouriteTracks(lib, favourites);
+    expect(initialResolution.resolvedTracks).toHaveLength(2);
+    expect(initialResolution.resolvedTracks.map((t) => t.id).sort()).toEqual([
+      'rootA:Jay/song.mp3',
+      'rootB:Jay/song.mp3',
+    ]);
+
+    // Unfavourite trackA only
+    const canonicalIdA = trackA.id;
+    favourites.delete(canonicalIdA);
+    favourites.delete(trackA.id);
+    if (trackA.aliases) {
+      trackA.aliases.forEach((a) => favourites.delete(a));
+    }
+    // Ambiguity check: since both trackA and trackB share 'Jay/song.mp3', sameRelPathTracks.length === 2
+    const sameRelPath = lib.filter((t) => t.relativePath === trackA.relativePath);
+    if (sameRelPath.length === 1) {
+      favourites.delete(trackA.relativePath);
+    }
+
+    // CRITICAL SAFETY CHECK: trackB must NOT have been removed by broad suffix matching!
+    expect(favourites.has('rootA:Jay/song.mp3')).toBe(false);
+    expect(favourites.has('rootB:Jay/song.mp3')).toBe(true);
+    expect(isFavouriteTrack(trackA, favourites, lib)).toBe(false);
+    expect(isFavouriteTrack(trackB, favourites, lib)).toBe(true);
+
+    const afterUnfavouriteAResolution = resolveFavouriteTracks(lib, favourites);
+    expect(afterUnfavouriteAResolution.resolvedTracks).toHaveLength(1);
+    expect(afterUnfavouriteAResolution.resolvedTracks[0].id).toBe('rootB:Jay/song.mp3');
+
+    // Now unfavourite trackB as well
+    const canonicalIdB = trackB.id;
+    favourites.delete(canonicalIdB);
+    favourites.delete(trackB.id);
+    if (trackB.aliases) {
+      trackB.aliases.forEach((a) => favourites.delete(a));
+    }
+
+    expect(favourites.size).toBe(0);
+    expect(isFavouriteTrack(trackB, favourites, lib)).toBe(false);
+    const finalResolution = resolveFavouriteTracks(lib, favourites);
+    expect(finalResolution.resolvedTracks).toHaveLength(0);
+  });
+
+  // Task 8: Overlapping roots referring to the same physical file
+  it('6d. cleans up both canonical ID and verified aliases when unfavouriting an overlapping folder track', () => {
+    // Physical file imported via parent folder and child folder
+    const physicalTrack = createMockTrack(
+      'parentFolder:Jay/song.mp3',
+      'Jay/song.mp3',
+      'Jay Song',
+      ['childFolder:song.mp3']
+    );
+    const lib = [physicalTrack];
+
+    // Stored favourite has alias from childFolder import
+    let favourites = new Set(['childFolder:song.mp3']);
+
+    // Check favourite resolution
+    expect(isFavouriteTrack(physicalTrack, favourites, lib)).toBe(true);
+    const res = resolveFavouriteTracks(lib, favourites);
+    expect(res.resolvedTracks).toHaveLength(1);
+    expect(res.resolvedTracks[0].id).toBe('parentFolder:Jay/song.mp3');
+    expect(res.migratedMap.get('childFolder:song.mp3')).toBe('parentFolder:Jay/song.mp3');
+
+    // Simulate migration: alias replaced by canonical ID
+    for (const [oldId, canId] of res.migratedMap.entries()) {
+      favourites.delete(oldId);
+      favourites.add(canId);
+    }
+    expect(favourites.has('parentFolder:Jay/song.mp3')).toBe(true);
+
+    // Unfavourite the physical track: must clean up both canonical ID and verified alias
+    const canId = physicalTrack.id;
+    favourites.delete(canId);
+    favourites.delete(physicalTrack.id);
+    if (physicalTrack.aliases) {
+      physicalTrack.aliases.forEach((a) => favourites.delete(a));
+    }
+    for (const [oldId, mappedCanId] of res.migratedMap.entries()) {
+      if (mappedCanId === canId) {
+        favourites.delete(oldId);
+      }
+    }
+
+    expect(favourites.size).toBe(0);
+
+    // On reload: neither canonical ID nor alias is present
+    const reloadRes = resolveFavouriteTracks(lib, favourites);
+    expect(reloadRes.resolvedTracks).toHaveLength(0);
+    expect(isFavouriteTrack(physicalTrack, favourites, lib)).toBe(false);
   });
 });
 

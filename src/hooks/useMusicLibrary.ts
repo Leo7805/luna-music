@@ -773,13 +773,18 @@ export function useMusicLibrary() {
 
   // Toggle favorite track
   const toggleFavourite = useCallback((trackId: string) => {
-    const track = library?.flatPlaylist.find(
-      (t) =>
-        t.id === trackId ||
-        (t.aliases && t.aliases.includes(trackId)) ||
-        t.relativePath === trackId ||
-        trackId.endsWith(':' + t.relativePath)
+    let track = library?.flatPlaylist.find(
+      (t) => t.id === trackId || (t.aliases && t.aliases.includes(trackId))
     );
+    if (!track && library) {
+      // Fallback for legacy bare relative path (without folder prefix) only if unambiguous
+      const candidates = library.flatPlaylist.filter(
+        (t) => t.relativePath === trackId
+      );
+      if (candidates.length === 1) {
+        track = candidates[0];
+      }
+    }
     const canonicalId = track ? track.id : trackId;
 
     setFavourites((prev) => {
@@ -789,20 +794,29 @@ export function useMusicLibrary() {
         : next.has(trackId);
 
       if (isFav) {
-        // Remove canonical ID, aliases, and any keys matching relative path
+        // 1. Remove canonical ID and trackId
         next.delete(canonicalId);
         next.delete(trackId);
-        if (track) {
-          if (track.aliases) {
-            track.aliases.forEach((a) => next.delete(a));
+
+        // 2. Remove verified aliases of this logical track (e.g. from overlapping parent/child imports)
+        if (track?.aliases) {
+          track.aliases.forEach((alias) => next.delete(alias));
+        }
+
+        // 3. Remove legacy relative-path key ONLY if it unambiguously belongs to this track
+        if (track && library) {
+          const sameRelPathTracks = library.flatPlaylist.filter(
+            (t) => t.relativePath === track.relativePath
+          );
+          if (sameRelPathTracks.length === 1) {
+            next.delete(track.relativePath);
           }
-          next.delete(track.relativePath);
-          const relColon = ':' + track.relativePath;
-          const relSlash = '/' + track.relativePath;
-          for (const key of Array.from(next)) {
-            if (key === track.relativePath || key.endsWith(relColon) || key.endsWith(relSlash)) {
-              next.delete(key);
-            }
+        }
+
+        // 4. Remove any legacy ID that was unambiguously migrated to this canonical track
+        for (const [oldId, mappedCanonicalId] of favouriteResolution.migratedMap.entries()) {
+          if (mappedCanonicalId === canonicalId) {
+            next.delete(oldId);
           }
         }
       } else {
@@ -811,7 +825,7 @@ export function useMusicLibrary() {
       storePlaybackState({ favourites: Array.from(next) });
       return next;
     });
-  }, [library]);
+  }, [library, favouriteResolution.migratedMap]);
 
   // Aggregate albums from library
   const albums = useMemo((): AlbumGroup[] => {

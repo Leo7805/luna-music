@@ -509,16 +509,8 @@ export function isFavouriteTrack(
   if (favourites.has(track.id)) return true;
   if (track.aliases && track.aliases.some((alias) => favourites.has(alias))) return true;
 
-  // Check legacy relative path matching
-  const relPathColon = ':' + track.relativePath;
-  const relPathSlash = '/' + track.relativePath;
-  const hasLegacyMatch =
-    favourites.has(track.relativePath) ||
-    Array.from(favourites).some(
-      (favId) => favId.endsWith(relPathColon) || favId.endsWith(relPathSlash)
-    );
-
-  if (hasLegacyMatch) {
+  // Check legacy relative path matching (bare relativePath without folder prefix)
+  if (favourites.has(track.relativePath)) {
     if (libraryTracks && libraryTracks.length > 0) {
       const matchCount = libraryTracks.filter(
         (t) => t.relativePath === track.relativePath
