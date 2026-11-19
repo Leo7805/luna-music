@@ -96,3 +96,56 @@ export function stripExtension(filename: string): string {
   if (lastDot <= 0) return filename;
   return filename.substring(0, lastDot);
 }
+
+export interface PlaybackErrorInfo {
+  message: string;
+  isUnsupported: boolean;
+}
+
+/**
+ * Evaluates HTMLAudioElement error and translates it into user-friendly message
+ * and unsupported format flag.
+ */
+export function evaluatePlaybackMediaError(
+  err: { code: number; message?: string } | null,
+  trackName: string
+): PlaybackErrorInfo | null {
+  if (!err) return null;
+  // Code 1: MEDIA_ERR_ABORTED
+  if (err.code === 1) {
+    return null;
+  }
+  if (err.message && /empty src/i.test(err.message)) {
+    return null;
+  }
+
+  let message = 'An error occurred while playing this audio file.';
+  let isUnsupported = false;
+
+  switch (err.code) {
+    case 2: // MEDIA_ERR_NETWORK
+      message = 'A network or file read error occurred.';
+      break;
+    case 3: // MEDIA_ERR_DECODE
+      message = 'Audio decode failed. The audio codec or file may be corrupted.';
+      break;
+    case 4: { // MEDIA_ERR_SRC_NOT_SUPPORTED
+      const isConfirmedUnsupported =
+        Boolean(err.message && /unsupported_codec|no decoder|codec not supported/i.test(err.message)) ||
+        Boolean(trackName && !isFormatSupportedByBrowser(trackName));
+
+      if (isConfirmedUnsupported) {
+        message = 'This audio format or codec may not be supported by your browser.';
+        isUnsupported = true;
+      } else {
+        message = 'Audio decode failed. The audio codec or file may be corrupted.';
+      }
+      break;
+    }
+    default:
+      message = err.message || 'Unable to play this audio file.';
+      break;
+  }
+
+  return { message, isUnsupported };
+}

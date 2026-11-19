@@ -1,19 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TrackItem, RepeatMode, LrcLine, FileStatus } from '../types/music';
-import { parseLrc } from '../utils/lrcParser';
-import { extractDominantColor } from '../utils/colorExtractor';
-import { extractAudioMetadata } from '../utils/metadata';
-import {
-  isFormatSupportedByBrowser,
-  isSameTrack,
-  applyPlayNext,
-  applyBulkPlayNext,
-  applyAddToQueue,
-  getNextTrackToPlay,
-} from '../utils/musicTree';
+import { TrackItem, RepeatMode, FileStatus } from '../types/music';
 import { storePlaybackState } from '../services/idbStorage';
+import { useArtworkColors } from './useArtworkColors';
+import { useTrackLyrics } from './useTrackLyrics';
+import { usePlaybackQueue } from './usePlaybackQueue';
+import { useAudioEngine } from './useAudioEngine';
 
-interface UseAudioPlayerProps {
+export interface UseAudioPlayerProps {
   playlist?: TrackItem[];
   initialQueue?: TrackItem[];
   initialVolume?: number;
@@ -30,6 +23,11 @@ interface UseAudioPlayerProps {
   ) => void;
 }
 
+/**
+ * Luna Music Audio Player Hook
+ * Coordinates the audio engine, playback queue, lyrics, ambient colors,
+ * and playback state persistence.
+ */
 export function useAudioPlayer({
   playlist,
   initialQueue,
@@ -42,40 +40,58 @@ export function useAudioPlayer({
   onTrackStatusChanged,
 }: UseAudioPlayerProps = {}) {
   const [currentTrack, setCurrentTrack] = useState<TrackItem | null>(null);
-  const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(0);
-  const [volume, setVolume] = useState<number>(initialVolume);
-  const [isMuted, setIsMuted] = useState<boolean>(initialMuted);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>(initialRepeatMode);
   const [shuffle, setShuffle] = useState<boolean>(initialShuffle);
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
-  const [lyrics, setLyrics] = useState<LrcLine[]>([]);
-  const [ambientColors, setAmbientColors] = useState<{ primary: string; glow: string }>({
-    primary: 'rgba(56, 189, 248, 0.15)',
-    glow: 'rgba(99, 102, 241, 0.12)',
-  });
-  const [queue, setQueue] = useState<TrackItem[]>(() => initialQueue || playlist || []);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const activeUrlRef = useRef<string | null>(null);
   const currentTrackRef = useRef<TrackItem | null>(null);
   currentTrackRef.current = currentTrack;
-  const pendingSeekRef = useRef<number | null>(initialPosition > 0 ? initialPosition : null);
-  const queueRef = useRef<TrackItem[]>(queue);
-  queueRef.current = queue;
-  const onTrackStatusChangedRef = useRef(onTrackStatusChanged);
-  onTrackStatusChangedRef.current = onTrackStatusChanged;
-  const loadRequestIdRef = useRef<number>(0);
-  const playNextTrackIdRef = useRef<string | null>(null);
 
-  // Initialize native HTMLAudioElement without assigning invalid empty src
-  if (!audioRef.current && typeof Audio !== 'undefined') {
-    const audio = new Audio();
-    audio.preload = 'metadata';
-    audio.volume = initialMuted ? 0 : initialVolume;
-    audioRef.current = audio;
-  }
+  const repeatModeRef = useRef<RepeatMode>(repeatMode);
+  repeatModeRef.current = repeatMode;
+
+  const shuffleRef = useRef<boolean>(shuffle);
+  shuffleRef.current = shuffle;
+
+  // Queue state and algorithms
+  const queueControls = usePlaybackQueue({ initialQueue, playlist });
+  const {
+    queue,
+    clearPlayNextOverride,
+    setQueueImmediate,
+    appendTrackIfMissing,
+  } = queueControls;
+
+  // Forward declarations for circular references in ended handler
+  const nextTrackRef = useRef<() => void>(() => {});
+
+  const handleEnded = useCallback(() => {
+    if (repeatModeRef.current === 'one') {
+      audioEngine.seekTo(0);
+      const audio = audioEngine.audioRef.current;
+      if (audio) {
+        audio.play().catch(() => {});
+      }
+    } else {
+      nextTrackRef.current();
+    }
+  }, []);
+
+  // Audio element and engine controls
+  const audioEngine = useAudioEngine({
+    initialVolume,
+    initialMuted,
+    initialPosition,
+    currentTrack,
+    onTrackStatusChanged,
+    onTrackUpdated: setCurrentTrack,
+    onEnded: handleEnded,
+  });
+
+  const { loadAudioSource } = audioEngine;
+
+  // Lyrics and ambient artwork colors
+  const lyrics = useTrackLyrics(currentTrack);
+  const ambientColors = useArtworkColors(currentTrack?.metadata.artworkUrl);
 
   // Restore initial track on first load without auto-initiating playback
   useEffect(() => {
@@ -87,491 +103,113 @@ export function useAudioPlayer({
     }
   }, [queue, initialTrackId, currentTrack]);
 
-  // Handle ambient color updates when track artwork changes
-  useEffect(() => {
-    if (!currentTrack?.metadata.artworkUrl) {
-      setAmbientColors({
-        primary: 'rgba(56, 189, 248, 0.15)',
-        glow: 'rgba(99, 102, 241, 0.12)',
-      });
-      return;
-    }
-
-    let isMounted = true;
-    extractDominantColor(currentTrack.metadata.artworkUrl).then((colors) => {
-      if (isMounted && colors) {
-        setAmbientColors(colors);
-        if (typeof document !== 'undefined') {
-          document.documentElement.style.setProperty('--ambient-color', colors.primary);
-          document.documentElement.style.setProperty('--ambient-glow', colors.glow);
-        }
-      }
-    });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentTrack?.metadata.artworkUrl]);
-
-  // Load and parse lyrics whenever currentTrack changes
-  useEffect(() => {
-    let isCancelled = false;
-    setLyrics([]);
-
-    async function loadLyrics() {
-      if (!currentTrack) return;
-
-      try {
-        let text: string | null = null;
-        if (currentTrack.lrcContent) {
-          text = currentTrack.lrcContent;
-        } else if (currentTrack.lrcHandle) {
-          const file = await currentTrack.lrcHandle.getFile();
-          text = await file.text();
-        } else if (currentTrack.lrcFile) {
-          text = await currentTrack.lrcFile.text();
-        }
-
-        if (text && !isCancelled) {
-          const parsed = parseLrc(text);
-          setLyrics(parsed);
-        }
-      } catch {
-        if (!isCancelled) setLyrics([]);
-      }
-    }
-
-    loadLyrics();
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [currentTrack]);
-
-  // Audio source loader
-  const loadAudioSource = useCallback(async (track: TrackItem, autoPlay = true) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const requestId = ++loadRequestIdRef.current;
-    setPlaybackError(null);
-
-    // Revoke previous blob object URL to free memory safely
-    if (activeUrlRef.current) {
-      URL.revokeObjectURL(activeUrlRef.current);
-      activeUrlRef.current = null;
-    }
-
-    try {
-      let file: File | Blob | null = null;
-      if (track.handle) {
-        try {
-          file = await track.handle.getFile();
-        } catch {
-          if (loadRequestIdRef.current !== requestId) return;
-          track.status = 'unreadable';
-          if (onTrackStatusChangedRef.current) {
-            onTrackStatusChangedRef.current(track.id, 'unreadable');
-          }
-          audio.pause();
-          audio.removeAttribute('src');
-          audio.load();
-          setIsPlaying(false);
-          throw new Error(
-            'Cannot access this audio file. Please check file permissions or reopen the music folder.'
-          );
-        }
-      } else if (track.file) {
-        file = track.file;
-      }
-
-      if (loadRequestIdRef.current !== requestId) return;
-
-      if (!file) {
-        track.status = 'unreadable';
-        if (onTrackStatusChangedRef.current) {
-          onTrackStatusChangedRef.current(track.id, 'unreadable');
-        }
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-        setIsPlaying(false);
-        throw new Error(
-          'Cannot access this audio file. Please check file permissions or reopen the music folder.'
-        );
-      }
-
-      if (file.size === 0) {
-        track.status = 'empty';
-        track.size = 0;
-        if (onTrackStatusChangedRef.current) {
-          onTrackStatusChangedRef.current(track.id, 'empty', 0);
-        }
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-        setIsPlaying(false);
-        throw new Error(
-          'This audio file is empty (0 bytes). Please check or replace the original file.'
-        );
-      }
-
-      // If the file was previously abnormal, or modified/replaced on disk, refresh status and metadata
-      const isStatusAbnormal = track.status && track.status !== 'normal';
-      const isFileModified =
-        (track.lastModified && 'lastModified' in file && track.lastModified !== (file as File).lastModified) ||
-        track.size !== file.size;
-
-      if (isStatusAbnormal || isFileModified) {
-        track.status = 'normal';
-        track.size = file.size;
-        if ('lastModified' in file) {
-          track.lastModified = (file as File).lastModified;
-        }
-
-        let freshMetadata: Partial<TrackItem['metadata']> | undefined;
-        try {
-          const extracted = await extractAudioMetadata(file, track.name);
-          if (extracted && loadRequestIdRef.current === requestId) {
-            // Revoke previous artwork if new artwork was generated
-            if (
-              track.metadata.artworkUrl &&
-              extracted.artworkUrl &&
-              track.metadata.artworkUrl !== extracted.artworkUrl
-            ) {
-              URL.revokeObjectURL(track.metadata.artworkUrl);
-            }
-
-            freshMetadata = extracted;
-            track.metadata = {
-              ...track.metadata,
-              ...extracted,
-              isMetadataLoaded: true,
-            };
-            setCurrentTrack({ ...track });
-          }
-        } catch {
-          // Ignore metadata parse error on raw audio
-        }
-
-        if (loadRequestIdRef.current !== requestId) return;
-
-        if (onTrackStatusChangedRef.current) {
-          onTrackStatusChangedRef.current(track.id, 'normal', file.size, freshMetadata);
-        }
-      }
-
-      if (loadRequestIdRef.current !== requestId) return;
-
-      const objectUrl = URL.createObjectURL(file);
-      activeUrlRef.current = objectUrl;
-      audio.src = objectUrl;
-      audio.load();
-
-      if (autoPlay) {
-        audio.play().catch((err: Error) => {
-          if (err.name !== 'AbortError') {
-            console.warn('[Luna Music] Autoplay blocked or interrupted:', err);
-            setIsPlaying(false);
-          }
-        });
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to load audio';
-      console.error('[Luna Music] Load audio error:', err);
-      setPlaybackError(msg);
-      setIsPlaying(false);
-    }
-  }, []);
-
   // Play a specific track, optionally providing a new playback queue
   const playTrack = useCallback(
     (track: TrackItem, newQueue?: TrackItem[], autoPlay = true) => {
-      playNextTrackIdRef.current = null;
+      clearPlayNextOverride();
       if (newQueue && newQueue.length > 0) {
-        setQueue(newQueue);
-        queueRef.current = newQueue;
-      } else if (!queueRef.current.some((t) => isSameTrack(t, track))) {
-        const nextQ = [...queueRef.current, track];
-        setQueue(nextQ);
-        queueRef.current = nextQ;
+        setQueueImmediate(newQueue);
+      } else {
+        appendTrackIfMissing(track);
       }
       setCurrentTrack(track);
       loadAudioSource(track, autoPlay);
     },
-    [loadAudioSource]
+    [clearPlayNextOverride, setQueueImmediate, appendTrackIfMissing, loadAudioSource]
   );
 
   // Play an entire queue starting from startIndex or 0
   const playQueue = useCallback(
     (tracks: TrackItem[], startIndex = 0, autoPlay = true) => {
-      playNextTrackIdRef.current = null;
+      clearPlayNextOverride();
       if (tracks.length === 0) return;
-      setQueue(tracks);
-      queueRef.current = tracks;
+      setQueueImmediate(tracks);
       const target = tracks[startIndex] || tracks[0];
       setCurrentTrack(target);
       loadAudioSource(target, autoPlay);
     },
-    [loadAudioSource]
+    [clearPlayNextOverride, setQueueImmediate, loadAudioSource]
   );
-
-  // Insert track immediately after currentTrack in queue (Play Next)
-  // - If already in upcoming queue, move existing occurrence to immediately after current track
-  // - If multiple duplicate occurrences already exist in upcoming queue, consolidate into one
-  // - If selected track is currently playing, allow one additional occurrence immediately after current track
-  // - Preserve relative order of unrelated tracks
-  const playNext = useCallback(
-    (track: TrackItem): 'added' | 'moved' => {
-      if (!currentTrackRef.current && queueRef.current.length === 0) {
-        playTrack(track, [track], true);
-        playNextTrackIdRef.current = null;
-        return 'added';
-      }
-
-      const { nextQueue, outcome } = applyPlayNext(
-        queueRef.current,
-        currentTrackRef.current,
-        track
-      );
-
-      setQueue(nextQueue);
-      queueRef.current = nextQueue;
-
-      // Override shuffle for the very next track
-      playNextTrackIdRef.current = track.id;
-      return outcome;
-    },
-    [playTrack]
-  );
-
-  // Insert multiple tracks to play next in visible order
-  const playNextBulk = useCallback(
-    (tracks: TrackItem[]): { movedCount: number; addedCount: number } => {
-      if (tracks.length === 0) return { movedCount: 0, addedCount: 0 };
-
-      if (!currentTrackRef.current && queueRef.current.length === 0) {
-        playTrack(tracks[0], tracks, true);
-        playNextTrackIdRef.current = null;
-        return { movedCount: 0, addedCount: tracks.length };
-      }
-
-      const { nextQueue, movedCount, addedCount } = applyBulkPlayNext(
-        queueRef.current,
-        currentTrackRef.current,
-        tracks
-      );
-
-      setQueue(nextQueue);
-      queueRef.current = nextQueue;
-
-      if (tracks.length > 0) {
-        playNextTrackIdRef.current = tracks[0].id;
-      }
-
-      return { movedCount, addedCount };
-    },
-    [playTrack]
-  );
-
-  // Append track(s) to end of queue (Add to Queue)
-  // - If track is already in upcoming queue, do not append another occurrence
-  // - If track is not in upcoming queue, append it normally
-  // - Return boolean indicating whether any track was added
-  const addToQueue = useCallback(
-    (trackOrTracks: TrackItem | TrackItem[]): boolean => {
-      const incoming = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
-      if (incoming.length === 0) return false;
-
-      if (!currentTrackRef.current && queueRef.current.length === 0) {
-        playTrack(incoming[0], incoming, true);
-        return true;
-      }
-
-      const { nextQueue, addedCount } = applyAddToQueue(
-        queueRef.current,
-        currentTrackRef.current,
-        incoming
-      );
-
-      if (addedCount > 0) {
-        setQueue(nextQueue);
-        queueRef.current = nextQueue;
-        return true;
-      }
-
-      return false;
-    },
-    [playTrack]
-  );
-
-  // Remove track at index from queue
-  const removeFromQueue = useCallback((index: number) => {
-    setQueue((prevQueue) => {
-      if (index < 0 || index >= prevQueue.length) return prevQueue;
-      const nextQueue = prevQueue.filter((_, idx) => idx !== index);
-      queueRef.current = nextQueue;
-      return nextQueue;
-    });
-  }, []);
-
-  // Clear upcoming items in queue (preserving current track)
-  const clearQueue = useCallback(() => {
-    if (currentTrackRef.current) {
-      setQueue([currentTrackRef.current]);
-      queueRef.current = [currentTrackRef.current];
-    } else {
-      setQueue([]);
-      queueRef.current = [];
-    }
-  }, []);
-
-  // Reorder queue items
-  const reorderQueue = useCallback((fromIndex: number, toIndex: number) => {
-    setQueue((prevQueue) => {
-      if (
-        fromIndex < 0 ||
-        fromIndex >= prevQueue.length ||
-        toIndex < 0 ||
-        toIndex >= prevQueue.length ||
-        fromIndex === toIndex
-      ) {
-        return prevQueue;
-      }
-      const nextQueue = [...prevQueue];
-      const [moved] = nextQueue.splice(fromIndex, 1);
-      nextQueue.splice(toIndex, 0, moved);
-      queueRef.current = nextQueue;
-      return nextQueue;
-    });
-  }, []);
-
-  // Toggle play/pause
-  const togglePlay = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (!currentTrack) {
-      if (queueRef.current.length > 0) {
-        playTrack(queueRef.current[0], undefined, true);
-      }
-      return;
-    }
-
-    // If track is selected but audio source hasn't loaded yet
-    if (!activeUrlRef.current && currentTrack) {
-      playTrack(currentTrack, undefined, true);
-      return;
-    }
-
-    if (audio.paused) {
-      audio.play().catch((err: Error) => {
-        if (err.name !== 'AbortError') {
-          setPlaybackError(`Playback failed: ${err.message}`);
-        }
-      });
-    } else {
-      audio.pause();
-    }
-  }, [currentTrack, playTrack]);
 
   // Advance to next track in queue
   const nextTrack = useCallback(() => {
-    const currentList = queueRef.current;
-    if (currentList.length === 0) return;
-
-    const { nextTrack: targetTrack, shouldClearOverride } = getNextTrackToPlay(
-      currentList,
-      currentTrack,
-      shuffle,
-      repeatMode,
-      playNextTrackIdRef.current
+    const targetTrack = queueControls.getNextTrack(
+      currentTrackRef.current,
+      shuffleRef.current,
+      repeatModeRef.current
     );
-
-    if (shouldClearOverride) {
-      playNextTrackIdRef.current = null;
-    }
 
     if (targetTrack) {
       playTrack(targetTrack, undefined, true);
     } else {
-      setIsPlaying(false);
+      audioEngine.setIsPlaying(false);
     }
-  }, [currentTrack, shuffle, repeatMode, playTrack]);
+  }, [queueControls, playTrack, audioEngine]);
+
+  nextTrackRef.current = nextTrack;
 
   // Return to previous track in queue
   const prevTrack = useCallback(() => {
-    const currentList = queueRef.current;
-    if (currentList.length === 0) return;
-
-    const audio = audioRef.current;
+    const audio = audioEngine.audioRef.current;
     if (audio && audio.currentTime > 3) {
-      audio.currentTime = 0;
+      audioEngine.seekTo(0);
       return;
     }
 
-    if (!currentTrack) {
-      playTrack(currentList[0], undefined, true);
-      return;
+    const { targetTrack, shouldRestartCurrent } = queueControls.getPrevTrack(
+      currentTrackRef.current,
+      repeatModeRef.current
+    );
+
+    if (targetTrack) {
+      playTrack(targetTrack, undefined, true);
+    } else if (shouldRestartCurrent) {
+      audioEngine.seekTo(0);
     }
+  }, [audioEngine, queueControls, playTrack]);
 
-    const currentIndex = currentList.findIndex((t) => isSameTrack(t, currentTrack));
-    if (currentIndex > 0) {
-      playTrack(currentList[currentIndex - 1], undefined, true);
-    } else if (repeatMode === 'all') {
-      playTrack(currentList[currentList.length - 1], undefined, true);
-    } else {
-      if (audio) audio.currentTime = 0;
-    }
-  }, [currentTrack, repeatMode, playTrack]);
+  // Toggle play/pause
+  const togglePlay = useCallback(() => {
+    audioEngine.togglePlay(() => {
+      if (currentTrackRef.current) {
+        playTrack(currentTrackRef.current, undefined, true);
+      } else if (queueControls.queueRef.current.length > 0) {
+        playTrack(queueControls.queueRef.current[0], undefined, true);
+      }
+    });
+  }, [audioEngine, playTrack, queueControls.queueRef]);
 
-  // Seek absolute time
-  const seekTo = useCallback((timeInSeconds: number) => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const clamped = Math.max(0, Math.min(timeInSeconds, audio.duration || 0));
-    audio.currentTime = clamped;
-    setCurrentTime(clamped);
-  }, []);
-
-  // Seek relative delta seconds
-  const seekRelative = useCallback(
-    (deltaSeconds: number) => {
-      const audio = audioRef.current;
-      if (!audio) return;
-      seekTo((audio.currentTime || 0) + deltaSeconds);
+  // Queue manipulation actions bound with fallback playback
+  const playNext = useCallback(
+    (track: TrackItem) => {
+      return queueControls.playNext(track, currentTrackRef.current, (t, q) =>
+        playTrack(t, q, true)
+      );
     },
-    [seekTo]
+    [queueControls, playTrack]
   );
 
-  // Set volume
-  const changeVolume = useCallback((newVol: number) => {
-    const clamped = Math.max(0, Math.min(1, newVol));
-    setVolume(clamped);
-    setIsMuted(clamped === 0);
-    if (audioRef.current) {
-      audioRef.current.volume = clamped;
-    }
-    storePlaybackState({ volume: clamped, isMuted: clamped === 0 });
-  }, []);
-
-  // Adjust volume relative
-  const adjustVolume = useCallback(
-    (delta: number) => {
-      changeVolume(volume + delta);
+  const playNextBulk = useCallback(
+    (tracks: TrackItem[]) => {
+      return queueControls.playNextBulk(tracks, currentTrackRef.current, (t, q) =>
+        playTrack(t, q, true)
+      );
     },
-    [volume, changeVolume]
+    [queueControls, playTrack]
   );
 
-  // Toggle mute
-  const toggleMute = useCallback(() => {
-    const nextMuted = !isMuted;
-    setIsMuted(nextMuted);
-    if (audioRef.current) {
-      audioRef.current.volume = nextMuted ? 0 : volume;
-    }
-    storePlaybackState({ isMuted: nextMuted });
-  }, [isMuted, volume]);
+  const addToQueue = useCallback(
+    (trackOrTracks: TrackItem | TrackItem[]) => {
+      return queueControls.addToQueue(trackOrTracks, currentTrackRef.current, (t, q) =>
+        playTrack(t, q, true)
+      );
+    },
+    [queueControls, playTrack]
+  );
+
+  const clearQueue = useCallback(() => {
+    queueControls.clearQueue(currentTrackRef.current);
+  }, [queueControls]);
 
   // Cycle repeat modes: off -> all -> one -> off
   const cycleRepeatMode = useCallback(() => {
@@ -591,160 +229,33 @@ export function useAudioPlayer({
     });
   }, []);
 
-  const clearPlaybackError = useCallback(() => {
-    setPlaybackError(null);
-  }, []);
-
-  // Attach audio element event listeners
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-    const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onDurationChange = () => setDuration(audio.duration || 0);
-
-    const onLoadedMetadata = () => {
-      setDuration(audio.duration || 0);
-      if (pendingSeekRef.current !== null) {
-        audio.currentTime = pendingSeekRef.current;
-        pendingSeekRef.current = null;
-      }
-    };
-
-    const onEnded = () => {
-      if (repeatMode === 'one') {
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
-      } else {
-        nextTrack();
-      }
-    };
-
-    const onError = () => {
-      const err = audio.error;
-
-      // Ignore errors when no track is actively assigned, no src attribute is set, or during cleanup
-      if (!activeUrlRef.current || !currentTrackRef.current || !audio.hasAttribute('src')) {
-        return;
-      }
-
-      // Ignore aborted errors from switching tracks
-      if (!err || (typeof MediaError !== 'undefined' && err.code === MediaError.MEDIA_ERR_ABORTED)) {
-        return;
-      }
-
-      // Ignore empty src errors
-      if (err.message && /empty src/i.test(err.message)) {
-        return;
-      }
-
-      let message = 'An error occurred while playing this audio file.';
-      if (typeof MediaError !== 'undefined') {
-        switch (err.code) {
-          case MediaError.MEDIA_ERR_NETWORK:
-            message = 'A network or file read error occurred.';
-            break;
-          case MediaError.MEDIA_ERR_DECODE:
-            message = 'Audio decode failed. The audio codec or file may be corrupted.';
-            break;
-          case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED: {
-            const trackName = currentTrackRef.current?.name || '';
-            const isConfirmedUnsupported =
-              Boolean(err.message && /unsupported_codec|no decoder|codec not supported/i.test(err.message)) ||
-              Boolean(trackName && !isFormatSupportedByBrowser(trackName));
-
-            if (isConfirmedUnsupported) {
-              message = 'This audio format or codec may not be supported by your browser.';
-              if (currentTrackRef.current) {
-                currentTrackRef.current.status = 'unsupported';
-                if (onTrackStatusChangedRef.current) {
-                  onTrackStatusChangedRef.current(currentTrackRef.current.id, 'unsupported');
-                }
-              }
-            } else {
-              // Ambiguous Code 4 / demuxer / corrupted stream errors default to decode failure, not unsupported
-              message = 'Audio decode failed. The audio codec or file may be corrupted.';
-            }
-            break;
-          }
-          default:
-            message = err.message || 'Unable to play this audio file.';
-            break;
-        }
-      }
-
-      console.error('[Luna Music] Audio playback error:', {
-        code: err.code,
-        message: err.message,
-        track: currentTrackRef.current?.name,
-      });
-
-      setPlaybackError(message);
-      setIsPlaying(false);
-    };
-
-    audio.addEventListener('play', onPlay);
-    audio.addEventListener('pause', onPause);
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('durationchange', onDurationChange);
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('error', onError);
-
-    return () => {
-      audio.removeEventListener('play', onPlay);
-      audio.removeEventListener('pause', onPause);
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('durationchange', onDurationChange);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('error', onError);
-    };
-  }, [repeatMode, nextTrack]);
-
   // Persist playback position throttled
   useEffect(() => {
     if (!currentTrack) return;
     const interval = setInterval(() => {
-      if (audioRef.current && isPlaying) {
+      const audio = audioEngine.audioRef.current;
+      if (audio && audioEngine.isPlaying) {
         storePlaybackState({
           lastTrackId: currentTrack.id,
-          lastPosition: audioRef.current.currentTime,
+          lastPosition: audio.currentTime,
         });
       }
     }, 4000);
 
     return () => clearInterval(interval);
-  }, [currentTrack, isPlaying]);
-
-  // Clean up on component unmount safely without setting audio.src = ''
-  useEffect(() => {
-    return () => {
-      if (activeUrlRef.current) {
-        URL.revokeObjectURL(activeUrlRef.current);
-        activeUrlRef.current = null;
-      }
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute('src');
-        audioRef.current.load();
-      }
-    };
-  }, []);
+  }, [currentTrack, audioEngine.isPlaying, audioEngine.audioRef]);
 
   return {
     currentTrack,
-    isPlaying,
-    currentTime,
-    duration,
-    volume,
-    isMuted,
+    isPlaying: audioEngine.isPlaying,
+    currentTime: audioEngine.currentTime,
+    duration: audioEngine.duration,
+    volume: audioEngine.volume,
+    isMuted: audioEngine.isMuted,
     repeatMode,
     shuffle,
-    playbackError,
-    clearPlaybackError,
+    playbackError: audioEngine.playbackError,
+    clearPlaybackError: audioEngine.clearPlaybackError,
     lyrics,
     ambientColors,
     queue,
@@ -753,17 +264,17 @@ export function useAudioPlayer({
     playNext,
     playNextBulk,
     addToQueue,
-    removeFromQueue,
+    removeFromQueue: queueControls.removeFromQueue,
     clearQueue,
-    reorderQueue,
+    reorderQueue: queueControls.reorderQueue,
     togglePlay,
     nextTrack,
     prevTrack,
-    seekTo,
-    seekRelative,
-    changeVolume,
-    adjustVolume,
-    toggleMute,
+    seekTo: audioEngine.seekTo,
+    seekRelative: audioEngine.seekRelative,
+    changeVolume: audioEngine.changeVolume,
+    adjustVolume: audioEngine.adjustVolume,
+    toggleMute: audioEngine.toggleMute,
     cycleRepeatMode,
     toggleShuffle,
   };
