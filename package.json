@@ -1,0 +1,38 @@
+{
+  "name": "luna-music",
+  "version": "0.1.0",
+  "description": "Luna Music - Modern browser-based local music player",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "music-player",
+    "local-audio",
+    "browser",
+    "id3",
+    "lrc-lyrics"
+  ],
+  "author": "Jin Liu",
+  "license": "MIT",
+  "dependencies": {
+    "lucide-react": "^1.66.0",
+    "music-metadata": "^12.7.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
