@@ -275,6 +275,7 @@ export function App() {
                 {currentView === 'all' && (
                   <TrackList
                     tracks={displayedTracks}
+                    libraryTracks={library?.flatPlaylist || []}
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}
@@ -292,6 +293,7 @@ export function App() {
                 {currentView === 'favourites' && (
                   <TrackList
                     tracks={displayedTracks}
+                    libraryTracks={library?.flatPlaylist || []}
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}

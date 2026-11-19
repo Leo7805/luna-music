@@ -497,20 +497,39 @@ export function isSameTrack(a: TrackItem, b: TrackItem): boolean {
 /**
  * Authoritative check if a track matches the user's favourites set.
  * Checks canonical id, aliases, and relative path matching.
+ * When libraryTracks is provided, legacy relative path matching is only applied
+ * if the relative path unambiguously refers to exactly one track in the library.
  */
-export function isFavouriteTrack(track: TrackItem, favourites: Set<string>): boolean {
+export function isFavouriteTrack(
+  track: TrackItem,
+  favourites: Set<string>,
+  libraryTracks?: TrackItem[]
+): boolean {
   if (favourites.size === 0) return false;
   if (favourites.has(track.id)) return true;
   if (track.aliases && track.aliases.some((alias) => favourites.has(alias))) return true;
-  if (favourites.has(track.relativePath)) return true;
 
-  // Check if any favourite entry ends with :relativePath or /relativePath
+  // Check legacy relative path matching
   const relPathColon = ':' + track.relativePath;
   const relPathSlash = '/' + track.relativePath;
-  for (const favId of favourites) {
-    if (favId.endsWith(relPathColon) || favId.endsWith(relPathSlash)) {
-      return true;
+  const hasLegacyMatch =
+    favourites.has(track.relativePath) ||
+    Array.from(favourites).some(
+      (favId) => favId.endsWith(relPathColon) || favId.endsWith(relPathSlash)
+    );
+
+  if (hasLegacyMatch) {
+    if (libraryTracks && libraryTracks.length > 0) {
+      const matchCount = libraryTracks.filter(
+        (t) => t.relativePath === track.relativePath
+      ).length;
+      if (matchCount === 1) {
+        return true;
+      }
+      // Ambiguous: multiple tracks across independent folders share this relative path
+      return false;
     }
+    return true;
   }
 
   return false;
@@ -526,7 +545,8 @@ export interface FavouriteResolutionResult {
  * Resolves stored favourite IDs against the library tracks.
  * - Deduplicates resolved tracks by canonical ID (avoiding inflated counts).
  * - Preserves unresolved favourite IDs so they are not lost when folders are detached.
- * - Detects IDs that can be migrated/healed to canonical track IDs.
+ * - Only migrates legacy relativePath matches when the match is strictly unambiguous (exactly 1 track).
+ * - Preserves ambiguous IDs in unresolvedIds to prevent marking the wrong track.
  */
 export function resolveFavouriteTracks(
   libraryTracks: TrackItem[],
@@ -573,7 +593,8 @@ export function resolveFavouriteTracks(
         relativePathCandidate = favId.slice(colonIdx + 1);
       }
       const candidates = tracksByRelativePath.get(relativePathCandidate);
-      if (candidates && candidates.length > 0) {
+      // Strictly require unambiguous match (exactly 1 track across all imported folders)
+      if (candidates && candidates.length === 1) {
         matchedTrack = candidates[0];
         migratedMap.set(favId, matchedTrack.id);
       }

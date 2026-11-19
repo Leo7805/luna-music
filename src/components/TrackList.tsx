@@ -20,6 +20,7 @@ import { PlaylistModal } from './PlaylistModal';
 
 interface TrackListProps {
   tracks: TrackItem[];
+  libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
   favourites: Set<string>;
@@ -40,6 +41,7 @@ interface TrackListProps {
 
 export const TrackList: React.FC<TrackListProps> = ({
   tracks,
+  libraryTracks,
   currentTrackId,
   isPlaying,
   favourites,
@@ -155,7 +157,7 @@ export const TrackList: React.FC<TrackListProps> = ({
       <div className="divide-y divide-slate-200/60 dark:divide-white/[0.02]">
         {tracks.map((track, idx) => {
           const isCurrent = currentTrackId === track.id;
-          const isFav = isFavouriteTrack(track, favourites);
+          const isFav = isFavouriteTrack(track, favourites, libraryTracks || tracks);
           const extension = track.name.split('.').pop()?.toUpperCase() || '';
           const status = getTrackStatus(track);
           const isAbnormal = status !== 'normal';

@@ -751,7 +751,12 @@ export function useMusicLibrary() {
       setFavourites((prev) => {
         let changed = false;
         const next = new Set(prev);
-        for (const canonicalId of favouriteResolution.migratedMap.values()) {
+        for (const [oldId, canonicalId] of favouriteResolution.migratedMap.entries()) {
+          // Replace legacy ID with canonical ID in persistent storage
+          if (next.has(oldId)) {
+            next.delete(oldId);
+            changed = true;
+          }
           if (!next.has(canonicalId)) {
             next.add(canonicalId);
             changed = true;
@@ -779,7 +784,9 @@ export function useMusicLibrary() {
 
     setFavourites((prev) => {
       const next = new Set(prev);
-      const isFav = track ? isFavouriteTrack(track, next) : next.has(trackId);
+      const isFav = track
+        ? isFavouriteTrack(track, next, library?.flatPlaylist)
+        : next.has(trackId);
 
       if (isFav) {
         // Remove canonical ID, aliases, and any keys matching relative path
@@ -793,7 +800,7 @@ export function useMusicLibrary() {
           const relColon = ':' + track.relativePath;
           const relSlash = '/' + track.relativePath;
           for (const key of Array.from(next)) {
-            if (key.endsWith(relColon) || key.endsWith(relSlash)) {
+            if (key === track.relativePath || key.endsWith(relColon) || key.endsWith(relSlash)) {
               next.delete(key);
             }
           }

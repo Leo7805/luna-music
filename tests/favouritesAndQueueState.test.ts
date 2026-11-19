@@ -111,6 +111,82 @@ describe('Favourites State Synchronization (Bug A)', () => {
     expect(result.unresolvedIds).toEqual(['nonExistent:track.mp3']);
     expect(isFavouriteTrack(track1, favourites)).toBe(false);
   });
+
+  // Edge Case 1: Legacy relativePath ambiguity across independent root folders
+  it('6a. prevents accidental favourite match when multiple independent folders share identical relative paths', () => {
+    const folder1Track = createMockTrack('folder1:shared.mp3', 'shared.mp3', 'Shared Track in Folder 1');
+    const folder2Track = createMockTrack('folder2:shared.mp3', 'shared.mp3', 'Shared Track in Folder 2');
+    const uniqueTrack = createMockTrack('folder1:unique.mp3', 'unique.mp3', 'Unique Track');
+    const multiRootLibrary = [folder1Track, folder2Track, uniqueTrack];
+
+    // Legacy favourite with ambiguous relativePath
+    const ambiguousFavourites = new Set(['shared.mp3']);
+    const ambResult = resolveFavouriteTracks(multiRootLibrary, ambiguousFavourites);
+
+    // Because 'shared.mp3' exists in both folders, it cannot be safely identified
+    expect(ambResult.resolvedTracks).toHaveLength(0);
+    expect(ambResult.migratedMap.size).toBe(0);
+    expect(ambResult.unresolvedIds).toEqual(['shared.mp3']);
+
+    // isFavouriteTrack with multiRootLibrary context must also reject ambiguous match
+    expect(isFavouriteTrack(folder1Track, ambiguousFavourites, multiRootLibrary)).toBe(false);
+    expect(isFavouriteTrack(folder2Track, ambiguousFavourites, multiRootLibrary)).toBe(false);
+
+    // Unambiguous track must resolve safely
+    const unambiguousFavourites = new Set(['unique.mp3']);
+    const unambResult = resolveFavouriteTracks(multiRootLibrary, unambiguousFavourites);
+    expect(unambResult.resolvedTracks).toHaveLength(1);
+    expect(unambResult.resolvedTracks[0].id).toBe('folder1:unique.mp3');
+    expect(unambResult.migratedMap.get('unique.mp3')).toBe('folder1:unique.mp3');
+    expect(isFavouriteTrack(uniqueTrack, unambiguousFavourites, multiRootLibrary)).toBe(true);
+  });
+
+  // Edge Case 2: Favourite removal after migration and reload
+  it('6b. correctly removes all legacy, canonical, and alias references on unfavourite so track stays unfavourited on reload', () => {
+    const track = createMockTrack('folderA:APT.flac', 'APT.flac', 'APT', ['legacyAlias:APT.flac']);
+    const lib = [track];
+
+    // Step 1: Start with legacy favourite ID
+    let storedFavourites = new Set(['APT.flac']);
+
+    // Step 2: Resolve and migrate legacy ID to canonical ID
+    const resolution = resolveFavouriteTracks(lib, storedFavourites);
+    expect(resolution.resolvedTracks).toHaveLength(1);
+    expect(resolution.migratedMap.get('APT.flac')).toBe('folderA:APT.flac');
+
+    // Simulate migration effect: replace oldId with canonicalId in stored favourites
+    for (const [oldId, canonicalId] of resolution.migratedMap.entries()) {
+      storedFavourites.delete(oldId);
+      storedFavourites.add(canonicalId);
+    }
+    expect(storedFavourites.has('APT.flac')).toBe(false);
+    expect(storedFavourites.has('folderA:APT.flac')).toBe(true);
+
+    // Step 3: User unfavourites the track
+    const canonicalId = track.id;
+    const trackId = track.id;
+    storedFavourites.delete(canonicalId);
+    storedFavourites.delete(trackId);
+    if (track.aliases) {
+      track.aliases.forEach((a) => storedFavourites.delete(a));
+    }
+    storedFavourites.delete(track.relativePath);
+    const relColon = ':' + track.relativePath;
+    const relSlash = '/' + track.relativePath;
+    for (const key of Array.from(storedFavourites)) {
+      if (key === track.relativePath || key.endsWith(relColon) || key.endsWith(relSlash)) {
+        storedFavourites.delete(key);
+      }
+    }
+
+    expect(storedFavourites.size).toBe(0);
+
+    // Step 4: Simulate app reload with storedFavourites
+    const reloadResolution = resolveFavouriteTracks(lib, storedFavourites);
+    expect(reloadResolution.resolvedTracks).toHaveLength(0);
+    expect(reloadResolution.unresolvedIds).toHaveLength(0);
+    expect(isFavouriteTrack(track, storedFavourites, lib)).toBe(false);
+  });
 });
 
 describe('Authoritative Playback Queue & Now Playing Decoupling (Bug B)', () => {

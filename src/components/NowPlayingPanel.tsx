@@ -99,19 +99,17 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
         <div className="flex items-center gap-1">
           {/* Tab Switcher */}
           <div className="flex items-center bg-slate-200/80 dark:bg-white/[0.06] rounded-lg p-0.5 border border-slate-300/80 dark:border-white/[0.06]">
-            {hasLyrics && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('lyrics')}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                  activeTab === 'lyrics'
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                }`}
-              >
-                Lyrics
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setActiveTab('lyrics')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                activeTab === 'lyrics'
+                  ? 'bg-indigo-600 text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              Lyrics
+            </button>
             <button
               type="button"
               onClick={() => setActiveTab('queue')}
