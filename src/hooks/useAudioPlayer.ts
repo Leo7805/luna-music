@@ -13,7 +13,8 @@ import {
 import { storePlaybackState } from '../services/idbStorage';
 
 interface UseAudioPlayerProps {
-  playlist: TrackItem[];
+  playlist?: TrackItem[];
+  initialQueue?: TrackItem[];
   initialVolume?: number;
   initialMuted?: boolean;
   initialRepeatMode?: RepeatMode;
@@ -30,6 +31,7 @@ interface UseAudioPlayerProps {
 
 export function useAudioPlayer({
   playlist,
+  initialQueue,
   initialVolume = 0.8,
   initialMuted = false,
   initialRepeatMode = 'off',
@@ -37,7 +39,7 @@ export function useAudioPlayer({
   initialTrackId = null,
   initialPosition = 0,
   onTrackStatusChanged,
-}: UseAudioPlayerProps) {
+}: UseAudioPlayerProps = {}) {
   const [currentTrack, setCurrentTrack] = useState<TrackItem | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -52,7 +54,7 @@ export function useAudioPlayer({
     primary: 'rgba(56, 189, 248, 0.15)',
     glow: 'rgba(99, 102, 241, 0.12)',
   });
-  const [queue, setQueue] = useState<TrackItem[]>(() => playlist || []);
+  const [queue, setQueue] = useState<TrackItem[]>(() => initialQueue || playlist || []);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeUrlRef = useRef<string | null>(null);
@@ -73,14 +75,6 @@ export function useAudioPlayer({
     audio.volume = initialMuted ? 0 : initialVolume;
     audioRef.current = audio;
   }
-
-  // Populate queue on first load if queue is empty and playlist is supplied
-  useEffect(() => {
-    if (queue.length === 0 && playlist.length > 0) {
-      setQueue(playlist);
-      queueRef.current = playlist;
-    }
-  }, [playlist, queue.length]);
 
   // Restore initial track on first load without auto-initiating playback
   useEffect(() => {

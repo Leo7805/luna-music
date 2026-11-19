@@ -31,6 +31,8 @@ import {
   buildUnifiedMultiFolderTree,
   combineFlatPlaylists,
   reconcileOverlappingTracks,
+  resolveFavouriteTracks,
+  isFavouriteTrack,
 } from '../utils/musicTree';
 import { extractAudioMetadata } from '../utils/metadata';
 import { naturalSort } from '../utils/naturalSort';
@@ -732,19 +734,70 @@ export function useMusicLibrary() {
     [library, startIncrementalMetadataExtraction]
   );
 
+  // Resolve favourites against library tracks
+  const favouriteResolution = useMemo(() => {
+    if (!library) {
+      return { resolvedTracks: [], unresolvedIds: Array.from(favourites), migratedMap: new Map<string, string>() };
+    }
+    return resolveFavouriteTracks(library.flatPlaylist, favourites);
+  }, [library, favourites]);
+
+  const favouriteTracks = favouriteResolution.resolvedTracks;
+  const favouritesCount = favouriteTracks.length;
+
+  // Auto-heal legacy or alias favourite IDs to canonical IDs without dropping unresolved IDs
+  useEffect(() => {
+    if (favouriteResolution.migratedMap.size > 0) {
+      setFavourites((prev) => {
+        let changed = false;
+        const next = new Set(prev);
+        for (const canonicalId of favouriteResolution.migratedMap.values()) {
+          if (!next.has(canonicalId)) {
+            next.add(canonicalId);
+            changed = true;
+          }
+        }
+        if (changed) {
+          storePlaybackState({ favourites: Array.from(next) });
+          return next;
+        }
+        return prev;
+      });
+    }
+  }, [favouriteResolution.migratedMap]);
+
   // Toggle favorite track
   const toggleFavourite = useCallback((trackId: string) => {
     const track = library?.flatPlaylist.find(
-      (t) => t.id === trackId || (t.aliases && t.aliases.includes(trackId))
+      (t) =>
+        t.id === trackId ||
+        (t.aliases && t.aliases.includes(trackId)) ||
+        t.relativePath === trackId ||
+        trackId.endsWith(':' + t.relativePath)
     );
     const canonicalId = track ? track.id : trackId;
-    const allIds = track?.aliases && track.aliases.length > 0 ? track.aliases : [canonicalId];
 
     setFavourites((prev) => {
       const next = new Set(prev);
-      const isFav = allIds.some((id) => next.has(id));
+      const isFav = track ? isFavouriteTrack(track, next) : next.has(trackId);
+
       if (isFav) {
-        allIds.forEach((id) => next.delete(id));
+        // Remove canonical ID, aliases, and any keys matching relative path
+        next.delete(canonicalId);
+        next.delete(trackId);
+        if (track) {
+          if (track.aliases) {
+            track.aliases.forEach((a) => next.delete(a));
+          }
+          next.delete(track.relativePath);
+          const relColon = ':' + track.relativePath;
+          const relSlash = '/' + track.relativePath;
+          for (const key of Array.from(next)) {
+            if (key.endsWith(relColon) || key.endsWith(relSlash)) {
+              next.delete(key);
+            }
+          }
+        }
       } else {
         next.add(canonicalId);
       }
@@ -837,9 +890,7 @@ export function useMusicLibrary() {
     if (currentView === 'all') {
       baseList = library.flatPlaylist;
     } else if (currentView === 'favourites') {
-      baseList = library.flatPlaylist.filter(
-        (t) => favourites.has(t.id) || Boolean(t.aliases?.some((a) => favourites.has(a)))
-      );
+      baseList = favouriteTracks;
     } else if (currentView === 'folder') {
       if (currentFolderNode) {
         baseList = currentFolderNode.tracks;
@@ -883,7 +934,7 @@ export function useMusicLibrary() {
     selectedArtistName,
     selectedAlbumId,
     albums,
-    favourites,
+    favouriteTracks,
     searchQuery,
   ]);
 
@@ -964,6 +1015,8 @@ export function useMusicLibrary() {
     selectedAlbumId,
     searchQuery,
     favourites,
+    favouriteTracks,
+    favouritesCount,
     isLoading,
     scanProgress,
     needsPermission,

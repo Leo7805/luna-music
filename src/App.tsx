@@ -49,6 +49,7 @@ export function App() {
     selectedAlbumId,
     searchQuery,
     favourites,
+    favouritesCount,
     isLoading,
     scanProgress,
     needsPermission,
@@ -104,7 +105,6 @@ export function App() {
     cycleRepeatMode,
     toggleShuffle,
   } = useAudioPlayer({
-    playlist: displayedTracks.length > 0 ? displayedTracks : library?.flatPlaylist || [],
     onTrackStatusChanged: updateTrackStatus,
   });
 
@@ -218,7 +218,7 @@ export function App() {
           folders={folders}
           playlists={playlists}
           selectedPlaylistId={selectedPlaylistId}
-          favouritesCount={favourites.size}
+          favouritesCount={favouritesCount}
           totalTracksCount={library?.flatPlaylist.length || 0}
           hasLibrary={hasLibrary}
           isScanning={isLoading}
@@ -285,6 +285,7 @@ export function App() {
                     onPlayNext={playNext}
                     onAddToQueue={addToQueue}
                     onAddToPlaylist={addTrackToPlaylist}
+                    emptyVariant={searchQuery ? 'search' : 'default'}
                   />
                 )}
 
@@ -301,6 +302,7 @@ export function App() {
                     onPlayNext={playNext}
                     onAddToQueue={addToQueue}
                     onAddToPlaylist={addTrackToPlaylist}
+                    emptyVariant="favourites"
                   />
                 )}
 

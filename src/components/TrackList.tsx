@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { TrackItem, Playlist } from '../types/music';
 import { formatDuration } from '../utils/formatters';
-import { getTrackStatus } from '../utils/musicTree';
+import { getTrackStatus, isFavouriteTrack } from '../utils/musicTree';
 import { TrackStatusBadge } from './TrackStatusBadge';
 import { PlaylistModal } from './PlaylistModal';
 
@@ -34,6 +34,8 @@ interface TrackListProps {
   onRemoveFromPlaylist?: (trackId: string, index: number) => void;
   onMoveTrackUp?: (index: number) => void;
   onMoveTrackDown?: (index: number) => void;
+  emptyVariant?: 'default' | 'favourites' | 'search';
+  emptyMessage?: string;
 }
 
 export const TrackList: React.FC<TrackListProps> = ({
@@ -52,6 +54,8 @@ export const TrackList: React.FC<TrackListProps> = ({
   onRemoveFromPlaylist,
   onMoveTrackUp,
   onMoveTrackDown,
+  emptyVariant = 'default',
+  emptyMessage,
 }) => {
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
   const [playlistModalTrack, setPlaylistModalTrack] = useState<TrackItem | null>(null);
@@ -90,9 +94,37 @@ export const TrackList: React.FC<TrackListProps> = ({
   };
 
   if (tracks.length === 0) {
+    if (emptyVariant === 'favourites') {
+      return (
+        <div className="py-20 text-center flex flex-col items-center justify-center">
+          <div className="w-12 h-12 rounded-full bg-rose-500/10 dark:bg-rose-500/20 flex items-center justify-center mb-3 text-rose-500 dark:text-rose-400">
+            <Heart className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+            No favourite tracks yet
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">
+            Click the heart icon on any track to add it to your favourites.
+          </p>
+        </div>
+      );
+    }
+
+    if (emptyVariant === 'search') {
+      return (
+        <div className="py-16 text-center">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {emptyMessage || 'No tracks found matching your search.'}
+          </p>
+        </div>
+      );
+    }
+
     return (
       <div className="py-16 text-center">
-        <p className="text-sm text-slate-500 dark:text-slate-400">No tracks found matching your selection.</p>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
+          {emptyMessage || 'No tracks found matching your selection.'}
+        </p>
       </div>
     );
   }
@@ -123,9 +155,7 @@ export const TrackList: React.FC<TrackListProps> = ({
       <div className="divide-y divide-slate-200/60 dark:divide-white/[0.02]">
         {tracks.map((track, idx) => {
           const isCurrent = currentTrackId === track.id;
-          const isFav =
-            favourites.has(track.id) ||
-            Boolean(track.aliases?.some((a) => favourites.has(a)));
+          const isFav = isFavouriteTrack(track, favourites);
           const extension = track.name.split('.').pop()?.toUpperCase() || '';
           const status = getTrackStatus(track);
           const isAbnormal = status !== 'normal';
