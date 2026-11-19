@@ -93,7 +93,7 @@ export interface LrcLine {
   text: string;
 }
 
-export type LibraryView = 'all' | 'folder' | 'artists' | 'albums' | 'favourites';
+export type LibraryView = 'all' | 'folder' | 'playlists' | 'artists' | 'albums' | 'favourites';
 
 export interface AlbumGroup {
   id: string;

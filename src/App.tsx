@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { TrackList } from './components/TrackList';
+import { PlaylistsView } from './components/PlaylistsView';
 import { FolderView } from './components/FolderView';
 import { AlbumsView } from './components/AlbumsView';
 import { ArtistsView } from './components/ArtistsView';
@@ -16,6 +17,7 @@ import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { getBreadcrumbs } from './utils/musicTree';
+import { LibraryView } from './types/music';
 
 export function App() {
   const { theme, toggleTheme } = useTheme();
@@ -25,6 +27,7 @@ export function App() {
   // Music Library state and actions
   const {
     library,
+    folders,
     currentView,
     selectedFolderPath,
     selectedArtistName,
@@ -45,6 +48,9 @@ export function App() {
     setSearchQuery,
     toggleFavourite,
     openFolderPicker,
+    refreshFolder,
+    removeFolder,
+    requestPermissionForFolder,
     handleFallbackFolderSelect,
     handleOpenFilesSelect,
     requestPermissionAndLoad,
@@ -104,12 +110,24 @@ export function App() {
 
   useShortcuts(shortcutHandlers);
 
-  const hasLibrary = Boolean(library && library.flatPlaylist.length > 0);
+  const hasLibrary = Boolean(
+    library && (library.flatPlaylist.length > 0 || (library.folders && library.folders.length > 0))
+  );
+
+  const handleSelectView = useCallback(
+    (view: LibraryView) => {
+      setCurrentView(view);
+      if (view === 'folder' && currentView === 'folder') {
+        selectFolder('');
+      }
+    },
+    [currentView, setCurrentView, selectFolder]
+  );
 
   // Compute breadcrumbs for folder view
   const breadcrumbs = useMemo(() => {
     if (!library) return [];
-    return getBreadcrumbs(library.name, selectedFolderPath);
+    return getBreadcrumbs(library.name, selectedFolderPath, library.folders);
   }, [library, selectedFolderPath]);
 
   // Compute view title (Neutral "Music Library" when empty)
@@ -120,7 +138,10 @@ export function App() {
       case 'all':
         return 'All Tracks';
       case 'folder':
+        if (!selectedFolderPath) return 'Music Folders';
         return currentFolderNode ? currentFolderNode.name : 'Folder Browser';
+      case 'playlists':
+        return 'Playlists';
       case 'albums':
         return selectedAlbumId ? 'Album' : 'Albums';
       case 'artists':
@@ -130,12 +151,13 @@ export function App() {
       default:
         return 'Music';
     }
-  }, [hasLibrary, currentView, currentFolderNode, selectedAlbumId, selectedArtistName, searchQuery]);
+  }, [hasLibrary, currentView, currentFolderNode, selectedFolderPath, selectedAlbumId, selectedArtistName, searchQuery]);
 
   const viewSubtitle = useMemo(() => {
     if (!hasLibrary) return '';
+    if (currentView === 'playlists') return '0 playlists';
     return `${displayedTracks.length} ${displayedTracks.length === 1 ? 'track' : 'tracks'}`;
-  }, [hasLibrary, displayedTracks.length]);
+  }, [hasLibrary, currentView, displayedTracks.length]);
 
   return (
     <div
@@ -170,14 +192,18 @@ export function App() {
           currentView={currentView}
           selectedFolderPath={selectedFolderPath}
           folderTree={library?.tree || null}
+          folders={folders}
           favouritesCount={favourites.size}
           totalTracksCount={library?.flatPlaylist.length || 0}
           hasLibrary={hasLibrary}
           isScanning={isLoading}
           scanCount={scanProgress}
-          onSelectView={setCurrentView}
+          onSelectView={handleSelectView}
           onSelectFolder={selectFolder}
           onOpenFolder={openFolderPicker}
+          onRefreshFolder={refreshFolder}
+          onRemoveFolder={removeFolder}
+          onRequestFolderPermission={requestPermissionForFolder}
           onFallbackFolderSelect={handleFallbackFolderSelect}
           onOpenFilesSelect={handleOpenFilesSelect}
         />
@@ -239,6 +265,10 @@ export function App() {
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
                   />
+                )}
+
+                {currentView === 'playlists' && (
+                  <PlaylistsView />
                 )}
 
                 {currentView === 'folder' && (

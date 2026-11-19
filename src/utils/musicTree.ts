@@ -397,8 +397,13 @@ export interface BreadcrumbItem {
 
 /**
  * Generates breadcrumbs array from a relative path.
+ * When folders is provided, maps root folder IDs to friendly folder names.
  */
-export function getBreadcrumbs(rootName: string, relativePath: string): BreadcrumbItem[] {
+export function getBreadcrumbs(
+  rootName: string,
+  relativePath: string,
+  folders?: ImportedFolder[]
+): BreadcrumbItem[] {
   const items: BreadcrumbItem[] = [{ name: rootName || 'Library', path: '' }];
   const normalized = normalizePath(relativePath);
   if (!normalized) return items;
@@ -406,10 +411,18 @@ export function getBreadcrumbs(rootName: string, relativePath: string): Breadcru
   const parts = normalized.split('/');
   let currentPath = '';
 
-  for (const part of parts) {
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
     currentPath = currentPath ? `${currentPath}/${part}` : part;
+    let displayName = part;
+    if (i === 0 && folders && folders.length > 0) {
+      const matched = folders.find((f) => f.id === part);
+      if (matched) {
+        displayName = matched.name;
+      }
+    }
     items.push({
-      name: part,
+      name: displayName,
       path: currentPath,
     });
   }

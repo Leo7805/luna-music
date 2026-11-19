@@ -98,10 +98,31 @@ export function useMusicLibrary() {
             setNeedsPermission(true);
           }
 
+          const promptImportedFolders: ImportedFolder[] = promptFolders.map((p) => ({
+            id: p.id,
+            name: p.name,
+            sourceType: p.sourceType,
+            handle: p.handle,
+            tree: {
+              id: p.id,
+              name: p.name,
+              relativePath: p.id,
+              tracks: [],
+              subfolders: [],
+              totalTrackCount: p.trackCount || 0,
+            },
+            tracks: [],
+            trackCount: p.trackCount || 0,
+            addedAt: p.addedAt,
+            lastScannedAt: p.lastScannedAt || p.addedAt,
+            permissionStatus: 'prompt',
+          }));
+
+          const loadedFolders: ImportedFolder[] = [];
+          let existingTracksAccum: TrackItem[] = [];
+
           if (grantedFolders.length > 0) {
             setIsLoading(true);
-            const loadedFolders: ImportedFolder[] = [];
-            let existingTracksAccum: TrackItem[] = [];
 
             for (const record of grantedFolders) {
               try {
@@ -112,28 +133,32 @@ export function useMusicLibrary() {
                   scanned.id
                 );
                 scanned.tree = buildFolderTree(scanned.name, scanned.tracks, scanned.id);
+                scanned.permissionStatus = 'granted';
                 loadedFolders.push(scanned);
                 existingTracksAccum = combineFlatPlaylists(loadedFolders);
               } catch (err) {
                 console.error(`Failed to load folder ${record.name}:`, err);
               }
             }
+            setIsLoading(false);
+          }
 
-            if (loadedFolders.length > 0) {
-              const unifiedTree = buildUnifiedMultiFolderTree(loadedFolders);
-              const flatPlaylist = combineFlatPlaylists(loadedFolders);
-              setLibrary({
-                id: 'multi-library',
-                name: 'Music Library',
-                folders: loadedFolders,
-                tree: unifiedTree,
-                flatPlaylist,
-                sourceType: 'fs-access',
-                handle: loadedFolders[0]?.handle,
-              });
+          const allInitialFolders = [...loadedFolders, ...promptImportedFolders];
+          if (allInitialFolders.length > 0) {
+            const unifiedTree = buildUnifiedMultiFolderTree(allInitialFolders);
+            const flatPlaylist = combineFlatPlaylists(loadedFolders);
+            setLibrary({
+              id: 'multi-library',
+              name: 'Music Library',
+              folders: allInitialFolders,
+              tree: unifiedTree,
+              flatPlaylist,
+              sourceType: 'fs-access',
+              handle: allInitialFolders[0]?.handle,
+            });
+            if (flatPlaylist.length > 0) {
               startIncrementalMetadataExtraction(flatPlaylist);
             }
-            setIsLoading(false);
           }
         }
       }
@@ -314,10 +339,15 @@ export function useMusicLibrary() {
       setIsLoading(true);
       setScanProgress(0);
 
+      // Mark folder scanning state
+      targetFolder.isScanning = true;
+      setLibrary((prev) => (prev ? { ...prev } : null));
+
       try {
         const hasPerm = await verifyHandlePermission(targetFolder.handle, false);
         if (!hasPerm) {
           targetFolder.permissionStatus = 'prompt';
+          targetFolder.isScanning = false;
           setLibrary((prev) => (prev ? { ...prev } : null));
           return;
         }
@@ -334,6 +364,7 @@ export function useMusicLibrary() {
 
         scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, otherTracks, folderId);
         scanned.tree = buildFolderTree(scanned.name, scanned.tracks, folderId);
+        scanned.permissionStatus = 'granted';
 
         // Preserve metadata already loaded if file content is unchanged
         const oldTrackMap = new Map<string, TrackItem>();
@@ -382,10 +413,70 @@ export function useMusicLibrary() {
       } catch (err) {
         console.error(`Failed to refresh folder ${folderId}:`, err);
       } finally {
+        if (targetFolder) targetFolder.isScanning = false;
         setIsLoading(false);
       }
     },
     [library, startIncrementalMetadataExtraction]
+  );
+
+  // Request permission for a single folder and scan it
+  const requestPermissionForFolder = useCallback(
+    async (folderId: string) => {
+      const targetFolder = library?.folders.find((f) => f.id === folderId);
+      const targetPending = pendingFolders.find((f) => f.id === folderId);
+      const handle = targetFolder?.handle || targetPending?.handle;
+      if (!handle) return;
+
+      setIsLoading(true);
+      try {
+        const granted = await verifyHandlePermission(handle, true);
+        if (granted) {
+          const scanned = await scanRootFolderHandle(handle, folderId);
+          const otherFolders = (library?.folders || []).filter((f) => f.id !== folderId);
+          const otherTracks = otherFolders.flatMap((f) => f.tracks);
+
+          scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, otherTracks, folderId);
+          scanned.tree = buildFolderTree(scanned.name, scanned.tracks, folderId);
+          scanned.permissionStatus = 'granted';
+
+          const exists = (library?.folders || []).some((f) => f.id === folderId);
+          const nextFolders = exists
+            ? (library?.folders || []).map((f) => (f.id === folderId ? scanned : f))
+            : [...(library?.folders || []), scanned];
+
+          const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+          const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+          setLibrary({
+            id: 'multi-library',
+            name: 'Music Library',
+            folders: nextFolders,
+            tree: unifiedTree,
+            flatPlaylist,
+            sourceType: 'fs-access',
+            handle: nextFolders[0]?.handle,
+          });
+
+          const remainingPending = pendingFolders.filter((f) => f.id !== folderId);
+          setPendingFolders(remainingPending);
+          setNeedsPermission(remainingPending.length > 0);
+
+          await storeRegisteredFolders(nextFolders);
+          startIncrementalMetadataExtraction(flatPlaylist);
+        } else {
+          if (targetFolder) {
+            targetFolder.permissionStatus = 'denied';
+            setLibrary((prev) => (prev ? { ...prev } : null));
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to grant permission for folder ${folderId}:`, err);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [library, pendingFolders, startIncrementalMetadataExtraction]
   );
 
   // Pick folder via native File System Access API
@@ -457,6 +548,23 @@ export function useMusicLibrary() {
     async (folderId: string) => {
       // Invalidate any in-flight scan for this folder
       cancelScan(folderId);
+
+      // Also clean up pendingFolders if this folder was in pending status
+      setPendingFolders((prev) => {
+        const next = prev.filter((f) => f.id !== folderId);
+        if (next.length === 0) {
+          setNeedsPermission(false);
+        }
+        return next;
+      });
+
+      // If the removed folder was selected or parent of selected, reset folder path
+      setSelectedFolderPath((prev) => {
+        if (prev === folderId || prev.startsWith(`${folderId}/`)) {
+          return '';
+        }
+        return prev;
+      });
 
       if (!library) return;
 
@@ -854,6 +962,7 @@ export function useMusicLibrary() {
     handleFolderInput: handleFallbackFolderSelect,
     handleFilesInput: handleOpenFilesSelect,
     requestPermissionAndLoad,
+    requestPermissionForFolder,
     updateTrackStatus,
   };
 }
