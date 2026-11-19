@@ -215,6 +215,22 @@ function FolderTreeNode({
   const isSelected = selectedPath === node.relativePath;
   const hasSubfolders = node.subfolders.length > 0;
 
+  if (isRoot && node.id === 'root') {
+    return (
+      <div className="space-y-0.5">
+        {node.subfolders.map((sub) => (
+          <FolderTreeNode
+            key={sub.id}
+            node={sub}
+            selectedPath={selectedPath}
+            onSelect={onSelect}
+            depth={0}
+          />
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="select-none">
       <div

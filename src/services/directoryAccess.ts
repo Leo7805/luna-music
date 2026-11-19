@@ -1,10 +1,9 @@
-import { MusicLibrary, TrackItem, FileStatus } from '../types/music';
+import { MusicLibrary, TrackItem, FileStatus, ImportedFolder } from '../types/music';
 import {
   isSupportedAudioFile,
   isLrcFile,
   stripExtension,
   buildFolderTree,
-  flattenTreeToDfsPlaylist,
 } from '../utils/musicTree';
 import { createFallbackMetadata } from '../utils/metadata';
 
@@ -48,12 +47,16 @@ export async function verifyHandlePermission(
 }
 
 /**
- * Recursively scans directory handle, collecting audio files and pairing with .lrc companion files.
+ * Scans a single directory handle into a self-contained ImportedFolder.
  */
-export async function scanDirectoryHandle(
+export async function scanRootFolderHandle(
   rootHandle: FileSystemDirectoryHandle,
+  folderId?: string,
   onProgress?: (count: number) => void
-): Promise<MusicLibrary> {
+): Promise<ImportedFolder> {
+  const rootName = rootHandle.name || 'Local Music';
+  const id = folderId || `fsa_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
   const discoveredAudio: {
     name: string;
     relativePath: string;
@@ -135,7 +138,7 @@ export async function scanDirectoryHandle(
     const lrcHandle = dirLrcs ? dirLrcs.get(item.baseName) : undefined;
 
     return {
-      id: item.relativePath,
+      id: `${id}:${item.relativePath}`,
       name: item.name,
       relativePath: item.relativePath,
       size: item.size,
@@ -144,19 +147,42 @@ export async function scanDirectoryHandle(
       metadata: createFallbackMetadata(item.name, item.relativePath),
       lrcHandle,
       status: item.status,
+      folderIds: [id],
     };
   });
 
-  const rootName = rootHandle.name || 'Local Music';
-  const libraryId = `fsa:${rootName}`;
-  const tree = buildFolderTree(rootName, tracks);
-  const flatPlaylist = flattenTreeToDfsPlaylist(tree);
+  const tree = buildFolderTree(rootName, tracks, id);
 
   return {
-    id: libraryId,
+    id,
     name: rootName,
+    sourceType: 'fs-access',
+    handle: rootHandle,
     tree,
-    flatPlaylist,
+    tracks,
+    trackCount: tracks.length,
+    addedAt: Date.now(),
+    lastScannedAt: Date.now(),
+    permissionStatus: 'granted',
+  };
+}
+
+/**
+ * Recursively scans directory handle, collecting audio files and pairing with .lrc companion files.
+ * Backwards-compatible single root entrypoint.
+ */
+export async function scanDirectoryHandle(
+  rootHandle: FileSystemDirectoryHandle,
+  onProgress?: (count: number) => void
+): Promise<MusicLibrary> {
+  const folder = await scanRootFolderHandle(rootHandle, undefined, onProgress);
+
+  return {
+    id: folder.id,
+    name: folder.name,
+    folders: [folder],
+    tree: folder.tree,
+    flatPlaylist: folder.tracks,
     sourceType: 'fs-access',
     handle: rootHandle,
   };

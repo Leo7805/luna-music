@@ -7,21 +7,29 @@ import {
   ArtistGroup,
   FolderNode,
   FileStatus,
+  ImportedFolder,
+  StoredFolderRecord,
 } from '../types/music';
 import {
-  scanDirectoryHandle,
+  scanRootFolderHandle,
   promptOpenDirectory,
   verifyHandlePermission,
   isFileSystemAccessSupported,
 } from '../services/directoryAccess';
 import { parseFileList, parseSelectedFiles } from '../services/fallbackAccess';
 import {
-  storeDirectoryHandle,
-  getStoredDirectoryHandle,
+  storeRegisteredFolders,
+  getStoredRegisteredFolders,
   storePlaybackState,
   getStoredPlaybackState,
 } from '../services/idbStorage';
-import { findFolderNodeByPath } from '../utils/musicTree';
+import {
+  findFolderNodeByPath,
+  buildFolderTree,
+  buildUnifiedMultiFolderTree,
+  combineFlatPlaylists,
+  reconcileOverlappingTracks,
+} from '../utils/musicTree';
 import { extractAudioMetadata } from '../utils/metadata';
 import { naturalSort } from '../utils/naturalSort';
 
@@ -36,14 +44,31 @@ export function useMusicLibrary() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [scanProgress, setScanProgress] = useState<number>(0);
   const [needsPermission, setNeedsPermission] = useState<boolean>(false);
-  const [pendingHandle, setPendingHandle] = useState<FileSystemDirectoryHandle | null>(null);
+  const [pendingFolders, setPendingFolders] = useState<StoredFolderRecord[]>([]);
+
+  // Generation counter per folder to prevent stale scans from overwriting newer state
+  const scanGenerationsRef = useRef<Map<string, number>>(new Map());
+
+  const getNextScanGen = (folderId: string): number => {
+    const next = (scanGenerationsRef.current.get(folderId) || 0) + 1;
+    scanGenerationsRef.current.set(folderId, next);
+    return next;
+  };
+
+  const isScanCurrent = (folderId: string, gen: number): boolean => {
+    return scanGenerationsRef.current.get(folderId) === gen;
+  };
+
+  const cancelScan = (folderId: string) => {
+    scanGenerationsRef.current.set(folderId, -1);
+  };
 
   const metadataQueueRef = useRef<{ isRunning: boolean; cancel: boolean }>({
     isRunning: false,
     cancel: false,
   });
 
-  // Load stored state and directory handle on mount
+  // Load stored state and registered folders on mount
   useEffect(() => {
     async function init() {
       const storedState = await getStoredPlaybackState();
@@ -52,15 +77,63 @@ export function useMusicLibrary() {
       }
 
       if (isFileSystemAccessSupported()) {
-        const storedHandle = await getStoredDirectoryHandle();
-        if (storedHandle) {
-          const hasPerm = await verifyHandlePermission(storedHandle, false);
-          if (hasPerm) {
-            loadFromDirectoryHandle(storedHandle);
-          } else {
-            // Need user gesture to request permission
-            setPendingHandle(storedHandle);
+        const storedFolders = await getStoredRegisteredFolders();
+        if (storedFolders && storedFolders.length > 0) {
+          const grantedFolders: StoredFolderRecord[] = [];
+          const promptFolders: StoredFolderRecord[] = [];
+
+          for (const record of storedFolders) {
+            if (record.handle) {
+              const hasPerm = await verifyHandlePermission(record.handle, false);
+              if (hasPerm) {
+                grantedFolders.push(record);
+              } else {
+                promptFolders.push(record);
+              }
+            }
+          }
+
+          if (promptFolders.length > 0) {
+            setPendingFolders(promptFolders);
             setNeedsPermission(true);
+          }
+
+          if (grantedFolders.length > 0) {
+            setIsLoading(true);
+            const loadedFolders: ImportedFolder[] = [];
+            let existingTracksAccum: TrackItem[] = [];
+
+            for (const record of grantedFolders) {
+              try {
+                const scanned = await scanRootFolderHandle(record.handle!, record.id);
+                scanned.tracks = await reconcileOverlappingTracks(
+                  scanned.tracks,
+                  existingTracksAccum,
+                  scanned.id
+                );
+                scanned.tree = buildFolderTree(scanned.name, scanned.tracks, scanned.id);
+                loadedFolders.push(scanned);
+                existingTracksAccum = combineFlatPlaylists(loadedFolders);
+              } catch (err) {
+                console.error(`Failed to load folder ${record.name}:`, err);
+              }
+            }
+
+            if (loadedFolders.length > 0) {
+              const unifiedTree = buildUnifiedMultiFolderTree(loadedFolders);
+              const flatPlaylist = combineFlatPlaylists(loadedFolders);
+              setLibrary({
+                id: 'multi-library',
+                name: 'Music Library',
+                folders: loadedFolders,
+                tree: unifiedTree,
+                flatPlaylist,
+                sourceType: 'fs-access',
+                handle: loadedFolders[0]?.handle,
+              });
+              startIncrementalMetadataExtraction(flatPlaylist);
+            }
+            setIsLoading(false);
           }
         }
       }
@@ -68,20 +141,6 @@ export function useMusicLibrary() {
 
     init();
   }, []);
-
-  // Request permission for previously stored handle
-  const requestPermissionAndLoad = useCallback(async () => {
-    if (!pendingHandle) return;
-    try {
-      const granted = await verifyHandlePermission(pendingHandle, true);
-      if (granted) {
-        setNeedsPermission(false);
-        await loadFromDirectoryHandle(pendingHandle);
-      }
-    } catch {
-      setNeedsPermission(false);
-    }
-  }, [pendingHandle]);
 
   // Queue to incrementally extract metadata in background
   const startIncrementalMetadataExtraction = useCallback((tracks: TrackItem[]) => {
@@ -129,7 +188,6 @@ export function useMusicLibrary() {
                     return t;
                   });
 
-                  // Update tracks in folder tree
                   function updateNode(node: FolderNode): FolderNode {
                     return {
                       ...node,
@@ -150,8 +208,27 @@ export function useMusicLibrary() {
                     };
                   }
 
+                  const updatedFolders = (prevLib.folders || []).map((f) => ({
+                    ...f,
+                    tracks: f.tracks.map((t) => {
+                      if (t.id === track.id) {
+                        return {
+                          ...t,
+                          metadata: {
+                            ...t.metadata,
+                            ...meta,
+                            isMetadataLoaded: true,
+                          },
+                        };
+                      }
+                      return t;
+                    }),
+                    tree: updateNode(f.tree),
+                  }));
+
                   return {
                     ...prevLib,
+                    folders: updatedFolders,
                     flatPlaylist: updatedFlat,
                     tree: updateNode(prevLib.tree),
                   };
@@ -174,42 +251,237 @@ export function useMusicLibrary() {
     processQueue();
   }, []);
 
-  // Load from FileSystemDirectoryHandle
-  const loadFromDirectoryHandle = useCallback(
-    async (handle: FileSystemDirectoryHandle) => {
+  // Request permission for previously stored handles
+  const requestPermissionAndLoad = useCallback(async () => {
+    if (pendingFolders.length === 0) return;
+
+    setIsLoading(true);
+    const stillPending: StoredFolderRecord[] = [];
+    const newlyGrantedFolders: ImportedFolder[] = [];
+
+    // Snapshot of existing tracks for handle-level reconciliation
+    let currentTracks = library ? library.flatPlaylist : [];
+
+    for (const record of pendingFolders) {
+      if (!record.handle) continue;
+      try {
+        const granted = await verifyHandlePermission(record.handle, true);
+        if (granted) {
+          const scanned = await scanRootFolderHandle(record.handle, record.id);
+          scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, currentTracks, scanned.id);
+          scanned.tree = buildFolderTree(scanned.name, scanned.tracks, scanned.id);
+          newlyGrantedFolders.push(scanned);
+          currentTracks = combineFlatPlaylists([...(library?.folders || []), ...newlyGrantedFolders]);
+        } else {
+          stillPending.push(record);
+        }
+      } catch {
+        stillPending.push(record);
+      }
+    }
+
+    setPendingFolders(stillPending);
+    setNeedsPermission(stillPending.length > 0);
+
+    if (newlyGrantedFolders.length > 0) {
+      const mergedFolders = [...(library?.folders || []), ...newlyGrantedFolders];
+      const unifiedTree = buildUnifiedMultiFolderTree(mergedFolders);
+      const flatPlaylist = combineFlatPlaylists(mergedFolders);
+
+      setLibrary({
+        id: 'multi-library',
+        name: 'Music Library',
+        folders: mergedFolders,
+        tree: unifiedTree,
+        flatPlaylist,
+        sourceType: 'fs-access',
+        handle: mergedFolders[0]?.handle,
+      });
+
+      await storeRegisteredFolders(mergedFolders);
+      startIncrementalMetadataExtraction(flatPlaylist);
+    }
+    setIsLoading(false);
+  }, [pendingFolders, library, startIncrementalMetadataExtraction]);
+
+  // Refresh an existing root folder
+  const refreshFolder = useCallback(
+    async (folderId: string) => {
+      const targetFolder = library?.folders.find((f) => f.id === folderId);
+      if (!targetFolder || !targetFolder.handle) return;
+
+      const gen = getNextScanGen(folderId);
       setIsLoading(true);
       setScanProgress(0);
+
       try {
-        const lib = await scanDirectoryHandle(handle, (count) => {
+        const hasPerm = await verifyHandlePermission(targetFolder.handle, false);
+        if (!hasPerm) {
+          targetFolder.permissionStatus = 'prompt';
+          setLibrary((prev) => (prev ? { ...prev } : null));
+          return;
+        }
+
+        const scanned = await scanRootFolderHandle(targetFolder.handle, folderId, (count) => {
           setScanProgress(count);
         });
 
-        await storeDirectoryHandle(handle);
-        setLibrary(lib);
-        setSelectedFolderPath('');
-        startIncrementalMetadataExtraction(lib.flatPlaylist);
+        if (!isScanCurrent(folderId, gen)) return;
+
+        // Reconcile with other folders' tracks to maintain stable IDs and deduplication
+        const otherFolders = (library?.folders || []).filter((f) => f.id !== folderId);
+        const otherTracks = otherFolders.flatMap((f) => f.tracks);
+
+        scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, otherTracks, folderId);
+        scanned.tree = buildFolderTree(scanned.name, scanned.tracks, folderId);
+
+        // Preserve metadata already loaded if file content is unchanged
+        const oldTrackMap = new Map(targetFolder.tracks.map((t) => [t.id, t]));
+        scanned.tracks = scanned.tracks.map((t) => {
+          const old = oldTrackMap.get(t.id);
+          if (
+            old &&
+            old.metadata.isMetadataLoaded &&
+            old.size === t.size &&
+            old.lastModified === t.lastModified
+          ) {
+            return {
+              ...t,
+              metadata: old.metadata,
+              status: old.status,
+            };
+          }
+          return t;
+        });
+
+        const nextFolders = (library?.folders || []).map((f) => (f.id === folderId ? scanned : f));
+        const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+        const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+        setLibrary({
+          id: 'multi-library',
+          name: 'Music Library',
+          folders: nextFolders,
+          tree: unifiedTree,
+          flatPlaylist,
+          sourceType: 'fs-access',
+          handle: nextFolders[0]?.handle,
+        });
+
+        await storeRegisteredFolders(nextFolders);
+        startIncrementalMetadataExtraction(flatPlaylist);
       } catch (err) {
-        console.error('Failed to scan directory:', err);
+        console.error(`Failed to refresh folder ${folderId}:`, err);
       } finally {
         setIsLoading(false);
       }
     },
-    [startIncrementalMetadataExtraction]
+    [library, startIncrementalMetadataExtraction]
   );
 
-  // Pick folder via native API
+  // Pick folder via native File System Access API
   const openFolderPicker = useCallback(async () => {
     try {
       const handle = await promptOpenDirectory();
-      if (handle) {
-        setNeedsPermission(false);
-        setPendingHandle(null);
-        await loadFromDirectoryHandle(handle);
+      if (!handle) return;
+
+      // Deduplication check: Is this exact directory handle already imported?
+      const existingFolders = library?.folders || [];
+      for (const existing of existingFolders) {
+        if (existing.handle) {
+          try {
+            if (await existing.handle.isSameEntry(handle)) {
+              // Same directory selected again -> refresh it instead of adding duplicate!
+              await refreshFolder(existing.id);
+              return;
+            }
+          } catch {
+            // isSameEntry failed or permission issue
+          }
+        }
       }
+
+      // Generate stable folder ID and start scan with race guard
+      const folderId = `fsa_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const gen = getNextScanGen(folderId);
+      setIsLoading(true);
+      setScanProgress(0);
+
+      const scanned = await scanRootFolderHandle(handle, folderId, (count) => {
+        setScanProgress(count);
+      });
+
+      // Generation guard check: was this folder cancelled or superseded?
+      if (!isScanCurrent(folderId, gen)) return;
+
+      // Reconcile overlapping tracks using handle.isSameEntry
+      const currentFlat = library ? library.flatPlaylist : [];
+      scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, currentFlat, folderId);
+      scanned.tree = buildFolderTree(scanned.name, scanned.tracks, folderId);
+
+      // Merge into library folders list
+      const nextFolders = [...existingFolders, scanned];
+      const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+      const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+      setLibrary({
+        id: 'multi-library',
+        name: 'Music Library',
+        folders: nextFolders,
+        tree: unifiedTree,
+        flatPlaylist,
+        sourceType: 'fs-access',
+        handle: nextFolders[0]?.handle,
+      });
+
+      await storeRegisteredFolders(nextFolders);
+      startIncrementalMetadataExtraction(flatPlaylist);
     } catch (err) {
       console.error('Folder picker error:', err);
+    } finally {
+      setIsLoading(false);
     }
-  }, [loadFromDirectoryHandle]);
+  }, [library, refreshFolder, startIncrementalMetadataExtraction]);
+
+  // Remove a root folder from the library
+  const removeFolder = useCallback(
+    async (folderId: string) => {
+      // Invalidate any in-flight scan for this folder
+      cancelScan(folderId);
+
+      if (!library) return;
+
+      const remainingFolders = library.folders.filter((f) => f.id !== folderId);
+
+      // Remove folderId from all tracks referenced by remaining folders
+      const updatedFolders = remainingFolders.map((f) => ({
+        ...f,
+        tracks: f.tracks.map((t) => ({
+          ...t,
+          folderIds: (t.folderIds || []).filter((id) => id !== folderId),
+        })),
+      }));
+
+      if (updatedFolders.length === 0) {
+        setLibrary(null);
+        setSelectedFolderPath('');
+        await storeRegisteredFolders([]);
+      } else {
+        const unifiedTree = buildUnifiedMultiFolderTree(updatedFolders);
+        const flatPlaylist = combineFlatPlaylists(updatedFolders);
+
+        setLibrary({
+          ...library,
+          folders: updatedFolders,
+          tree: unifiedTree,
+          flatPlaylist,
+        });
+
+        await storeRegisteredFolders(updatedFolders);
+      }
+    },
+    [library]
+  );
 
   // Handle fallback directory input
   const handleFallbackFolderSelect = useCallback(
@@ -217,15 +489,27 @@ export function useMusicLibrary() {
       if (!files || files.length === 0) return;
 
       setIsLoading(true);
-      const lib = parseFileList(files);
-      if (lib) {
-        setLibrary(lib);
+      const parsed = parseFileList(files);
+      if (parsed && parsed.folders.length > 0) {
+        const newFolder = parsed.folders[0];
+        const nextFolders = [...(library?.folders || []), newFolder];
+        const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+        const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+        setLibrary({
+          id: 'multi-library',
+          name: 'Music Library',
+          folders: nextFolders,
+          tree: unifiedTree,
+          flatPlaylist,
+          sourceType: 'input-fallback',
+        });
         setSelectedFolderPath('');
-        startIncrementalMetadataExtraction(lib.flatPlaylist);
+        startIncrementalMetadataExtraction(flatPlaylist);
       }
       setIsLoading(false);
     },
-    [startIncrementalMetadataExtraction]
+    [library, startIncrementalMetadataExtraction]
   );
 
   // Handle fallback file selection input
@@ -234,15 +518,27 @@ export function useMusicLibrary() {
       if (!files || files.length === 0) return;
 
       setIsLoading(true);
-      const lib = parseSelectedFiles(files);
-      if (lib) {
-        setLibrary(lib);
+      const parsed = parseSelectedFiles(files);
+      if (parsed && parsed.folders.length > 0) {
+        const newFolder = parsed.folders[0];
+        const nextFolders = [...(library?.folders || []), newFolder];
+        const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+        const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+        setLibrary({
+          id: 'multi-library',
+          name: 'Music Library',
+          folders: nextFolders,
+          tree: unifiedTree,
+          flatPlaylist,
+          sourceType: 'files',
+        });
         setSelectedFolderPath('');
-        startIncrementalMetadataExtraction(lib.flatPlaylist);
+        startIncrementalMetadataExtraction(flatPlaylist);
       }
       setIsLoading(false);
     },
-    [startIncrementalMetadataExtraction]
+    [library, startIncrementalMetadataExtraction]
   );
 
   // Toggle favorite track
@@ -442,8 +738,15 @@ export function useMusicLibrary() {
           };
         }
 
+        const updatedFolders = (prevLib.folders || []).map((f) => ({
+          ...f,
+          tracks: f.tracks.map(updateItem),
+          tree: updateNode(f.tree),
+        }));
+
         return {
           ...prevLib,
+          folders: updatedFolders,
           tree: updateNode(prevLib.tree),
           flatPlaylist: updatedFlat,
         };
@@ -454,6 +757,7 @@ export function useMusicLibrary() {
 
   return {
     library,
+    folders: library?.folders || [],
     currentView,
     selectedFolderPath,
     selectedArtistName,
@@ -463,6 +767,7 @@ export function useMusicLibrary() {
     isLoading,
     scanProgress,
     needsPermission,
+    pendingFolders,
     currentFolderNode,
     displayedTracks,
     albums,
@@ -474,6 +779,9 @@ export function useMusicLibrary() {
     setSearchQuery,
     toggleFavourite,
     openFolderPicker,
+    addFolder: openFolderPicker,
+    refreshFolder,
+    removeFolder,
     handleFallbackFolderSelect,
     handleOpenFilesSelect,
     handleFolderInput: handleFallbackFolderSelect,

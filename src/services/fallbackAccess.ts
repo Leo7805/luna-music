@@ -1,4 +1,4 @@
-import { MusicLibrary, TrackItem } from '../types/music';
+import { MusicLibrary, TrackItem, ImportedFolder } from '../types/music';
 import {
   isSupportedAudioFile,
   isLrcFile,
@@ -70,12 +70,14 @@ export function parseFileList(files: FileList | File[]): MusicLibrary | null {
 
   if (audioFiles.length === 0) return null;
 
+  const folderId = `input_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+
   const tracks: TrackItem[] = audioFiles.map((item) => {
     const dirLrcs = lrcMap.get(item.dirPath);
     const lrcFile = dirLrcs ? dirLrcs.get(item.baseName) : undefined;
 
     return {
-      id: item.relativePath,
+      id: `${folderId}:${item.relativePath}`,
       name: item.name,
       relativePath: item.relativePath,
       size: item.file.size,
@@ -84,16 +86,30 @@ export function parseFileList(files: FileList | File[]): MusicLibrary | null {
       metadata: createFallbackMetadata(item.name, item.relativePath),
       lrcFile,
       status: item.file.size === 0 ? 'empty' : 'normal',
+      folderIds: [folderId],
     };
   });
 
   const libraryId = `input:${rootName}`;
-  const tree = buildFolderTree(rootName, tracks);
+  const tree = buildFolderTree(rootName, tracks, folderId);
   const flatPlaylist = flattenTreeToDfsPlaylist(tree);
+
+  const importedFolder: ImportedFolder = {
+    id: folderId,
+    name: rootName,
+    sourceType: 'input-fallback',
+    tree,
+    tracks,
+    trackCount: tracks.length,
+    addedAt: Date.now(),
+    lastScannedAt: Date.now(),
+    permissionStatus: 'granted',
+  };
 
   return {
     id: libraryId,
     name: rootName,
+    folders: [importedFolder],
     tree,
     flatPlaylist,
     sourceType: 'input-fallback',
@@ -121,35 +137,51 @@ export function parseSelectedFiles(files: FileList | File[]): MusicLibrary | nul
 
   if (audioFiles.length === 0) return null;
 
+  const folderId = `files_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
   const seenNames = new Map<string, number>();
+
   const tracks: TrackItem[] = audioFiles.map((file) => {
     const count = (seenNames.get(file.name) ?? 0) + 1;
     seenNames.set(file.name, count);
-    const uniqueId = count === 1 ? file.name : `${file.name} (${count})`;
+    const uniqueName = count === 1 ? file.name : `${file.name} (${count})`;
     const base = stripExtension(file.name).toLowerCase();
     const lrcFile = lrcMap.get(base);
 
     return {
-      id: uniqueId,
+      id: `${folderId}:${uniqueName}`,
       name: file.name,
-      relativePath: file.name,
+      relativePath: uniqueName,
       size: file.size,
       lastModified: file.lastModified,
       file,
       metadata: createFallbackMetadata(file.name, file.name),
       lrcFile,
       status: file.size === 0 ? 'empty' : 'normal',
+      folderIds: [folderId],
     };
   });
 
   const rootName = 'Selected Audio';
   const libraryId = `files:${rootName}`;
-  const tree = buildFolderTree(rootName, tracks);
+  const tree = buildFolderTree(rootName, tracks, folderId);
   const flatPlaylist = flattenTreeToDfsPlaylist(tree);
+
+  const importedFolder: ImportedFolder = {
+    id: folderId,
+    name: rootName,
+    sourceType: 'files',
+    tree,
+    tracks,
+    trackCount: tracks.length,
+    addedAt: Date.now(),
+    lastScannedAt: Date.now(),
+    permissionStatus: 'granted',
+  };
 
   return {
     id: libraryId,
     name: rootName,
+    folders: [importedFolder],
     tree,
     flatPlaylist,
     sourceType: 'files',

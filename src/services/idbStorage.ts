@@ -1,4 +1,4 @@
-import { StoredPlaybackState } from '../types/music';
+import { StoredPlaybackState, StoredFolderRecord } from '../types/music';
 
 const DB_NAME = 'LunaMusicDB';
 const DB_VERSION = 1;
@@ -6,6 +6,8 @@ const HANDLES_STORE = 'handles';
 const STATE_STORE = 'player_state';
 
 const DIR_HANDLE_KEY = 'directory_handle';
+const REGISTERED_FOLDERS_KEY = 'registered_root_folders';
+const MIGRATION_DONE_KEY = 'migrated_single_to_multi';
 const LAST_SOURCE_KEY = 'last_library_source';
 const PLAYBACK_STATE_KEY = 'playback_state';
 const LOCAL_STORAGE_STATE_KEY = 'luna_music_playback_state';
@@ -142,6 +144,132 @@ export async function clearStoredDirectoryHandle(): Promise<void> {
     });
   } catch {
     // Ignore error
+  }
+}
+
+/**
+ * Stores the list of registered root folders in IndexedDB.
+ * Saves only lightweight serializable metadata and DirectoryHandle instances.
+ * Never stores entire audio files or large artwork blobs.
+ */
+export async function storeRegisteredFolders(folders: StoredFolderRecord[]): Promise<boolean> {
+  try {
+    const db = await openDatabase();
+    if (!db) return false;
+
+    // Sanitize records to ensure only lightweight serializable data is stored
+    const records: StoredFolderRecord[] = folders.map((f) => ({
+      id: f.id,
+      name: f.name,
+      sourceType: f.sourceType,
+      handle: f.handle,
+      addedAt: f.addedAt,
+      lastScannedAt: f.lastScannedAt,
+      trackCount: f.trackCount,
+    }));
+
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(HANDLES_STORE, 'readwrite');
+        const store = tx.objectStore(HANDLES_STORE);
+        store.put(records, REGISTERED_FOLDERS_KEY);
+        store.put('folder', LAST_SOURCE_KEY);
+
+        tx.oncomplete = () => {
+          db.close();
+          resolve(true);
+        };
+        tx.onerror = () => {
+          db.close();
+          resolve(false);
+        };
+        tx.onabort = () => {
+          db.close();
+          resolve(false);
+        };
+      } catch {
+        db.close();
+        resolve(false);
+      }
+    });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Retrieves the stored list of registered root folders.
+ * Includes idempotent automatic migration of legacy single-directory handles.
+ */
+export async function getStoredRegisteredFolders(): Promise<StoredFolderRecord[]> {
+  try {
+    const db = await openDatabase();
+    if (!db) return [];
+
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(HANDLES_STORE, 'readwrite');
+        const store = tx.objectStore(HANDLES_STORE);
+        const req = store.get(REGISTERED_FOLDERS_KEY);
+
+        req.onsuccess = () => {
+          const result = req.result;
+          if (Array.isArray(result) && result.length > 0) {
+            db.close();
+            resolve(result as StoredFolderRecord[]);
+            return;
+          }
+
+          // If no multi-folder records exist, check for legacy single handle
+          const legacyReq = store.get(DIR_HANDLE_KEY);
+          legacyReq.onsuccess = () => {
+            const legacyHandle = legacyReq.result;
+            if (
+              legacyHandle &&
+              typeof legacyHandle === 'object' &&
+              'kind' in legacyHandle &&
+              legacyHandle.kind === 'directory'
+            ) {
+              const migratedFolder: StoredFolderRecord = {
+                id: `fsa_legacy_${Date.now()}`,
+                name: (legacyHandle as FileSystemDirectoryHandle).name || 'Local Music',
+                sourceType: 'fs-access',
+                handle: legacyHandle as FileSystemDirectoryHandle,
+                addedAt: Date.now(),
+              };
+
+              // Persist migration result idempotently
+              store.put([migratedFolder], REGISTERED_FOLDERS_KEY);
+              store.put(true, MIGRATION_DONE_KEY);
+
+              tx.oncomplete = () => {
+                db.close();
+                resolve([migratedFolder]);
+              };
+              return;
+            }
+
+            db.close();
+            resolve([]);
+          };
+
+          legacyReq.onerror = () => {
+            db.close();
+            resolve([]);
+          };
+        };
+
+        req.onerror = () => {
+          db.close();
+          resolve([]);
+        };
+      } catch {
+        db.close();
+        resolve([]);
+      }
+    });
+  } catch {
+    return [];
   }
 }
 

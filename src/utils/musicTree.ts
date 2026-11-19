@@ -1,4 +1,4 @@
-import { FolderNode, TrackItem, FileStatus } from '../types/music';
+import { FolderNode, TrackItem, FileStatus, ImportedFolder } from '../types/music';
 import { naturalSort } from './naturalSort';
 
 export const SUPPORTED_AUDIO_EXTENSIONS = new Set([
@@ -114,14 +114,16 @@ interface RawFolderBuilder {
 
 /**
  * Builds a pruned, naturally sorted folder tree from a flat list of discovered tracks.
+ * Supports optional pathPrefix to namespace subfolder paths for multi-folder integration.
  */
 export function buildFolderTree(
   rootName: string,
-  rawTracks: TrackItem[]
+  rawTracks: TrackItem[],
+  pathPrefix = ''
 ): FolderNode {
   const rootBuilder: RawFolderBuilder = {
     name: rootName || 'Music Library',
-    relativePath: '',
+    relativePath: pathPrefix,
     tracks: [],
     subfolderMap: new Map(),
   };
@@ -137,7 +139,7 @@ export function buildFolderTree(
 
     let current = rootBuilder;
     const folderParts = parts.slice(0, parts.length - 1);
-    let accumulatedPath = '';
+    let accumulatedPath = pathPrefix;
 
     for (const folderName of folderParts) {
       accumulatedPath = accumulatedPath ? `${accumulatedPath}/${folderName}` : folderName;
@@ -197,9 +199,9 @@ export function buildFolderTree(
   const rootNode = convert(rootBuilder);
   if (!rootNode) {
     return {
-      id: 'root',
+      id: pathPrefix || 'root',
       name: rootName || 'Music Library',
-      relativePath: '',
+      relativePath: pathPrefix,
       tracks: [],
       subfolders: [],
       totalTrackCount: 0,
@@ -207,6 +209,116 @@ export function buildFolderTree(
   }
 
   return rootNode;
+}
+
+/**
+ * Combines multiple ImportedFolder trees into a unified virtual root FolderNode.
+ * Each imported folder is represented as a top-level subfolder in the unified tree.
+ */
+export function buildUnifiedMultiFolderTree(folders: ImportedFolder[]): FolderNode {
+  if (folders.length === 0) {
+    return {
+      id: 'root',
+      name: 'Music Library',
+      relativePath: '',
+      tracks: [],
+      subfolders: [],
+      totalTrackCount: 0,
+    };
+  }
+
+  const topSubfolders: FolderNode[] = naturalSort(
+    folders.map((f) => f.tree),
+    (node) => node.name
+  );
+
+  const totalTrackCount = topSubfolders.reduce((sum, f) => sum + f.totalTrackCount, 0);
+
+  return {
+    id: 'root',
+    name: 'Music Library',
+    relativePath: '',
+    tracks: [],
+    subfolders: topSubfolders,
+    totalTrackCount,
+  };
+}
+
+/**
+ * Merges and deduplicates tracks across all imported roots to generate the global flat playlist.
+ * Ensures each logical track appears only once in the global list, even if referenced by multiple roots.
+ */
+export function combineFlatPlaylists(folders: ImportedFolder[]): TrackItem[] {
+  const seenTrackIds = new Set<string>();
+  const combined: TrackItem[] = [];
+
+  for (const folder of folders) {
+    for (const track of folder.tracks) {
+      if (!seenTrackIds.has(track.id)) {
+        seenTrackIds.add(track.id);
+        combined.push(track);
+      }
+    }
+  }
+
+  return naturalSort(combined, (t) => t.name);
+}
+
+/**
+ * Safely reconciles tracks from a new/refreshed folder against existing tracks.
+ * Uses FileSystemHandle.isSameEntry() when available to definitively match files.
+ * Does NOT merge independent sources based merely on metadata (name, size, timestamp).
+ */
+export async function reconcileOverlappingTracks(
+  newTracks: TrackItem[],
+  existingTracks: TrackItem[],
+  folderId: string
+): Promise<TrackItem[]> {
+  const result: TrackItem[] = [];
+
+  for (const newTrack of newTracks) {
+    let matchedExisting: TrackItem | null = null;
+
+    // Only attempt handle-based identity matching if both have FileSystemFileHandle
+    if (newTrack.handle) {
+      for (const existing of existingTracks) {
+        if (
+          existing.handle &&
+          existing.name === newTrack.name &&
+          existing.size === newTrack.size
+        ) {
+          try {
+            const isSame = await newTrack.handle.isSameEntry(existing.handle);
+            if (isSame) {
+              matchedExisting = existing;
+              break;
+            }
+          } catch {
+            // isSameEntry failed or permission issue; do not merge
+          }
+        }
+      }
+    }
+
+    if (matchedExisting) {
+      // Reliable match confirmed via isSameEntry!
+      // Reuse existing track, preserve its stable ID, metadata, status, etc.
+      const currentFolderIds = matchedExisting.folderIds || [];
+      if (!currentFolderIds.includes(folderId)) {
+        matchedExisting.folderIds = [...currentFolderIds, folderId];
+      }
+      result.push(matchedExisting);
+    } else {
+      // Independent track - preserve separate identity
+      const folderIds = newTrack.folderIds || [];
+      if (!folderIds.includes(folderId)) {
+        newTrack.folderIds = [...folderIds, folderId];
+      }
+      result.push(newTrack);
+    }
+  }
+
+  return result;
 }
 
 /**

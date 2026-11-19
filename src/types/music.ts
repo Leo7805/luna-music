@@ -17,7 +17,7 @@ export interface TrackMetadata {
 export type FileStatus = 'normal' | 'empty' | 'unreadable' | 'unsupported';
 
 export interface TrackItem {
-  id: string; // unique relative path or fallback identifier
+  id: string; // unique stable track identifier
   name: string; // file name e.g. "Song.mp3"
   relativePath: string; // "Rock/Queen/Bohemian Rhapsody.mp3"
   size: number;
@@ -29,6 +29,7 @@ export interface TrackItem {
   lrcFile?: File;
   lrcContent?: string;
   status?: FileStatus;
+  folderIds?: string[]; // IDs of imported root folders that reference this track
 }
 
 export interface FolderNode {
@@ -42,11 +43,44 @@ export interface FolderNode {
 
 export type LibrarySourceType = 'fs-access' | 'input-fallback' | 'files';
 
+/**
+ * Lightweight serializable record of a registered folder for persistence in IndexedDB.
+ * Contains no runtime-only state (no File objects, no Blob URLs, no extracted metadata).
+ */
+export interface StoredFolderRecord {
+  id: string; // Unique stable identifier e.g. "fsa_<timestamp>_<rand>"
+  name: string; // Root directory name
+  sourceType: LibrarySourceType;
+  handle?: FileSystemDirectoryHandle;
+  addedAt: number;
+  lastScannedAt?: number;
+  trackCount?: number;
+}
+
+/**
+ * Runtime state of an imported folder in the library.
+ */
+export interface ImportedFolder {
+  id: string; // Matches StoredFolderRecord.id
+  name: string;
+  sourceType: LibrarySourceType;
+  handle?: FileSystemDirectoryHandle;
+  tree: FolderNode;
+  tracks: TrackItem[];
+  trackCount: number;
+  addedAt: number;
+  lastScannedAt: number;
+  permissionStatus: 'granted' | 'prompt' | 'denied';
+  isScanning?: boolean;
+  error?: string | null;
+}
+
 export interface MusicLibrary {
   id: string;
   name: string;
-  tree: FolderNode;
-  flatPlaylist: TrackItem[];
+  folders: ImportedFolder[]; // Multi-folder list
+  tree: FolderNode; // Unified virtual root
+  flatPlaylist: TrackItem[]; // Global deduplicated track list
   sourceType: LibrarySourceType;
   handle?: FileSystemDirectoryHandle;
 }

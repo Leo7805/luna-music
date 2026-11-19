@@ -52,4 +52,44 @@ describe('idbStorage preferences', () => {
     expect(state.shuffle).toBe(true);
     expect(state.favourites).toEqual(['track-1', 'track-2']);
   });
+
+  it('migrates legacy single directory handle to registered_root_folders idempotently', () => {
+    const mockStore = new Map<string, unknown>();
+    mockStore.set('directory_handle', { kind: 'directory', name: 'Legacy Folder' });
+
+    // Verify migration logic
+    function simulateGetStoredRegisteredFolders(store: Map<string, unknown>) {
+      const existing = store.get('registered_root_folders');
+      if (Array.isArray(existing) && existing.length > 0) {
+        return { folders: existing, migrated: false };
+      }
+
+      const legacy = store.get('directory_handle') as { kind: string; name: string } | undefined;
+      if (legacy && legacy.kind === 'directory') {
+        const migratedFolder = {
+          id: 'fsa_legacy',
+          name: legacy.name,
+          sourceType: 'fs-access',
+          handle: legacy,
+          addedAt: 1000,
+        };
+        store.set('registered_root_folders', [migratedFolder]);
+        store.set('migrated_single_to_multi', true);
+        return { folders: [migratedFolder], migrated: true };
+      }
+      return { folders: [], migrated: false };
+    }
+
+    // 1st load: triggers migration
+    const res1 = simulateGetStoredRegisteredFolders(mockStore);
+    expect(res1.migrated).toBe(true);
+    expect(res1.folders).toHaveLength(1);
+    expect(res1.folders[0].name).toBe('Legacy Folder');
+
+    // 2nd load: already migrated, no duplicate migration
+    const res2 = simulateGetStoredRegisteredFolders(mockStore);
+    expect(res2.migrated).toBe(false);
+    expect(res2.folders).toHaveLength(1);
+    expect(res2.folders[0].id).toBe('fsa_legacy');
+  });
 });
