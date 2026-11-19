@@ -266,7 +266,8 @@ export function combineFlatPlaylists(folders: ImportedFolder[]): TrackItem[] {
 
 /**
  * Safely reconciles tracks from a new/refreshed folder against existing tracks.
- * Uses FileSystemHandle.isSameEntry() when available to definitively match files.
+ * Uses FileSystemHandle.isSameEntry() as the authoritative identity comparison.
+ * Does NOT require file size to match, as file sizes are mutable (e.g. hydration/edits).
  * Does NOT merge independent sources based merely on metadata (name, size, timestamp).
  */
 export async function reconcileOverlappingTracks(
@@ -279,14 +280,11 @@ export async function reconcileOverlappingTracks(
   for (const newTrack of newTracks) {
     let matchedExisting: TrackItem | null = null;
 
-    // Only attempt handle-based identity matching if both have FileSystemFileHandle
+    // Authoritative identity matching via FileSystemHandle.isSameEntry()
+    // Pre-filtered by filename only; file size is not required to match as size can change
     if (newTrack.handle) {
       for (const existing of existingTracks) {
-        if (
-          existing.handle &&
-          existing.name === newTrack.name &&
-          existing.size === newTrack.size
-        ) {
+        if (existing.handle && existing.name === newTrack.name) {
           try {
             const isSame = await newTrack.handle.isSameEntry(existing.handle);
             if (isSame) {
@@ -302,17 +300,46 @@ export async function reconcileOverlappingTracks(
 
     if (matchedExisting) {
       // Reliable match confirmed via isSameEntry!
-      // Reuse existing track, preserve its stable ID, metadata, status, etc.
       const currentFolderIds = matchedExisting.folderIds || [];
       if (!currentFolderIds.includes(folderId)) {
         matchedExisting.folderIds = [...currentFolderIds, folderId];
       }
+
+      // Record newTrack's ID as an alias so references across either root can resolve
+      const currentAliases = matchedExisting.aliases || [matchedExisting.id];
+      if (!currentAliases.includes(newTrack.id)) {
+        matchedExisting.aliases = [...currentAliases, newTrack.id];
+      }
+
+      // If newTrack observed a newer, nonzero, or hydrated file size, update existing track state
+      if (
+        newTrack.size !== matchedExisting.size ||
+        newTrack.lastModified !== matchedExisting.lastModified
+      ) {
+        if (newTrack.size > 0 && matchedExisting.size === 0) {
+          matchedExisting.size = newTrack.size;
+          matchedExisting.lastModified = newTrack.lastModified;
+          matchedExisting.status = 'normal';
+        } else if (newTrack.size > 0) {
+          matchedExisting.size = newTrack.size;
+          matchedExisting.lastModified = newTrack.lastModified;
+        }
+      }
+
+      // Keep fresh handle if present
+      if (newTrack.handle) {
+        matchedExisting.handle = newTrack.handle;
+      }
+
       result.push(matchedExisting);
     } else {
       // Independent track - preserve separate identity
       const folderIds = newTrack.folderIds || [];
       if (!folderIds.includes(folderId)) {
         newTrack.folderIds = [...folderIds, folderId];
+      }
+      if (!newTrack.aliases) {
+        newTrack.aliases = [newTrack.id];
       }
       result.push(newTrack);
     }

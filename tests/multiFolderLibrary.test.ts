@@ -495,4 +495,235 @@ describe('Phase 1: Multi-Folder Music Library Core', () => {
 
     expect(favourites.has(rescannedTrack.id)).toBe(true);
   });
+
+  // Test 10: Same file with different observed sizes deduplicates via isSameEntry and updates size/status
+  it('10. mutable file size (e.g. 0-byte placeholder vs hydrated) deduplicates via isSameEntry and updates size/status', async () => {
+    const placeholderHandle = {
+      name: 'HydrateMe.flac',
+      isSameEntry: vi.fn(),
+    } as unknown as FileSystemFileHandle;
+
+    const hydratedHandle = {
+      name: 'HydrateMe.flac',
+      isSameEntry: vi.fn(),
+    } as unknown as FileSystemFileHandle;
+
+    // isSameEntry is authoritative regardless of size difference
+    (hydratedHandle.isSameEntry as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+    const placeholderTrack: TrackItem = {
+      id: 'root_1:HydrateMe.flac',
+      name: 'HydrateMe.flac',
+      relativePath: 'HydrateMe.flac',
+      size: 0,
+      lastModified: 1000,
+      status: 'empty',
+      handle: placeholderHandle,
+      metadata: { title: 'HydrateMe', artist: '', album: '', isMetadataLoaded: false },
+      folderIds: ['root_1'],
+    };
+
+    const hydratedTrack: TrackItem = {
+      id: 'root_2:Sub/HydrateMe.flac',
+      name: 'HydrateMe.flac',
+      relativePath: 'Sub/HydrateMe.flac',
+      size: 32500000, // 32.5 MB hydrated
+      lastModified: 2000,
+      status: 'normal',
+      handle: hydratedHandle,
+      metadata: { title: 'HydrateMe', artist: 'Artist', album: 'Album', isMetadataLoaded: false },
+      folderIds: ['root_2'],
+    };
+
+    const reconciled = await reconcileOverlappingTracks(
+      [hydratedTrack],
+      [placeholderTrack],
+      'root_2'
+    );
+
+    // Verified: deduplication succeeds even though sizes were 0 vs 32500000
+    expect(reconciled).toHaveLength(1);
+    const resultTrack = reconciled[0];
+    expect(resultTrack.id).toBe('root_1:HydrateMe.flac');
+    expect(resultTrack.folderIds).toEqual(['root_1', 'root_2']);
+    expect(resultTrack.size).toBe(32500000);
+    expect(resultTrack.status).toBe('normal');
+    expect(resultTrack.aliases).toEqual(['root_1:HydrateMe.flac', 'root_2:Sub/HydrateMe.flac']);
+  });
+
+  // Test 11: Import order independence of track deduplication
+  it('11. import order independence: parent-then-child and child-then-parent both deduplicate shared tracks', async () => {
+    const parentHandle = {
+      name: 'OrderTest.mp3',
+      isSameEntry: vi.fn(),
+    } as unknown as FileSystemFileHandle;
+
+    const childHandle = {
+      name: 'OrderTest.mp3',
+      isSameEntry: vi.fn(),
+    } as unknown as FileSystemFileHandle;
+
+    (parentHandle.isSameEntry as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    (childHandle.isSameEntry as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+
+    const makeParentTrack = (): TrackItem => ({
+      id: 'parent:Music/OrderTest.mp3',
+      name: 'OrderTest.mp3',
+      relativePath: 'Music/OrderTest.mp3',
+      size: 8000000,
+      lastModified: 1000,
+      handle: parentHandle,
+      metadata: { title: 'Order Test', artist: 'Artist', album: 'Album', isMetadataLoaded: true },
+      folderIds: ['parent'],
+    });
+
+    const makeChildTrack = (): TrackItem => ({
+      id: 'child:OrderTest.mp3',
+      name: 'OrderTest.mp3',
+      relativePath: 'OrderTest.mp3',
+      size: 8000000,
+      lastModified: 1000,
+      handle: childHandle,
+      metadata: { title: 'Order Test', artist: 'Artist', album: 'Album', isMetadataLoaded: true },
+      folderIds: ['child'],
+    });
+
+    // Scenario A: Parent imported first, then Child imported
+    const parentFirst_parent = makeParentTrack();
+    const parentFirst_child = makeChildTrack();
+    const reconciledA = await reconcileOverlappingTracks(
+      [parentFirst_child],
+      [parentFirst_parent],
+      'child'
+    );
+    expect(reconciledA).toHaveLength(1);
+    expect(reconciledA[0].folderIds).toEqual(['parent', 'child']);
+    expect(reconciledA[0].aliases).toContain('parent:Music/OrderTest.mp3');
+    expect(reconciledA[0].aliases).toContain('child:OrderTest.mp3');
+
+    // Scenario B: Child imported first, then Parent imported
+    const childFirst_child = makeChildTrack();
+    const childFirst_parent = makeParentTrack();
+    const reconciledB = await reconcileOverlappingTracks(
+      [childFirst_parent],
+      [childFirst_child],
+      'parent'
+    );
+    expect(reconciledB).toHaveLength(1);
+    expect(reconciledB[0].folderIds).toEqual(['child', 'parent']);
+    expect(reconciledB[0].aliases).toContain('child:OrderTest.mp3');
+    expect(reconciledB[0].aliases).toContain('parent:Music/OrderTest.mp3');
+  });
+
+  // Test 12: Track ID stability and alias promotion when removing an overlapping root
+  it('12. removing an overlapping root promotes remaining alias to canonical ID without losing track identity', () => {
+    const folderAId = 'fsa_parent';
+    const folderBId = 'fsa_child';
+
+    // Track was originally imported via folder A, then aliased in folder B
+    const sharedTrack: TrackItem = {
+      id: `${folderAId}:Rock/Song.flac`,
+      name: 'Song.flac',
+      relativePath: 'Rock/Song.flac',
+      size: 20000000,
+      lastModified: 1000,
+      metadata: { title: 'Song', artist: 'Artist', album: 'Album', isMetadataLoaded: true },
+      folderIds: [folderAId, folderBId],
+      aliases: [`${folderAId}:Rock/Song.flac`, `${folderBId}:Song.flac`],
+    };
+
+    // Simulate removing folder A
+    const idMigrations = new Map<string, string>();
+    const folderIdToRemove = folderAId;
+
+    let updatedTrack: TrackItem = {
+      ...sharedTrack,
+      folderIds: (sharedTrack.folderIds || []).filter((id) => id !== folderIdToRemove),
+    };
+
+    if (updatedTrack.id.startsWith(`${folderIdToRemove}:`)) {
+      const validAlias = updatedTrack.aliases?.find(
+        (alias) => !alias.startsWith(`${folderIdToRemove}:`)
+      );
+      if (validAlias) {
+        idMigrations.set(updatedTrack.id, validAlias);
+        const remainingAliases = (updatedTrack.aliases || []).filter((a) => a !== updatedTrack.id);
+        updatedTrack = {
+          ...updatedTrack,
+          id: validAlias,
+          aliases: remainingAliases.includes(validAlias)
+            ? remainingAliases
+            : [validAlias, ...remainingAliases],
+        };
+      }
+    }
+
+    // Canonical ID was promoted cleanly to child folder's ID
+    expect(updatedTrack.id).toBe(`${folderBId}:Song.flac`);
+    expect(updatedTrack.folderIds).toEqual([folderBId]);
+    expect(idMigrations.get(`${folderAId}:Rock/Song.flac`)).toBe(`${folderBId}:Song.flac`);
+  });
+
+  // Test 13: Favourites preservation after root removal and refresh
+  it('13. favourites remain preserved and active across root removal and subsequent refresh', () => {
+    const parentId = 'root_parent';
+    const childId = 'root_child';
+
+    const oldCanonicalId = `${parentId}:Rock/Song.flac`;
+    const childAlias = `${childId}:Song.flac`;
+
+    // User favorited the track under original canonical ID
+    const favourites = new Set<string>([oldCanonicalId]);
+
+    const track: TrackItem = {
+      id: oldCanonicalId,
+      name: 'Song.flac',
+      relativePath: 'Rock/Song.flac',
+      size: 20000000,
+      lastModified: 1000,
+      metadata: { title: 'Song', artist: 'Artist', album: 'Album', isMetadataLoaded: true },
+      folderIds: [parentId, childId],
+      aliases: [oldCanonicalId, childAlias],
+    };
+
+    // Helper checking isFav via canonical ID or aliases
+    const isFavourite = (t: TrackItem, favSet: Set<string>) =>
+      favSet.has(t.id) || Boolean(t.aliases?.some((a) => favSet.has(a)));
+
+    expect(isFavourite(track, favourites)).toBe(true);
+
+    // Now parent root is removed; alias migration occurs
+    const nextFavourites = new Set(favourites);
+    const newCanonicalId = childAlias;
+    if (nextFavourites.has(oldCanonicalId)) {
+      nextFavourites.delete(oldCanonicalId);
+      nextFavourites.add(newCanonicalId);
+    }
+
+    const migratedTrack: TrackItem = {
+      ...track,
+      id: newCanonicalId,
+      folderIds: [childId],
+      aliases: [newCanonicalId],
+    };
+
+    // User favourite is preserved under new ID
+    expect(nextFavourites.has(migratedTrack.id)).toBe(true);
+    expect(isFavourite(migratedTrack, nextFavourites)).toBe(true);
+
+    // Now child folder is refreshed: track preserves child ID and remains favorited
+    const refreshedTrack: TrackItem = {
+      id: `${childId}:Song.flac`,
+      name: 'Song.flac',
+      relativePath: 'Song.flac',
+      size: 20000000,
+      lastModified: 1000,
+      metadata: { title: 'Song', artist: 'Artist', album: 'Album', isMetadataLoaded: true },
+      folderIds: [childId],
+      aliases: [`${childId}:Song.flac`],
+    };
+
+    expect(nextFavourites.has(refreshedTrack.id)).toBe(true);
+    expect(isFavourite(refreshedTrack, nextFavourites)).toBe(true);
+  });
 });

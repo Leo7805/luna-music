@@ -49,7 +49,7 @@ export const TrackList: React.FC<TrackListProps> = ({
       <div className="divide-y divide-slate-200/60 dark:divide-white/[0.02]">
         {tracks.map((track, idx) => {
           const isCurrent = currentTrackId === track.id;
-          const isFav = favourites.has(track.id);
+          const isFav = favourites.has(track.id) || Boolean(track.aliases?.some((a) => favourites.has(a)));
           const extension = track.name.split('.').pop()?.toUpperCase() || '';
           const status = getTrackStatus(track);
           const isAbnormal = status !== 'normal';

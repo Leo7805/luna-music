@@ -336,7 +336,16 @@ export function useMusicLibrary() {
         scanned.tree = buildFolderTree(scanned.name, scanned.tracks, folderId);
 
         // Preserve metadata already loaded if file content is unchanged
-        const oldTrackMap = new Map(targetFolder.tracks.map((t) => [t.id, t]));
+        const oldTrackMap = new Map<string, TrackItem>();
+        for (const oldT of targetFolder.tracks) {
+          oldTrackMap.set(oldT.id, oldT);
+          if (oldT.aliases) {
+            for (const a of oldT.aliases) {
+              oldTrackMap.set(a, oldT);
+            }
+          }
+        }
+
         scanned.tracks = scanned.tracks.map((t) => {
           const old = oldTrackMap.get(t.id);
           if (
@@ -453,32 +462,81 @@ export function useMusicLibrary() {
 
       const remainingFolders = library.folders.filter((f) => f.id !== folderId);
 
-      // Remove folderId from all tracks referenced by remaining folders
-      const updatedFolders = remainingFolders.map((f) => ({
-        ...f,
-        tracks: f.tracks.map((t) => ({
-          ...t,
-          folderIds: (t.folderIds || []).filter((id) => id !== folderId),
-        })),
-      }));
-
-      if (updatedFolders.length === 0) {
+      if (remainingFolders.length === 0) {
         setLibrary(null);
         setSelectedFolderPath('');
         await storeRegisteredFolders([]);
-      } else {
-        const unifiedTree = buildUnifiedMultiFolderTree(updatedFolders);
-        const flatPlaylist = combineFlatPlaylists(updatedFolders);
-
-        setLibrary({
-          ...library,
-          folders: updatedFolders,
-          tree: unifiedTree,
-          flatPlaylist,
-        });
-
-        await storeRegisteredFolders(updatedFolders);
+        return;
       }
+
+      // Track ID migration map (oldId -> newId) for promoted aliases
+      const idMigrations = new Map<string, string>();
+
+      // Update remaining folders: prune folderId and promote alias if needed
+      const updatedFolders = remainingFolders.map((f) => ({
+        ...f,
+        tracks: f.tracks.map((t) => {
+          let updatedTrack: TrackItem = {
+            ...t,
+            folderIds: (t.folderIds || []).filter((id) => id !== folderId),
+          };
+
+          if (updatedTrack.id.startsWith(`${folderId}:`)) {
+            // Find an alias that belongs to one of the remaining folders
+            const validAlias = updatedTrack.aliases?.find(
+              (alias) => !alias.startsWith(`${folderId}:`)
+            );
+            if (validAlias) {
+              idMigrations.set(updatedTrack.id, validAlias);
+              const remainingAliases = (updatedTrack.aliases || []).filter(
+                (a) => a !== updatedTrack.id
+              );
+              updatedTrack = {
+                ...updatedTrack,
+                id: validAlias,
+                aliases: remainingAliases.includes(validAlias)
+                  ? remainingAliases
+                  : [validAlias, ...remainingAliases],
+              };
+            }
+          }
+
+          return updatedTrack;
+        }),
+      }));
+
+      // Rebuild trees for folders where tracks were updated
+      const refreshedFolders = updatedFolders.map((f) => ({
+        ...f,
+        tree: buildFolderTree(f.name, f.tracks, f.id),
+      }));
+
+      // Migrate favourites if any track IDs were updated
+      if (idMigrations.size > 0) {
+        setFavourites((prev) => {
+          const next = new Set(prev);
+          for (const [oldId, newId] of idMigrations.entries()) {
+            if (next.has(oldId)) {
+              next.delete(oldId);
+              next.add(newId);
+            }
+          }
+          storePlaybackState({ favourites: Array.from(next) });
+          return next;
+        });
+      }
+
+      const unifiedTree = buildUnifiedMultiFolderTree(refreshedFolders);
+      const flatPlaylist = combineFlatPlaylists(refreshedFolders);
+
+      setLibrary({
+        ...library,
+        folders: refreshedFolders,
+        tree: unifiedTree,
+        flatPlaylist,
+      });
+
+      await storeRegisteredFolders(refreshedFolders);
     },
     [library]
   );
@@ -543,17 +601,24 @@ export function useMusicLibrary() {
 
   // Toggle favorite track
   const toggleFavourite = useCallback((trackId: string) => {
+    const track = library?.flatPlaylist.find(
+      (t) => t.id === trackId || (t.aliases && t.aliases.includes(trackId))
+    );
+    const canonicalId = track ? track.id : trackId;
+    const allIds = track?.aliases && track.aliases.length > 0 ? track.aliases : [canonicalId];
+
     setFavourites((prev) => {
       const next = new Set(prev);
-      if (next.has(trackId)) {
-        next.delete(trackId);
+      const isFav = allIds.some((id) => next.has(id));
+      if (isFav) {
+        allIds.forEach((id) => next.delete(id));
       } else {
-        next.add(trackId);
+        next.add(canonicalId);
       }
       storePlaybackState({ favourites: Array.from(next) });
       return next;
     });
-  }, []);
+  }, [library]);
 
   // Aggregate albums from library
   const albums = useMemo((): AlbumGroup[] => {
@@ -639,7 +704,9 @@ export function useMusicLibrary() {
     if (currentView === 'all') {
       baseList = library.flatPlaylist;
     } else if (currentView === 'favourites') {
-      baseList = library.flatPlaylist.filter((t) => favourites.has(t.id));
+      baseList = library.flatPlaylist.filter(
+        (t) => favourites.has(t.id) || Boolean(t.aliases?.some((a) => favourites.has(a)))
+      );
     } else if (currentView === 'folder') {
       if (currentFolderNode) {
         baseList = currentFolderNode.tracks;

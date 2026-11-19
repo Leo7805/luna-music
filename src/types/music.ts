@@ -30,6 +30,7 @@ export interface TrackItem {
   lrcContent?: string;
   status?: FileStatus;
   folderIds?: string[]; // IDs of imported root folders that reference this track
+  aliases?: string[]; // Alternative stable IDs from overlapping imported roots
 }
 
 export interface FolderNode {

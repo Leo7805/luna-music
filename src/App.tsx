@@ -308,7 +308,12 @@ export function App() {
         isMuted={isMuted}
         repeatMode={repeatMode}
         shuffle={shuffle}
-        isFavourite={currentTrack ? favourites.has(currentTrack.id) : false}
+        isFavourite={
+          currentTrack
+            ? favourites.has(currentTrack.id) ||
+              Boolean(currentTrack.aliases?.some((a) => favourites.has(a)))
+            : false
+        }
         isNowPlayingOpen={isNowPlayingOpen}
         hasLyrics={lyrics.length > 0}
         onTogglePlay={togglePlay}
