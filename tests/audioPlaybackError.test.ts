@@ -31,9 +31,9 @@ function evaluateAudioError(
       return 'Audio decode failed. The audio codec or file may be corrupted.';
     case 4 /* MEDIA_ERR_SRC_NOT_SUPPORTED */:
       if (err.message && /open context failed|DEMUXER_ERROR/i.test(err.message)) {
-        return 'Unable to read audio data. The file may be empty, incomplete, or corrupted.';
+        return 'Audio decode failed. The audio codec or file may be corrupted.';
       }
-      return 'This audio format or codec is not supported by your browser.';
+      return 'This audio format or codec may not be supported by your browser.';
     default:
       return err.message || 'Unable to play this audio file.';
   }
@@ -77,7 +77,7 @@ describe('Audio playback error suppression and genuine error handling', () => {
     };
 
     const error = evaluateAudioError(mockAudio, 'blob:http://localhost/unsupported-codec', true);
-    expect(error).toBe('This audio format or codec is not supported by your browser.');
+    expect(error).toBe('This audio format or codec may not be supported by your browser.');
   });
 
   it('correctly reports genuine decode failures for corrupted audio files', () => {
@@ -97,6 +97,6 @@ describe('Audio playback error suppression and genuine error handling', () => {
     };
 
     const error = evaluateAudioError(mockAudio, 'blob:http://localhost/empty.flac', true);
-    expect(error).toBe('Unable to read audio data. The file may be empty, incomplete, or corrupted.');
+    expect(error).toBe('Audio decode failed. The audio codec or file may be corrupted.');
   });
 });

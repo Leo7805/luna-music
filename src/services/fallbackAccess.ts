@@ -83,7 +83,7 @@ export function parseFileList(files: FileList | File[]): MusicLibrary | null {
       file: item.file,
       metadata: createFallbackMetadata(item.name, item.relativePath),
       lrcFile,
-      availability: item.file.size === 0 ? 'unavailable' : 'available',
+      status: item.file.size === 0 ? 'empty' : 'normal',
     };
   });
 
@@ -138,7 +138,7 @@ export function parseSelectedFiles(files: FileList | File[]): MusicLibrary | nul
       file,
       metadata: createFallbackMetadata(file.name, file.name),
       lrcFile,
-      availability: file.size === 0 ? 'unavailable' : 'available',
+      status: file.size === 0 ? 'empty' : 'normal',
     };
   });
 

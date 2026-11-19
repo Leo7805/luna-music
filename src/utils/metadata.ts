@@ -59,7 +59,7 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
       title: fallbackTitle,
       artist: 'Unknown Artist',
       album: 'Unknown Album',
-      isMetadataLoaded: true,
+      isMetadataLoaded: false,
     };
   }
 

@@ -131,7 +131,7 @@ export async function scanDirectoryHandle(
       handle: item.handle,
       metadata: createFallbackMetadata(item.name, item.relativePath),
       lrcHandle,
-      availability: item.size === 0 ? 'unavailable' : 'available',
+      status: item.size === 0 ? 'empty' : 'normal',
     };
   });
 

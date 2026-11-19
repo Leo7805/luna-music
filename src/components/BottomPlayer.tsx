@@ -13,10 +13,11 @@ import {
   Heart,
   List,
   FileText,
-  CloudOff,
 } from 'lucide-react';
 import { TrackItem, RepeatMode } from '../types/music';
 import { formatDuration } from '../utils/formatters';
+import { getTrackStatus } from '../utils/musicTree';
+import { TrackStatusBadge } from './TrackStatusBadge';
 
 interface BottomPlayerProps {
   currentTrack: TrackItem | null;
@@ -120,15 +121,7 @@ export function BottomPlayer({
                 title={currentTrack.metadata.artist || 'Unknown Artist'}
               >
                 <span>{currentTrack.metadata.artist || 'Unknown Artist'}</span>
-                {(currentTrack.availability === 'unavailable' || currentTrack.size === 0) && (
-                  <span
-                    className="inline-flex items-center gap-1 text-[9px] text-amber-600 dark:text-amber-400 font-medium shrink-0"
-                    title="Not available locally"
-                  >
-                    <CloudOff className="w-2.5 h-2.5" />
-                    <span>Not available locally</span>
-                  </span>
-                )}
+                <TrackStatusBadge status={getTrackStatus(currentTrack)} />
               </p>
             </div>
 

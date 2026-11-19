@@ -48,7 +48,7 @@ export function App() {
     handleFallbackFolderSelect,
     handleOpenFilesSelect,
     requestPermissionAndLoad,
-    updateTrackAvailability,
+    updateTrackStatus,
   } = useMusicLibrary();
 
   // Audio Player state and actions
@@ -78,7 +78,7 @@ export function App() {
     toggleShuffle,
   } = useAudioPlayer({
     playlist: displayedTracks.length > 0 ? displayedTracks : library?.flatPlaylist || [],
-    onTrackAvailabilityChanged: updateTrackAvailability,
+    onTrackStatusChanged: updateTrackStatus,
   });
 
   // Keyboard shortcuts dispatcher

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { TrackItem, RepeatMode, LrcLine, FileAvailability } from '../types/music';
+import { TrackItem, RepeatMode, LrcLine, FileStatus } from '../types/music';
 import { parseLrc } from '../utils/lrcParser';
 import { extractDominantColor } from '../utils/colorExtractor';
+import { extractAudioMetadata } from '../utils/metadata';
 import { storePlaybackState } from '../services/idbStorage';
 
 interface UseAudioPlayerProps {
@@ -12,7 +13,12 @@ interface UseAudioPlayerProps {
   initialShuffle?: boolean;
   initialTrackId?: string | null;
   initialPosition?: number;
-  onTrackAvailabilityChanged?: (trackId: string, availability: FileAvailability, size?: number) => void;
+  onTrackStatusChanged?: (
+    trackId: string,
+    status: FileStatus,
+    size?: number,
+    metadata?: Partial<TrackItem['metadata']>
+  ) => void;
 }
 
 export function useAudioPlayer({
@@ -23,7 +29,7 @@ export function useAudioPlayer({
   initialShuffle = false,
   initialTrackId = null,
   initialPosition = 0,
-  onTrackAvailabilityChanged,
+  onTrackStatusChanged,
 }: UseAudioPlayerProps) {
   const [currentTrack, setCurrentTrack] = useState<TrackItem | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
@@ -47,8 +53,8 @@ export function useAudioPlayer({
   const pendingSeekRef = useRef<number | null>(initialPosition > 0 ? initialPosition : null);
   const playlistRef = useRef<TrackItem[]>(playlist);
   playlistRef.current = playlist;
-  const onTrackAvailabilityChangedRef = useRef(onTrackAvailabilityChanged);
-  onTrackAvailabilityChangedRef.current = onTrackAvailabilityChanged;
+  const onTrackStatusChangedRef = useRef(onTrackStatusChanged);
+  onTrackStatusChangedRef.current = onTrackStatusChanged;
 
   // Initialize native HTMLAudioElement without assigning invalid empty src
   if (!audioRef.current && typeof Audio !== 'undefined') {
@@ -144,36 +150,77 @@ export function useAudioPlayer({
 
     try {
       let file: File | Blob | null = null;
-      if (track.file) {
+      if (track.handle) {
+        try {
+          file = await track.handle.getFile();
+        } catch {
+          track.status = 'unreadable';
+          if (onTrackStatusChangedRef.current) {
+            onTrackStatusChangedRef.current(track.id, 'unreadable');
+          }
+          audio.pause();
+          audio.removeAttribute('src');
+          audio.load();
+          setIsPlaying(false);
+          throw new Error(
+            'Cannot access this audio file. Please check file permissions or reopen the music folder.'
+          );
+        }
+      } else if (track.file) {
         file = track.file;
-      } else if (track.handle) {
-        file = await track.handle.getFile();
       }
 
       if (!file) {
-        throw new Error(`File handle not accessible for ${track.name}`);
-      }
-
-      if (file.size === 0) {
-        track.availability = 'unavailable';
-        if (onTrackAvailabilityChangedRef.current) {
-          onTrackAvailabilityChangedRef.current(track.id, 'unavailable', 0);
+        track.status = 'unreadable';
+        if (onTrackStatusChangedRef.current) {
+          onTrackStatusChangedRef.current(track.id, 'unreadable');
         }
         audio.pause();
         audio.removeAttribute('src');
         audio.load();
         setIsPlaying(false);
         throw new Error(
-          'This file is not available locally. If it is stored in OneDrive, download it in Finder and try again.'
+          'Cannot access this audio file. Please check file permissions or reopen the music folder.'
         );
       }
 
-      // If the file was previously unavailable, it is now available after download!
-      if (track.availability === 'unavailable' || track.size === 0) {
-        track.availability = 'available';
+      if (file.size === 0) {
+        track.status = 'empty';
+        if (onTrackStatusChangedRef.current) {
+          onTrackStatusChangedRef.current(track.id, 'empty', 0);
+        }
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+        setIsPlaying(false);
+        throw new Error(
+          'This audio file is empty (0 bytes). Please check or replace the original file.'
+        );
+      }
+
+      // If the file was previously empty or unreadable, it is now valid after hydration or access restoration
+      if (track.status === 'empty' || track.status === 'unreadable' || track.size === 0) {
+        track.status = 'normal';
         track.size = file.size;
-        if (onTrackAvailabilityChangedRef.current) {
-          onTrackAvailabilityChangedRef.current(track.id, 'available', file.size);
+
+        let freshMetadata: Partial<TrackItem['metadata']> | undefined;
+        try {
+          const extracted = await extractAudioMetadata(file, track.name);
+          if (extracted) {
+            freshMetadata = extracted;
+            track.metadata = {
+              ...track.metadata,
+              ...extracted,
+              isMetadataLoaded: true,
+            };
+            setCurrentTrack({ ...track });
+          }
+        } catch {
+          // Ignore metadata parse error on raw audio
+        }
+
+        if (onTrackStatusChangedRef.current) {
+          onTrackStatusChangedRef.current(track.id, 'normal', file.size, freshMetadata);
         }
       }
 
@@ -422,9 +469,15 @@ export function useAudioPlayer({
             break;
           case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
             if (err.message && /open context failed|DEMUXER_ERROR/i.test(err.message)) {
-              message = 'Unable to read audio data. The file may be empty, incomplete, or corrupted.';
+              message = 'Audio decode failed. The audio codec or file may be corrupted.';
             } else {
-              message = 'This audio format or codec is not supported by your browser.';
+              message = 'This audio format or codec may not be supported by your browser.';
+              if (currentTrackRef.current) {
+                currentTrackRef.current.status = 'unsupported';
+                if (onTrackStatusChangedRef.current) {
+                  onTrackStatusChangedRef.current(currentTrackRef.current.id, 'unsupported');
+                }
+              }
             }
             break;
           default:

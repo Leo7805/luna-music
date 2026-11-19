@@ -6,11 +6,12 @@ import {
   Disc,
   Info,
   Sparkles,
-  CloudOff,
 } from 'lucide-react';
 import { TrackItem, LrcLine } from '../types/music';
 import { findCurrentLyricIndex } from '../utils/lrcParser';
 import { formatDuration, formatFileSize } from '../utils/formatters';
+import { getTrackStatus } from '../utils/musicTree';
+import { TrackStatusBadge } from './TrackStatusBadge';
 
 interface NowPlayingPanelProps {
   currentTrack: TrackItem | null;
@@ -153,12 +154,7 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
 
             {/* Technical Badges */}
             <div className="flex items-center gap-2 mt-3 flex-wrap justify-center sm:justify-start">
-              {(currentTrack.availability === 'unavailable' || currentTrack.size === 0) && (
-                <span className="text-[9px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                  <CloudOff className="w-2.5 h-2.5" />
-                  <span>Not available locally</span>
-                </span>
-              )}
+              <TrackStatusBadge status={getTrackStatus(currentTrack)} variant="pill" />
               {currentTrack.metadata.codec && (
                 <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-white/[0.06] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/[0.08]">
                   {currentTrack.metadata.codec}

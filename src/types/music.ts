@@ -14,7 +14,7 @@ export interface TrackMetadata {
   isMetadataLoaded: boolean;
 }
 
-export type FileAvailability = 'available' | 'unavailable';
+export type FileStatus = 'normal' | 'empty' | 'unreadable' | 'unsupported';
 
 export interface TrackItem {
   id: string; // unique relative path or fallback identifier
@@ -28,7 +28,7 @@ export interface TrackItem {
   lrcHandle?: FileSystemFileHandle;
   lrcFile?: File;
   lrcContent?: string;
-  availability?: FileAvailability;
+  status?: FileStatus;
 }
 
 export interface FolderNode {

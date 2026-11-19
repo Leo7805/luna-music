@@ -1,7 +1,9 @@
 import React from 'react';
-import { Play, Pause, Heart, Clock, CloudOff } from 'lucide-react';
+import { Play, Pause, Heart, Clock } from 'lucide-react';
 import { TrackItem } from '../types/music';
 import { formatDuration } from '../utils/formatters';
+import { getTrackStatus } from '../utils/musicTree';
+import { TrackStatusBadge } from './TrackStatusBadge';
 
 interface TrackListProps {
   tracks: TrackItem[];
@@ -49,7 +51,8 @@ export const TrackList: React.FC<TrackListProps> = ({
           const isCurrent = currentTrackId === track.id;
           const isFav = favourites.has(track.id);
           const extension = track.name.split('.').pop()?.toUpperCase() || '';
-          const isUnavailable = track.availability === 'unavailable' || track.size === 0;
+          const status = getTrackStatus(track);
+          const isAbnormal = status !== 'normal';
 
           return (
             <div
@@ -59,7 +62,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                 isCurrent
                   ? 'bg-indigo-600/15 border border-indigo-500/25 shadow-sm'
                   : 'hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
-              } ${isUnavailable ? 'opacity-85' : ''}`}
+              } ${isAbnormal ? 'opacity-85' : ''}`}
             >
               {/* Col 1: Number or Animated Equalizer or Play Button */}
               <div className="flex items-center justify-center">
@@ -137,15 +140,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                         {extension}
                       </span>
                     )}
-                    {isUnavailable && (
-                      <span
-                        className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-400 font-medium shrink-0"
-                        title="Not available locally"
-                      >
-                        <CloudOff className="w-2.5 h-2.5" />
-                        <span>Not available locally</span>
-                      </span>
-                    )}
+                    <TrackStatusBadge status={status} />
                     {track.lrcHandle || track.lrcFile || track.lrcContent ? (
                       <span
                         className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-semibold shrink-0"

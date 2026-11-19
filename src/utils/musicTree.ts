@@ -1,4 +1,4 @@
-import { FolderNode, TrackItem } from '../types/music';
+import { FolderNode, TrackItem, FileStatus } from '../types/music';
 import { naturalSort } from './naturalSort';
 
 export const SUPPORTED_AUDIO_EXTENSIONS = new Set([
@@ -26,14 +26,20 @@ export function isLrcFile(filename: string): boolean {
 }
 
 /**
- * Checks whether a track is locally available for playback.
- * A zero-byte file or explicitly unavailable track is considered unavailable.
+ * Determines the effective FileStatus for a track.
  */
-export function isTrackAvailable(track: TrackItem): boolean {
-  if (track.availability !== undefined) {
-    return track.availability === 'available';
+export function getTrackStatus(track: TrackItem): FileStatus {
+  if (track.status) {
+    return track.status;
   }
-  return track.size > 0;
+  return track.size === 0 ? 'empty' : 'normal';
+}
+
+/**
+ * Checks whether a track is normally playable.
+ */
+export function isTrackPlayable(track: TrackItem): boolean {
+  return getTrackStatus(track) === 'normal';
 }
 
 /**

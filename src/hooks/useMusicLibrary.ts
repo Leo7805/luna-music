@@ -6,7 +6,7 @@ import {
   AlbumGroup,
   ArtistGroup,
   FolderNode,
-  FileAvailability,
+  FileStatus,
 } from '../types/music';
 import {
   scanDirectoryHandle,
@@ -100,14 +100,14 @@ export function useMusicLibrary() {
       async function worker() {
         while (idx < unparsed.length && !currentRunner.cancel) {
           const track = unparsed[idx++];
-          if (!track || track.metadata.isMetadataLoaded) continue;
+          if (!track || track.metadata.isMetadataLoaded || track.size === 0) continue;
 
           try {
             let blob: Blob | null = null;
-            if (track.file) {
-              blob = track.file;
-            } else if (track.handle) {
+            if (track.handle) {
               blob = await track.handle.getFile();
+            } else if (track.file) {
+              blob = track.file;
             }
 
             if (blob && !currentRunner.cancel) {
@@ -406,35 +406,38 @@ export function useMusicLibrary() {
     setCurrentView('albums');
   }, []);
 
-  const updateTrackAvailability = useCallback(
-    (trackId: string, availability: FileAvailability, size?: number) => {
+  const updateTrackStatus = useCallback(
+    (
+      trackId: string,
+      status: FileStatus,
+      size?: number,
+      metadata?: Partial<TrackItem['metadata']>
+    ) => {
       setLibrary((prevLib) => {
         if (!prevLib) return null;
 
-        const updatedFlat = prevLib.flatPlaylist.map((t) => {
-          if (t.id === trackId) {
-            return {
-              ...t,
-              availability,
-              size: size !== undefined ? size : t.size,
-            };
-          }
-          return t;
-        });
+        const updateItem = (t: TrackItem): TrackItem => {
+          if (t.id !== trackId) return t;
+          return {
+            ...t,
+            status,
+            size: size !== undefined ? size : t.size,
+            metadata: metadata
+              ? {
+                  ...t.metadata,
+                  ...metadata,
+                  isMetadataLoaded: true,
+                }
+              : t.metadata,
+          };
+        };
+
+        const updatedFlat = prevLib.flatPlaylist.map(updateItem);
 
         function updateNode(node: FolderNode): FolderNode {
           return {
             ...node,
-            tracks: node.tracks.map((t) => {
-              if (t.id === trackId) {
-                return {
-                  ...t,
-                  availability,
-                  size: size !== undefined ? size : t.size,
-                };
-              }
-              return t;
-            }),
+            tracks: node.tracks.map(updateItem),
             subfolders: node.subfolders.map(updateNode),
           };
         }
@@ -476,6 +479,6 @@ export function useMusicLibrary() {
     handleFolderInput: handleFallbackFolderSelect,
     handleFilesInput: handleOpenFilesSelect,
     requestPermissionAndLoad,
-    updateTrackAvailability,
+    updateTrackStatus,
   };
 }
