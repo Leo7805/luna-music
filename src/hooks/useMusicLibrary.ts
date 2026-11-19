@@ -9,17 +9,23 @@ import {
   FileStatus,
   ImportedFolder,
   StoredFolderRecord,
+  StoredImportedFileRecord,
+  IMPORTED_FILES_ROOT_ID,
+  IMPORTED_FILES_COLLECTION_NAME,
 } from '../types/music';
 import {
   scanRootFolderHandle,
   promptOpenDirectory,
+  promptOpenFiles,
   verifyHandlePermission,
   isFileSystemAccessSupported,
 } from '../services/directoryAccess';
-import { parseFileList, parseSelectedFiles } from '../services/fallbackAccess';
+import { parseFileList } from '../services/fallbackAccess';
 import {
   storeRegisteredFolders,
   getStoredRegisteredFolders,
+  storeImportedFiles,
+  getStoredImportedFiles,
   storePlaybackState,
   getStoredPlaybackState,
   getStoredPlaylists,
@@ -33,8 +39,10 @@ import {
   reconcileOverlappingTracks,
   resolveFavouriteTracks,
   isFavouriteTrack,
+  isSupportedAudioFile,
+  isLrcFile,
 } from '../utils/musicTree';
-import { extractAudioMetadata } from '../utils/metadata';
+import { extractAudioMetadata, createFallbackMetadata } from '../utils/metadata';
 import { naturalSort } from '../utils/naturalSort';
 
 export function useMusicLibrary() {
@@ -80,13 +88,27 @@ export function useMusicLibrary() {
         setFavourites(new Set(storedState.favourites));
       }
 
+      let loadedFolders: ImportedFolder[] = [];
+      let promptImportedFolders: ImportedFolder[] = [];
+
       if (isFileSystemAccessSupported()) {
         const storedFolders = await getStoredRegisteredFolders();
-        if (storedFolders && storedFolders.length > 0) {
+        // Check for legacy migration: remove any legacy folder with sourceType === 'files' or name === 'Selected Audio'
+        const legacyFolders = storedFolders.filter(
+          (f) => f.sourceType === 'files' || f.name === 'Selected Audio'
+        );
+        const validStoredFolders = storedFolders.filter(
+          (f) => f.sourceType !== 'files' && f.name !== 'Selected Audio'
+        );
+        if (legacyFolders.length > 0) {
+          await storeRegisteredFolders(validStoredFolders);
+        }
+
+        if (validStoredFolders.length > 0) {
           const grantedFolders: StoredFolderRecord[] = [];
           const promptFolders: StoredFolderRecord[] = [];
 
-          for (const record of storedFolders) {
+          for (const record of validStoredFolders) {
             if (record.handle) {
               const hasPerm = await verifyHandlePermission(record.handle, false);
               if (hasPerm) {
@@ -102,7 +124,7 @@ export function useMusicLibrary() {
             setNeedsPermission(true);
           }
 
-          const promptImportedFolders: ImportedFolder[] = promptFolders.map((p) => ({
+          promptImportedFolders = promptFolders.map((p) => ({
             id: p.id,
             name: p.name,
             sourceType: p.sourceType,
@@ -122,7 +144,6 @@ export function useMusicLibrary() {
             permissionStatus: 'prompt',
           }));
 
-          const loadedFolders: ImportedFolder[] = [];
           let existingTracksAccum: TrackItem[] = [];
 
           if (grantedFolders.length > 0) {
@@ -146,24 +167,95 @@ export function useMusicLibrary() {
             }
             setIsLoading(false);
           }
+        }
+      }
 
-          const allInitialFolders = [...loadedFolders, ...promptImportedFolders];
-          if (allInitialFolders.length > 0) {
-            const unifiedTree = buildUnifiedMultiFolderTree(allInitialFolders);
-            const flatPlaylist = combineFlatPlaylists(loadedFolders);
-            setLibrary({
-              id: 'multi-library',
-              name: 'Music Library',
-              folders: allInitialFolders,
-              tree: unifiedTree,
-              flatPlaylist,
-              sourceType: 'fs-access',
-              handle: allInitialFolders[0]?.handle,
-            });
-            if (flatPlaylist.length > 0) {
-              startIncrementalMetadataExtraction(flatPlaylist);
+      // Load stored imported files (virtual collection)
+      const storedImported = await getStoredImportedFiles();
+      let importedFilesFolder: ImportedFolder | null = null;
+
+      if (storedImported && storedImported.length > 0) {
+        const importedTracks: TrackItem[] = [];
+        for (const rec of storedImported) {
+          let fileObj: File | undefined = undefined;
+          let status: FileStatus = rec.status || 'normal';
+
+          if (rec.handle) {
+            const hasPerm = await verifyHandlePermission(rec.handle, false);
+            if (hasPerm) {
+              try {
+                fileObj = await rec.handle.getFile();
+                status = fileObj.size === 0 ? 'empty' : 'normal';
+              } catch {
+                status = 'unreadable';
+              }
+            } else {
+              status = 'unreadable';
             }
+          } else {
+            status = 'unreadable';
           }
+
+          importedTracks.push({
+            id: rec.id,
+            name: rec.name,
+            relativePath: rec.relativePath,
+            size: rec.size,
+            lastModified: rec.lastModified,
+            handle: rec.handle,
+            file: fileObj,
+            status,
+            metadata: rec.metadata || createFallbackMetadata(rec.name, rec.relativePath),
+            folderIds: [IMPORTED_FILES_ROOT_ID],
+          });
+        }
+
+        importedFilesFolder = {
+          id: IMPORTED_FILES_ROOT_ID,
+          name: IMPORTED_FILES_COLLECTION_NAME,
+          sourceType: 'files',
+          tree: {
+            id: IMPORTED_FILES_ROOT_ID,
+            name: IMPORTED_FILES_COLLECTION_NAME,
+            relativePath: IMPORTED_FILES_ROOT_ID,
+            tracks: importedTracks,
+            subfolders: [],
+            totalTrackCount: importedTracks.length,
+          },
+          tracks: importedTracks,
+          trackCount: importedTracks.length,
+          addedAt: storedImported[0]?.addedAt || Date.now(),
+          lastScannedAt: Date.now(),
+          permissionStatus: 'granted',
+        };
+      }
+
+      const allInitialFolders = [
+        ...loadedFolders,
+        ...promptImportedFolders,
+        ...(importedFilesFolder ? [importedFilesFolder] : []),
+      ];
+
+      if (allInitialFolders.length > 0) {
+        const unifiedTree = buildUnifiedMultiFolderTree(allInitialFolders);
+        const playableFolders = [
+          ...loadedFolders,
+          ...(importedFilesFolder ? [importedFilesFolder] : []),
+        ];
+        const flatPlaylist = combineFlatPlaylists(playableFolders);
+
+        setLibrary({
+          id: 'multi-library',
+          name: 'Music Library',
+          folders: allInitialFolders,
+          tree: unifiedTree,
+          flatPlaylist,
+          sourceType: loadedFolders.length > 0 ? 'fs-access' : 'files',
+          handle: allInitialFolders[0]?.handle,
+        });
+
+        if (flatPlaylist.length > 0) {
+          startIncrementalMetadataExtraction(flatPlaylist);
         }
       }
     }
@@ -547,9 +639,213 @@ export function useMusicLibrary() {
     }
   }, [library, refreshFolder, startIncrementalMetadataExtraction]);
 
+  // Pick individual files via native File System Access API
+  const openFilesPicker = useCallback(async () => {
+    try {
+      const handles = await promptOpenFiles();
+      if (!handles || handles.length === 0) return;
+
+      setIsLoading(true);
+      const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+      const existingTracks = existingImportedFolder ? [...existingImportedFolder.tracks] : [];
+      const newTracks: TrackItem[] = [];
+
+      for (const handle of handles) {
+        let alreadyExists = false;
+        for (const existing of existingTracks) {
+          if (existing.handle) {
+            try {
+              if (await existing.handle.isSameEntry(handle)) {
+                alreadyExists = true;
+                break;
+              }
+            } catch {
+              // Ignore
+            }
+          }
+        }
+        if (alreadyExists) continue;
+
+        try {
+          const file = await handle.getFile();
+          const stableId = `${IMPORTED_FILES_ROOT_ID}:${file.name}`;
+          const finalId =
+            existingTracks.some((t) => t.id === stableId) ||
+            newTracks.some((t) => t.id === stableId)
+              ? `${IMPORTED_FILES_ROOT_ID}:${file.name}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+              : stableId;
+
+          const trackItem: TrackItem = {
+            id: finalId,
+            name: file.name,
+            relativePath: file.name,
+            size: file.size,
+            lastModified: file.lastModified,
+            handle,
+            file,
+            metadata: createFallbackMetadata(file.name, file.name),
+            status: file.size === 0 ? 'empty' : 'normal',
+            folderIds: [IMPORTED_FILES_ROOT_ID],
+          };
+          newTracks.push(trackItem);
+        } catch (err) {
+          console.error('Error reading file handle:', err);
+        }
+      }
+
+      if (newTracks.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      const allImportedTracks = [...existingTracks, ...newTracks];
+      const updatedImportedFolder: ImportedFolder = {
+        id: IMPORTED_FILES_ROOT_ID,
+        name: IMPORTED_FILES_COLLECTION_NAME,
+        sourceType: 'files',
+        tree: {
+          id: IMPORTED_FILES_ROOT_ID,
+          name: IMPORTED_FILES_COLLECTION_NAME,
+          relativePath: IMPORTED_FILES_ROOT_ID,
+          tracks: allImportedTracks,
+          subfolders: [],
+          totalTrackCount: allImportedTracks.length,
+        },
+        tracks: allImportedTracks,
+        trackCount: allImportedTracks.length,
+        addedAt: existingImportedFolder?.addedAt || Date.now(),
+        lastScannedAt: Date.now(),
+        permissionStatus: 'granted',
+      };
+
+      const recordsToStore: StoredImportedFileRecord[] = allImportedTracks.map((t) => ({
+        id: t.id,
+        name: t.name,
+        relativePath: t.relativePath,
+        size: t.size,
+        lastModified: t.lastModified,
+        handle: t.handle,
+        status: t.status,
+        metadata: t.metadata,
+        addedAt: Date.now(),
+      }));
+      await storeImportedFiles(recordsToStore);
+
+      const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
+      const nextFolders = [...otherFolders, updatedImportedFolder];
+      const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+      const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+      setLibrary({
+        id: 'multi-library',
+        name: 'Music Library',
+        folders: nextFolders,
+        tree: unifiedTree,
+        flatPlaylist,
+        sourceType: library?.sourceType || 'fs-access',
+        handle: nextFolders[0]?.handle,
+      });
+
+      startIncrementalMetadataExtraction(newTracks);
+    } catch (err) {
+      console.error('Failed to open files:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [library, startIncrementalMetadataExtraction]);
+
+  // Remove individual imported files from the virtual collection
+  const removeImportedFiles = useCallback(
+    async (trackIds: string[]) => {
+      const idSet = new Set(trackIds);
+      const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+      if (!existingImportedFolder) return;
+
+      const remainingTracks = existingImportedFolder.tracks.filter((t) => !idSet.has(t.id));
+
+      const updatedFolder: ImportedFolder = {
+        ...existingImportedFolder,
+        tracks: remainingTracks,
+        trackCount: remainingTracks.length,
+        tree: {
+          ...existingImportedFolder.tree,
+          tracks: remainingTracks,
+          totalTrackCount: remainingTracks.length,
+        },
+      };
+
+      const recordsToStore: StoredImportedFileRecord[] = remainingTracks.map((t) => ({
+        id: t.id,
+        name: t.name,
+        relativePath: t.relativePath,
+        size: t.size,
+        lastModified: t.lastModified,
+        handle: t.handle,
+        status: t.status,
+        metadata: t.metadata,
+        addedAt: Date.now(),
+      }));
+      await storeImportedFiles(recordsToStore);
+
+      // Clean up favourites for removed tracks that don't belong to any other remaining folder
+      setFavourites((prev) => {
+        let changed = false;
+        const next = new Set(prev);
+        for (const trackId of trackIds) {
+          if (next.has(trackId)) {
+            next.delete(trackId);
+            changed = true;
+          }
+        }
+        if (changed) {
+          storePlaybackState({ favourites: Array.from(next) });
+          return next;
+        }
+        return prev;
+      });
+
+      const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
+      const nextFolders = remainingTracks.length > 0 ? [...otherFolders, updatedFolder] : otherFolders;
+
+      if (nextFolders.length === 0) {
+        setLibrary(null);
+        setSelectedFolderPath('');
+        return;
+      }
+
+      const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+      const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+      setLibrary((prev) =>
+        prev
+          ? {
+              ...prev,
+              folders: nextFolders,
+              tree: unifiedTree,
+              flatPlaylist,
+            }
+          : null
+      );
+    },
+    [library]
+  );
+
+  // Remove all imported files from library
+  const removeAllImportedFiles = useCallback(async () => {
+    const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+    if (!existingImportedFolder) return;
+    const allIds = existingImportedFolder.tracks.map((t) => t.id);
+    await removeImportedFiles(allIds);
+  }, [library, removeImportedFiles]);
+
   // Remove a root folder from the library
   const removeFolder = useCallback(
     async (folderId: string) => {
+      if (folderId === IMPORTED_FILES_ROOT_ID) {
+        await removeAllImportedFiles();
+        return;
+      }
+
       // Invalidate any in-flight scan for this folder
       cancelScan(folderId);
 
@@ -705,30 +1001,137 @@ export function useMusicLibrary() {
     [library, startIncrementalMetadataExtraction]
   );
 
-  // Handle fallback file selection input
+  // Handle fallback file selection input (iPad / Safari reconnect and additive import)
   const handleOpenFilesSelect = useCallback(
-    (files: FileList | File[] | null) => {
+    async (files: FileList | File[] | null) => {
       if (!files || files.length === 0) return;
 
       setIsLoading(true);
-      const parsed = parseSelectedFiles(files);
-      if (parsed && parsed.folders.length > 0) {
-        const newFolder = parsed.folders[0];
-        const nextFolders = [...(library?.folders || []), newFolder];
-        const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
-        const flatPlaylist = combineFlatPlaylists(nextFolders);
+      const fileArray = Array.from(files);
 
-        setLibrary({
-          id: 'multi-library',
-          name: 'Music Library',
-          folders: nextFolders,
-          tree: unifiedTree,
-          flatPlaylist,
-          sourceType: 'files',
-        });
-        setSelectedFolderPath('');
-        startIncrementalMetadataExtraction(flatPlaylist);
+      const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+      const existingTracks = existingImportedFolder ? [...existingImportedFolder.tracks] : [];
+
+      const unreadableTracks = existingTracks.filter((t) => !t.file || t.status === 'unreadable');
+      const reconnectedIds = new Set<string>();
+      const updatedExistingTracks = [...existingTracks];
+      const newTracksToAdd: TrackItem[] = [];
+
+      for (const file of fileArray) {
+        if (!isSupportedAudioFile(file.name) && !isLrcFile(file.name)) continue;
+        if (isLrcFile(file.name)) continue;
+
+        // Candidate matching for safe reconnect on iPad/Safari:
+        // Match only if (name === file.name && size === file.size && lastModified === file.lastModified)
+        const matchingCandidates = unreadableTracks.filter(
+          (t) =>
+            !reconnectedIds.has(t.id) &&
+            t.name === file.name &&
+            t.size === file.size &&
+            t.lastModified === file.lastModified
+        );
+
+        if (matchingCandidates.length >= 1) {
+          // Reconnect unambiguous candidate without creating duplicate
+          const matched = matchingCandidates[0];
+          reconnectedIds.add(matched.id);
+          const idx = updatedExistingTracks.findIndex((t) => t.id === matched.id);
+          if (idx !== -1) {
+            updatedExistingTracks[idx] = {
+              ...updatedExistingTracks[idx],
+              file,
+              status: file.size === 0 ? 'empty' : 'normal',
+            };
+          }
+        } else {
+          // Check if file is already active and readable
+          const alreadyReadable = updatedExistingTracks.some(
+            (t) =>
+              t.file &&
+              t.name === file.name &&
+              t.size === file.size &&
+              t.lastModified === file.lastModified
+          );
+          if (alreadyReadable) {
+            continue;
+          }
+
+          // New imported file -> append additively
+          const stableId = `${IMPORTED_FILES_ROOT_ID}:${file.name}`;
+          const finalId =
+            updatedExistingTracks.some((t) => t.id === stableId) ||
+            newTracksToAdd.some((t) => t.id === stableId)
+              ? `${IMPORTED_FILES_ROOT_ID}:${file.name}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+              : stableId;
+
+          newTracksToAdd.push({
+            id: finalId,
+            name: file.name,
+            relativePath: file.name,
+            size: file.size,
+            lastModified: file.lastModified,
+            file,
+            metadata: createFallbackMetadata(file.name, file.name),
+            status: file.size === 0 ? 'empty' : 'normal',
+            folderIds: [IMPORTED_FILES_ROOT_ID],
+          });
+        }
       }
+
+      const allTracks = [...updatedExistingTracks, ...newTracksToAdd];
+      if (allTracks.length === 0) {
+        setIsLoading(false);
+        return;
+      }
+
+      const updatedImportedFolder: ImportedFolder = {
+        id: IMPORTED_FILES_ROOT_ID,
+        name: IMPORTED_FILES_COLLECTION_NAME,
+        sourceType: 'files',
+        tree: {
+          id: IMPORTED_FILES_ROOT_ID,
+          name: IMPORTED_FILES_COLLECTION_NAME,
+          relativePath: IMPORTED_FILES_ROOT_ID,
+          tracks: allTracks,
+          subfolders: [],
+          totalTrackCount: allTracks.length,
+        },
+        tracks: allTracks,
+        trackCount: allTracks.length,
+        addedAt: existingImportedFolder?.addedAt || Date.now(),
+        lastScannedAt: Date.now(),
+        permissionStatus: 'granted',
+      };
+
+      const recordsToStore: StoredImportedFileRecord[] = allTracks.map((t) => ({
+        id: t.id,
+        name: t.name,
+        relativePath: t.relativePath,
+        size: t.size,
+        lastModified: t.lastModified,
+        handle: t.handle,
+        status: t.status,
+        metadata: t.metadata,
+        addedAt: Date.now(),
+      }));
+      await storeImportedFiles(recordsToStore);
+
+      const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
+      const nextFolders = [...otherFolders, updatedImportedFolder];
+      const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
+      const flatPlaylist = combineFlatPlaylists(nextFolders);
+
+      setLibrary({
+        id: 'multi-library',
+        name: 'Music Library',
+        folders: nextFolders,
+        tree: unifiedTree,
+        flatPlaylist,
+        sourceType: library?.sourceType || 'files',
+        handle: nextFolders[0]?.handle,
+      });
+
+      startIncrementalMetadataExtraction(newTracksToAdd);
       setIsLoading(false);
     },
     [library, startIncrementalMetadataExtraction]
@@ -826,6 +1229,54 @@ export function useMusicLibrary() {
       return next;
     });
   }, [library, favouriteResolution.migratedMap]);
+
+  // Bulk add tracks to favourites (single state and storage update)
+  const addTracksToFavourites = useCallback((tracks: TrackItem[]) => {
+    setFavourites((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const track of tracks) {
+        const canonicalId = track.id;
+        if (!next.has(canonicalId)) {
+          next.add(canonicalId);
+          changed = true;
+        }
+      }
+      if (changed) {
+        storePlaybackState({ favourites: Array.from(next) });
+        return next;
+      }
+      return prev;
+    });
+  }, []);
+
+  // Bulk remove tracks from favourites (single state and storage update)
+  const removeTracksFromFavourites = useCallback((tracks: TrackItem[]) => {
+    setFavourites((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const track of tracks) {
+        const canonicalId = track.id;
+        if (next.has(canonicalId)) {
+          next.delete(canonicalId);
+          changed = true;
+        }
+        if (track.aliases) {
+          for (const a of track.aliases) {
+            if (next.has(a)) {
+              next.delete(a);
+              changed = true;
+            }
+          }
+        }
+      }
+      if (changed) {
+        storePlaybackState({ favourites: Array.from(next) });
+        return next;
+      }
+      return prev;
+    });
+  }, []);
 
   // Aggregate albums from library
   const albums = useMemo((): AlbumGroup[] => {
@@ -933,6 +1384,9 @@ export function useMusicLibrary() {
       } else {
         baseList = library.flatPlaylist;
       }
+    } else if (currentView === 'imported-files') {
+      const importedFolder = library.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+      baseList = importedFolder ? importedFolder.tracks : [];
     }
 
     // Apply search query filter
@@ -1052,10 +1506,15 @@ export function useMusicLibrary() {
     selectAlbum,
     setSearchQuery,
     toggleFavourite,
+    addTracksToFavourites,
+    removeTracksFromFavourites,
     openFolderPicker,
+    openFilesPicker,
     addFolder: openFolderPicker,
     refreshFolder,
     removeFolder,
+    removeImportedFiles,
+    removeAllImportedFiles,
     handleFallbackFolderSelect,
     handleOpenFilesSelect,
     handleFolderInput: handleFallbackFolderSelect,

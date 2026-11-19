@@ -5,6 +5,7 @@ import { TrackList } from './TrackList';
 
 interface FolderViewProps {
   currentNode: FolderNode | null;
+  libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
   favourites: Set<string>;
@@ -14,12 +15,18 @@ interface FolderViewProps {
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
+  onPlayNextBulk?: (tracks: TrackItem[]) => { movedCount: number; addedCount: number } | void;
   onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => boolean | void;
   onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
+  onAddTracksToPlaylist?: (playlistId: string, tracks: TrackItem[]) => { addedCount: number };
+  onCreateAndAddToPlaylist?: (playlistName: string, trackOrTracks: TrackItem | TrackItem[]) => void;
+  onAddTracksToFavourites?: (tracks: TrackItem[]) => void;
+  onRemoveTracksFromFavourites?: (tracks: TrackItem[]) => void;
 }
 
 export const FolderView: React.FC<FolderViewProps> = ({
   currentNode,
+  libraryTracks,
   currentTrackId,
   isPlaying,
   favourites,
@@ -29,8 +36,13 @@ export const FolderView: React.FC<FolderViewProps> = ({
   onTogglePlay,
   onToggleFavourite,
   onPlayNext,
+  onPlayNextBulk,
   onAddToQueue,
   onAddToPlaylist,
+  onAddTracksToPlaylist,
+  onCreateAndAddToPlaylist,
+  onAddTracksToFavourites,
+  onRemoveTracksFromFavourites,
 }) => {
   if (!currentNode) {
     return (
@@ -104,6 +116,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
 
         <TrackList
           tracks={currentNode.tracks}
+          libraryTracks={libraryTracks}
           currentTrackId={currentTrackId}
           isPlaying={isPlaying}
           favourites={favourites}
@@ -112,8 +125,13 @@ export const FolderView: React.FC<FolderViewProps> = ({
           onTogglePlay={onTogglePlay}
           onToggleFavourite={onToggleFavourite}
           onPlayNext={onPlayNext}
+          onPlayNextBulk={onPlayNextBulk}
           onAddToQueue={onAddToQueue}
           onAddToPlaylist={onAddToPlaylist}
+          onAddTracksToPlaylist={onAddTracksToPlaylist}
+          onCreateAndAddToPlaylist={onCreateAndAddToPlaylist}
+          onAddTracksToFavourites={onAddTracksToFavourites}
+          onRemoveTracksFromFavourites={onRemoveTracksFromFavourites}
         />
       </div>
     </div>

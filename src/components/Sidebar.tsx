@@ -15,10 +15,17 @@ import {
   Key,
   Loader2,
   ListMusic,
+  Files,
   Plus,
   Edit2,
 } from 'lucide-react';
-import { FolderNode, ImportedFolder, LibraryView, Playlist } from '../types/music';
+import {
+  FolderNode,
+  ImportedFolder,
+  LibraryView,
+  Playlist,
+  IMPORTED_FILES_ROOT_ID,
+} from '../types/music';
 import { OpenMusicControl } from './OpenMusicControl';
 import { ConfirmModal } from './ConfirmModal';
 import { PlaylistModal } from './PlaylistModal';
@@ -42,8 +49,10 @@ interface SidebarProps {
   onRenamePlaylist?: (id: string, newName: string) => void;
   onDeletePlaylist?: (id: string) => void;
   onOpenFolder: () => void;
+  onOpenFiles?: () => void;
   onRefreshFolder?: (folderId: string) => void;
   onRemoveFolder?: (folderId: string) => void;
+  onRemoveAllImportedFiles?: () => void;
   onRequestFolderPermission?: (folderId: string) => void;
   onFallbackFolderSelect: (files: FileList | null) => void;
   onOpenFilesSelect: (files: FileList | null) => void;
@@ -68,14 +77,20 @@ export function Sidebar({
   onRenamePlaylist,
   onDeletePlaylist,
   onOpenFolder,
+  onOpenFiles,
   onRefreshFolder,
   onRemoveFolder,
+  onRemoveAllImportedFiles,
   onRequestFolderPermission,
   onFallbackFolderSelect,
   onOpenFilesSelect,
 }: SidebarProps) {
   const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);
   const [folderToRemove, setFolderToRemove] = useState<ImportedFolder | null>(null);
+  const [showClearImportedFilesModal, setShowClearImportedFilesModal] = useState<boolean>(false);
+
+  const physicalFolders = folders.filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
+  const importedFilesFolder = folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
 
   const [activeMenuPlaylistId, setActiveMenuPlaylistId] = useState<string | null>(null);
   const [playlistModal, setPlaylistModal] = useState<{
@@ -171,9 +186,12 @@ export function Sidebar({
 
         {/* 2. Folders */}
         <button
-          onClick={() => onSelectView('folder')}
+          onClick={() => {
+            onSelectView('folder');
+            onSelectFolder('');
+          }}
           className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all cursor-pointer ${
-            currentView === 'folder'
+            currentView === 'folder' || currentView === 'imported-files'
               ? 'bg-indigo-600/15 dark:bg-indigo-600/20 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30 shadow-sm'
               : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
           }`}
@@ -256,7 +274,7 @@ export function Sidebar({
       </div>
 
       {/* Contextual Sidebar Section - Requirement 3 */}
-      {currentView === 'folder' ? (
+      {currentView === 'folder' || currentView === 'imported-files' ? (
         <div className="flex-1 flex flex-col min-h-0 border-t border-slate-300/80 dark:border-white/[0.08] mt-2">
           {/* Section Header */}
           <div className="px-4 py-3 flex items-center justify-between">
@@ -276,21 +294,93 @@ export function Sidebar({
           {/* Root Folders Tree / List */}
           <div className="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar text-sm space-y-0.5">
             {folders.length > 0 ? (
-              folders.map((folder) => (
-                <RootFolderItem
-                  key={folder.id}
-                  folder={folder}
-                  selectedPath={selectedFolderPath}
-                  isMenuOpen={activeMenuFolderId === folder.id}
-                  onToggleMenu={() =>
-                    setActiveMenuFolderId((prev) => (prev === folder.id ? null : folder.id))
-                  }
-                  onSelectFolder={onSelectFolder}
-                  onRefreshFolder={(id) => onRefreshFolder?.(id)}
-                  onRemoveFolder={(f) => setFolderToRemove(f)}
-                  onRequestPermission={(id) => onRequestFolderPermission?.(id)}
-                />
-              ))
+              <>
+                {physicalFolders.map((folder) => (
+                  <RootFolderItem
+                    key={folder.id}
+                    folder={folder}
+                    selectedPath={selectedFolderPath}
+                    isMenuOpen={activeMenuFolderId === folder.id}
+                    onToggleMenu={() =>
+                      setActiveMenuFolderId((prev) => (prev === folder.id ? null : folder.id))
+                    }
+                    onSelectFolder={onSelectFolder}
+                    onRefreshFolder={(id) => onRefreshFolder?.(id)}
+                    onRemoveFolder={(f) => setFolderToRemove(f)}
+                    onRequestPermission={(id) => onRequestFolderPermission?.(id)}
+                  />
+                ))}
+
+                {/* Virtual Imported Files collection rendered after physical folders */}
+                {importedFilesFolder && importedFilesFolder.tracks.length > 0 && (
+                  <div
+                    className="select-none relative"
+                    data-testid="sidebar-imported-files"
+                  >
+                    <div
+                      className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer transition-all ${
+                        currentView === 'imported-files'
+                          ? 'bg-indigo-600/20 dark:bg-indigo-600/25 text-indigo-700 dark:text-white font-medium border border-indigo-500/30 shadow-sm'
+                          : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+                      }`}
+                      onClick={() => onSelectView('imported-files')}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Files className="w-3.5 h-3.5 shrink-0 text-sky-500 dark:text-sky-400" />
+                        <span className="truncate text-xs font-medium" title="Imported Files">
+                          Imported Files
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                        <span className="text-[10px] text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/[0.04] shrink-0">
+                          {importedFilesFolder.tracks.length}
+                        </span>
+
+                        <div className="relative" data-folder-menu>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuFolderId((prev) =>
+                                prev === 'imported_files' ? null : 'imported_files'
+                              );
+                            }}
+                            aria-label="Options for Imported Files"
+                            title="Imported Files options"
+                            className={`p-1 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity cursor-pointer ${
+                              activeMenuFolderId === 'imported_files'
+                                ? 'opacity-100 bg-slate-300/60 dark:bg-white/[0.1]'
+                                : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
+                            }`}
+                          >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                          </button>
+
+                          {activeMenuFolderId === 'imported_files' && (
+                            <div
+                              className="absolute right-0 top-full mt-1 w-44 py-1 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-white/[0.08] z-50 text-xs animate-fade-in"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuFolderId(null);
+                                  setShowClearImportedFilesModal(true);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                <span>Remove All Files</span>
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : folderTree ? (
               <LegacyFolderTreeNode
                 node={folderTree}
@@ -447,11 +537,27 @@ export function Sidebar({
             isScanning={isScanning}
             scanCount={scanCount}
             onOpenFolder={onOpenFolder}
+            onOpenFiles={onOpenFiles}
             onFallbackFolderSelect={onFallbackFolderSelect}
             onOpenFilesSelect={onOpenFilesSelect}
           />
         </div>
       )}
+
+      {/* Remove All Imported Files Modal */}
+      <ConfirmModal
+        isOpen={showClearImportedFilesModal}
+        title="Remove All Imported Files"
+        message="Are you sure you want to remove all imported files from your library? Your physical files on disk will not be deleted."
+        confirmLabel="Remove All"
+        cancelLabel="Cancel"
+        isDanger={true}
+        onConfirm={() => {
+          setShowClearImportedFilesModal(false);
+          onRemoveAllImportedFiles?.();
+        }}
+        onCancel={() => setShowClearImportedFilesModal(false)}
+      />
 
       {/* Folder Removal Confirmation Modal */}
       <ConfirmModal

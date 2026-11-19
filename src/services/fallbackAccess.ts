@@ -1,4 +1,10 @@
-import { MusicLibrary, TrackItem, ImportedFolder } from '../types/music';
+import {
+  MusicLibrary,
+  TrackItem,
+  ImportedFolder,
+  IMPORTED_FILES_ROOT_ID,
+  IMPORTED_FILES_COLLECTION_NAME,
+} from '../types/music';
 import {
   isSupportedAudioFile,
   isLrcFile,
@@ -137,7 +143,7 @@ export function parseSelectedFiles(files: FileList | File[]): MusicLibrary | nul
 
   if (audioFiles.length === 0) return null;
 
-  const folderId = `files_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const folderId = IMPORTED_FILES_ROOT_ID;
   const seenNames = new Map<string, number>();
 
   const tracks: TrackItem[] = audioFiles.map((file) => {
@@ -161,7 +167,7 @@ export function parseSelectedFiles(files: FileList | File[]): MusicLibrary | nul
     };
   });
 
-  const rootName = 'Selected Audio';
+  const rootName = IMPORTED_FILES_COLLECTION_NAME;
   const libraryId = `files:${rootName}`;
   const tree = buildFolderTree(rootName, tracks, folderId);
   const flatPlaylist = flattenTreeToDfsPlaylist(tree);

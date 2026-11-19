@@ -8,6 +8,7 @@ interface PlaylistModalProps {
   initialName?: string;
   playlists?: Playlist[];
   targetTrack?: TrackItem | null;
+  targetTracks?: TrackItem[];
   onClose: () => void;
   onSubmitName?: (name: string) => void;
   onSelectPlaylist?: (playlistId: string) => void;
@@ -20,6 +21,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
   initialName = '',
   playlists = [],
   targetTrack,
+  targetTracks,
   onClose,
   onSubmitName,
   onSelectPlaylist,
@@ -82,6 +84,9 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
     onClose();
   };
 
+  const isBulk = Boolean(targetTracks && targetTracks.length > 0);
+  const trackCount = targetTracks?.length || (targetTrack ? 1 : 0);
+
   return (
     <div
       role="dialog"
@@ -103,6 +108,8 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 ? 'Create New Playlist'
                 : mode === 'rename'
                 ? 'Rename Playlist'
+                : isBulk
+                ? `Add ${trackCount} Tracks to Playlist`
                 : 'Add to Playlist'}
             </h3>
           </div>
@@ -123,11 +130,15 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
 
         {mode === 'addToPlaylist' ? (
           <div className="mt-4 space-y-3">
-            {targetTrack && (
+            {isBulk ? (
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Adding <span className="font-semibold text-slate-800 dark:text-slate-200">{trackCount} tracks</span> to playlist:
+              </p>
+            ) : targetTrack ? (
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                 Adding: <span className="font-semibold text-slate-800 dark:text-slate-200">{targetTrack.metadata.title || targetTrack.name}</span>
               </p>
-            )}
+            ) : null}
 
             {playlists.length > 0 && (
               <div className="max-h-48 overflow-y-auto space-y-1 custom-scrollbar pr-1">

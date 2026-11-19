@@ -27,8 +27,32 @@ export async function promptOpenDirectory(): Promise<FileSystemDirectoryHandle |
   }
 }
 
+export async function promptOpenFiles(): Promise<FileSystemFileHandle[] | null> {
+  if (typeof window === 'undefined' || !('showOpenFilePicker' in window)) return null;
+
+  try {
+    const handles = await window.showOpenFilePicker({
+      multiple: true,
+      types: [
+        {
+          description: 'Audio Files',
+          accept: {
+            'audio/*': ['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg', '.opus', '.weba'],
+          },
+        },
+      ],
+    });
+    return handles;
+  } catch (err: unknown) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return null;
+    }
+    throw err;
+  }
+}
+
 export async function verifyHandlePermission(
-  handle: FileSystemDirectoryHandle,
+  handle: FileSystemHandle,
   requestIfPrompt = false
 ): Promise<boolean> {
   try {

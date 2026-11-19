@@ -44,6 +44,24 @@ export interface FolderNode {
 
 export type LibrarySourceType = 'fs-access' | 'input-fallback' | 'files';
 
+export const IMPORTED_FILES_ROOT_ID = 'imported_files_root';
+export const IMPORTED_FILES_COLLECTION_NAME = 'Imported Files';
+
+/**
+ * Lightweight serializable record of individually imported files in the virtual collection.
+ */
+export interface StoredImportedFileRecord {
+  id: string; // unique stable track identifier e.g. "imported_files_root:song.mp3"
+  name: string;
+  relativePath: string;
+  size: number;
+  lastModified: number;
+  handle?: FileSystemFileHandle;
+  status?: FileStatus;
+  metadata?: TrackMetadata;
+  addedAt: number;
+}
+
 /**
  * Lightweight serializable record of a registered folder for persistence in IndexedDB.
  * Contains no runtime-only state (no File objects, no Blob URLs, no extracted metadata).
@@ -93,7 +111,7 @@ export interface LrcLine {
   text: string;
 }
 
-export type LibraryView = 'all' | 'folder' | 'playlists' | 'artists' | 'albums' | 'favourites';
+export type LibraryView = 'all' | 'folder' | 'playlists' | 'artists' | 'albums' | 'favourites' | 'imported-files';
 
 export interface AlbumGroup {
   id: string;

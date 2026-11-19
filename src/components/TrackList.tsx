@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Play,
   Pause,
@@ -11,6 +11,9 @@ import {
   ChevronUp,
   ChevronDown,
   FolderPlus,
+  CheckSquare,
+  Square,
+  X,
 } from 'lucide-react';
 import { TrackItem, Playlist } from '../types/music';
 import { formatDuration } from '../utils/formatters';
@@ -29,14 +32,22 @@ interface TrackListProps {
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
-  onAddToQueue?: (track: TrackItem) => boolean | void;
+  onPlayNextBulk?: (tracks: TrackItem[]) => { movedCount: number; addedCount: number } | void;
+  onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => boolean | void;
   onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
-  onCreateAndAddToPlaylist?: (playlistName: string, track: TrackItem) => void;
+  onAddTracksToPlaylist?: (playlistId: string, tracks: TrackItem[]) => { addedCount: number };
+  onCreateAndAddToPlaylist?: (playlistName: string, trackOrTracks: TrackItem | TrackItem[]) => void;
   onRemoveFromPlaylist?: (trackId: string, index: number) => void;
+  onRemoveTracksFromPlaylist?: (trackIds: string[]) => void;
+  onRemoveImportedFiles?: (trackIds: string[]) => void;
+  onAddTracksToFavourites?: (tracks: TrackItem[]) => void;
+  onRemoveTracksFromFavourites?: (tracks: TrackItem[]) => void;
   onMoveTrackUp?: (index: number) => void;
   onMoveTrackDown?: (index: number) => void;
   emptyVariant?: 'default' | 'favourites' | 'search';
   emptyMessage?: string;
+  isPlaylistView?: boolean;
+  isImportedFilesView?: boolean;
 }
 
 export const TrackList: React.FC<TrackListProps> = ({
@@ -50,18 +61,51 @@ export const TrackList: React.FC<TrackListProps> = ({
   onTogglePlay,
   onToggleFavourite,
   onPlayNext,
+  onPlayNextBulk,
   onAddToQueue,
   onAddToPlaylist,
+  onAddTracksToPlaylist,
   onCreateAndAddToPlaylist,
   onRemoveFromPlaylist,
+  onRemoveTracksFromPlaylist,
+  onRemoveImportedFiles,
+  onAddTracksToFavourites,
+  onRemoveTracksFromFavourites,
   onMoveTrackUp,
   onMoveTrackDown,
   emptyVariant = 'default',
   emptyMessage,
+  isPlaylistView = false,
+  isImportedFilesView = false,
 }) => {
   const [activeMenuTrackId, setActiveMenuTrackId] = useState<string | null>(null);
   const [playlistModalTrack, setPlaylistModalTrack] = useState<TrackItem | null>(null);
+  const [bulkPlaylistModalOpen, setBulkPlaylistModalOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Multi-selection state
+  const [selectedTrackIds, setSelectedTrackIds] = useState<Set<string>>(new Set());
+  const [lastSelectedTrackId, setLastSelectedTrackId] = useState<string | null>(null);
+  const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
+
+  // Touch long-press timer ref
+  const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isTouchLongPressTriggeredRef = useRef<boolean>(false);
+
+  // Reconcile selection if displayed tracks change (prune deleted/promoted IDs)
+  useEffect(() => {
+    setSelectedTrackIds((prev) => {
+      if (prev.size === 0) return prev;
+      const validIds = new Set(tracks.map((t) => t.id));
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (validIds.has(id)) {
+          next.add(id);
+        }
+      }
+      return next.size === prev.size ? prev : next;
+    });
+  }, [tracks]);
 
   // Close context menu on outside click or escape
   useEffect(() => {
@@ -88,11 +132,241 @@ export const TrackList: React.FC<TrackListProps> = ({
     };
   }, [activeMenuTrackId]);
 
+  // Keyboard navigation for multi-selection (Cmd+A / Ctrl+A, Escape)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (
+        activeEl &&
+        (activeEl.tagName === 'INPUT' ||
+          activeEl.tagName === 'TEXTAREA' ||
+          (activeEl as HTMLElement).isContentEditable)
+      ) {
+        return;
+      }
+
+      // Cmd+A / Ctrl+A: Select all tracks
+      if ((e.metaKey || e.ctrlKey) && (e.key === 'a' || e.key === 'A')) {
+        e.preventDefault();
+        setSelectedTrackIds(new Set(tracks.map((t) => t.id)));
+        return;
+      }
+
+      // Escape: Clear selection
+      if (e.key === 'Escape') {
+        if (selectedTrackIds.size > 0) {
+          e.preventDefault();
+          setSelectedTrackIds(new Set());
+          setLastSelectedTrackId(null);
+        } else if (isSelectMode) {
+          setIsSelectMode(false);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tracks, selectedTrackIds.size, isSelectMode]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
       setToastMessage(null);
     }, 2500);
+  };
+
+  const selectedTracks = useMemo(() => {
+    return tracks.filter((t) => selectedTrackIds.has(t.id));
+  }, [tracks, selectedTrackIds]);
+
+  const areAllSelectedFavourites = useMemo(() => {
+    if (selectedTracks.length === 0) return false;
+    return selectedTracks.every((t) => isFavouriteTrack(t, favourites, libraryTracks || tracks));
+  }, [selectedTracks, favourites, libraryTracks, tracks]);
+
+  // Handle row click with modifiers
+  const handleRowClick = (e: React.MouseEvent, track: TrackItem, index: number) => {
+    if ((e.target as HTMLElement).closest('button, [data-track-menu], input[type="checkbox"]')) {
+      return;
+    }
+
+    if (e.metaKey || e.ctrlKey) {
+      setSelectedTrackIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(track.id)) {
+          next.delete(track.id);
+        } else {
+          next.add(track.id);
+        }
+        return next;
+      });
+      setLastSelectedTrackId(track.id);
+      return;
+    }
+
+    if (e.shiftKey) {
+      if (!lastSelectedTrackId) {
+        setSelectedTrackIds(new Set([track.id]));
+        setLastSelectedTrackId(track.id);
+        return;
+      }
+
+      const lastIdx = tracks.findIndex((t) => t.id === lastSelectedTrackId);
+      if (lastIdx === -1) {
+        setSelectedTrackIds(new Set([track.id]));
+        setLastSelectedTrackId(track.id);
+        return;
+      }
+
+      const start = Math.min(lastIdx, index);
+      const end = Math.max(lastIdx, index);
+      const rangeIds = tracks.slice(start, end + 1).map((t) => t.id);
+
+      setSelectedTrackIds((prev) => {
+        const next = new Set(prev);
+        rangeIds.forEach((id) => next.add(id));
+        return next;
+      });
+      return;
+    }
+
+    if (isSelectMode) {
+      setSelectedTrackIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(track.id)) {
+          next.delete(track.id);
+        } else {
+          next.add(track.id);
+        }
+        return next;
+      });
+      setLastSelectedTrackId(track.id);
+      return;
+    }
+
+    if (selectedTrackIds.size > 0) {
+      setSelectedTrackIds(new Set());
+      setLastSelectedTrackId(null);
+    }
+  };
+
+  const handleCheckboxClick = (e: React.MouseEvent, track: TrackItem) => {
+    e.stopPropagation();
+    setSelectedTrackIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(track.id)) {
+        next.delete(track.id);
+      } else {
+        next.add(track.id);
+      }
+      return next;
+    });
+    setLastSelectedTrackId(track.id);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTrackIds.size === tracks.length && tracks.length > 0) {
+      setSelectedTrackIds(new Set());
+      setLastSelectedTrackId(null);
+    } else {
+      setSelectedTrackIds(new Set(tracks.map((t) => t.id)));
+    }
+  };
+
+  // Touch long press handlers
+  const handleTouchStart = (track: TrackItem) => {
+    isTouchLongPressTriggeredRef.current = false;
+    touchTimerRef.current = setTimeout(() => {
+      isTouchLongPressTriggeredRef.current = true;
+      setIsSelectMode(true);
+      setSelectedTrackIds((prev) => {
+        const next = new Set(prev);
+        next.add(track.id);
+        return next;
+      });
+      setLastSelectedTrackId(track.id);
+    }, 500);
+  };
+
+  const handleTouchEnd = () => {
+    if (touchTimerRef.current) {
+      clearTimeout(touchTimerRef.current);
+      touchTimerRef.current = null;
+    }
+  };
+
+  // Bulk actions handlers
+  const handleBulkPlayNext = () => {
+    if (selectedTracks.length === 0) return;
+    if (onPlayNextBulk) {
+      const res = onPlayNextBulk(selectedTracks);
+      if (res && res.movedCount > 0 && res.addedCount === 0) {
+        showToast(`${res.movedCount} tracks moved to play next`);
+      } else {
+        showToast(`${selectedTracks.length} tracks set to play next`);
+      }
+    } else if (onPlayNext) {
+      for (const t of selectedTracks) {
+        onPlayNext(t);
+      }
+      showToast(`${selectedTracks.length} tracks added to play next`);
+    }
+    setSelectedTrackIds(new Set());
+  };
+
+  const handleBulkAddToQueue = () => {
+    if (selectedTracks.length === 0) return;
+    if (onAddToQueue) {
+      const added = onAddToQueue(selectedTracks);
+      if (added === false) {
+        showToast('Selected tracks already in queue');
+      } else {
+        showToast(`Added ${selectedTracks.length} tracks to queue`);
+      }
+    }
+    setSelectedTrackIds(new Set());
+  };
+
+  const handleBulkToggleFavourites = () => {
+    if (selectedTracks.length === 0) return;
+    if (areAllSelectedFavourites) {
+      if (onRemoveTracksFromFavourites) {
+        onRemoveTracksFromFavourites(selectedTracks);
+      } else {
+        selectedTracks.forEach((t) => onToggleFavourite(t.id));
+      }
+      showToast(`Removed ${selectedTracks.length} favourites`);
+    } else {
+      if (onAddTracksToFavourites) {
+        onAddTracksToFavourites(selectedTracks);
+      } else {
+        selectedTracks.forEach((t) => {
+          if (!isFavouriteTrack(t, favourites, libraryTracks || tracks)) {
+            onToggleFavourite(t.id);
+          }
+        });
+      }
+      showToast(`Added ${selectedTracks.length} favourites`);
+    }
+    setSelectedTrackIds(new Set());
+  };
+
+  const handleBulkRemoveFromPlaylist = () => {
+    if (selectedTrackIds.size === 0) return;
+    if (onRemoveTracksFromPlaylist) {
+      onRemoveTracksFromPlaylist(Array.from(selectedTrackIds));
+      showToast(`Removed ${selectedTrackIds.size} tracks from playlist`);
+    }
+    setSelectedTrackIds(new Set());
+  };
+
+  const handleBulkRemoveFromImportedFiles = () => {
+    if (selectedTrackIds.size === 0) return;
+    if (onRemoveImportedFiles) {
+      onRemoveImportedFiles(Array.from(selectedTrackIds));
+      showToast(`Removed ${selectedTrackIds.size} files from library`);
+    }
+    setSelectedTrackIds(new Set());
   };
 
   if (tracks.length === 0) {
@@ -132,19 +406,66 @@ export const TrackList: React.FC<TrackListProps> = ({
   }
 
   const isPlaylistMode = Boolean(onRemoveFromPlaylist || onMoveTrackUp);
+  const showCheckboxes = isSelectMode || selectedTrackIds.size > 0;
 
   return (
     <div className="w-full relative">
-      {/* Subtle floating feedback toast */}
+      {/* Feedback Toast */}
       {toastMessage && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-xl bg-slate-900/90 dark:bg-white/90 text-white dark:text-slate-900 text-xs font-medium shadow-xl backdrop-blur-md animate-fade-in pointer-events-none">
           {toastMessage}
         </div>
       )}
 
+      {/* Select Mode Toolbar Controls */}
+      <div className="flex items-center justify-between pb-2 px-1">
+        <div className="text-[11px] text-slate-400 dark:text-slate-500">
+          {selectedTrackIds.size > 0
+            ? `${selectedTrackIds.size} of ${tracks.length} selected`
+            : `${tracks.length} tracks`}
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            if (isSelectMode) {
+              setIsSelectMode(false);
+              setSelectedTrackIds(new Set());
+              setLastSelectedTrackId(null);
+            } else {
+              setIsSelectMode(true);
+            }
+          }}
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+            isSelectMode
+              ? 'bg-indigo-600 text-white shadow-sm'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+          }`}
+          data-testid="toggle-select-mode"
+        >
+          {isSelectMode ? 'Done' : 'Select'}
+        </button>
+      </div>
+
       {/* Table Header */}
       <div className="grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-300/80 dark:border-white/[0.06] select-none">
-        <div className="text-center">#</div>
+        <div className="text-center flex items-center justify-center">
+          {showCheckboxes ? (
+            <button
+              type="button"
+              onClick={toggleSelectAll}
+              aria-label="Select all"
+              className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+            >
+              {selectedTrackIds.size === tracks.length && tracks.length > 0 ? (
+                <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+            </button>
+          ) : (
+            '#'
+          )}
+        </div>
         <div>Title</div>
         <div>Album</div>
         <div className="text-right flex items-center justify-end gap-1">
@@ -157,6 +478,7 @@ export const TrackList: React.FC<TrackListProps> = ({
       <div className="divide-y divide-slate-200/60 dark:divide-white/[0.02]">
         {tracks.map((track, idx) => {
           const isCurrent = currentTrackId === track.id;
+          const isSelected = selectedTrackIds.has(track.id);
           const isFav = isFavouriteTrack(track, favourites, libraryTracks || tracks);
           const extension = track.name.split('.').pop()?.toUpperCase() || '';
           const status = getTrackStatus(track);
@@ -166,16 +488,36 @@ export const TrackList: React.FC<TrackListProps> = ({
           return (
             <div
               key={`${track.id}-${idx}`}
+              onClick={(e) => handleRowClick(e, track, idx)}
               onDoubleClick={() => onPlayTrack(track)}
+              onTouchStart={() => handleTouchStart(track)}
+              onTouchEnd={handleTouchEnd}
+              onTouchMove={handleTouchEnd}
+              data-testid={`track-row-${track.id}`}
               className={`group grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 items-center rounded-xl transition-all cursor-pointer select-none text-xs relative ${
-                isCurrent
+                isSelected
+                  ? 'bg-indigo-600/20 dark:bg-indigo-600/25 border border-indigo-500/40 shadow-sm'
+                  : isCurrent
                   ? 'bg-indigo-600/15 border border-indigo-500/25 shadow-sm'
                   : 'hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
               } ${isAbnormal ? 'opacity-85' : ''}`}
             >
-              {/* Col 1: Number or Animated Equalizer or Play Button */}
+              {/* Col 1: Number, Checkbox, Equalizer, or Play Button */}
               <div className="flex items-center justify-center">
-                {isCurrent && isPlaying ? (
+                {showCheckboxes ? (
+                  <button
+                    type="button"
+                    onClick={(e) => handleCheckboxClick(e, track)}
+                    className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+                    data-testid={`track-checkbox-${track.id}`}
+                  >
+                    {isSelected ? (
+                      <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                ) : isCurrent && isPlaying ? (
                   <div className="w-4 h-4 flex items-end justify-center gap-[2px]">
                     <span className="w-[3px] bg-indigo-500 dark:bg-indigo-400 rounded-full animate-bar-1" />
                     <span className="w-[3px] bg-indigo-500 dark:bg-indigo-400 rounded-full animate-bar-2" />
@@ -214,7 +556,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                 )}
               </div>
 
-              {/* Col 2: Thumbnail Artwork + Title + Artist + Format Badge */}
+              {/* Col 2: Thumbnail Artwork + Title + Artist + Badges */}
               <div className="flex items-center gap-3 min-w-0">
                 <div
                   className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden shadow-sm"
@@ -280,7 +622,7 @@ export const TrackList: React.FC<TrackListProps> = ({
                 {formatDuration(track.metadata.duration)}
               </div>
 
-              {/* Col 5: Reorder controls (playlist mode) + Heart Favourite + ... Context Menu */}
+              {/* Col 5: Reorder controls + Heart Favourite + ... Context Menu */}
               <div className="flex items-center justify-end gap-1 shrink-0">
                 {isPlaylistMode && onMoveTrackUp && onMoveTrackDown && (
                   <div className="hidden group-hover:flex items-center gap-0.5">
@@ -427,6 +769,21 @@ export const TrackList: React.FC<TrackListProps> = ({
                           <span>Remove from Playlist</span>
                         </button>
                       )}
+
+                      {isImportedFilesView && onRemoveImportedFiles && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveMenuTrackId(null);
+                            onRemoveImportedFiles([track.id]);
+                            showToast('Removed file from library');
+                          }}
+                          className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove from Library</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -436,7 +793,118 @@ export const TrackList: React.FC<TrackListProps> = ({
         })}
       </div>
 
-      {/* Add to Playlist Modal */}
+      {/* Bulk Action Toolbar */}
+      {selectedTrackIds.size > 0 && (
+        <div
+          data-testid="bulk-action-toolbar"
+          className="sticky bottom-6 z-40 mt-4 mx-auto max-w-xl px-4 py-2.5 rounded-2xl bg-slate-900/95 dark:bg-[#0c192c]/95 text-white shadow-2xl backdrop-blur-md border border-slate-700 dark:border-white/10 flex items-center justify-between gap-2 animate-fade-in"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-300 shrink-0">
+              {selectedTrackIds.size} selected
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar py-0.5">
+            {/* Play Next */}
+            <button
+              type="button"
+              onClick={handleBulkPlayNext}
+              data-testid="bulk-play-next"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              title="Play Next"
+            >
+              <ListPlus className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Play Next</span>
+            </button>
+
+            {/* Add to Queue */}
+            <button
+              type="button"
+              onClick={handleBulkAddToQueue}
+              data-testid="bulk-add-queue"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              title="Add to Queue"
+            >
+              <Plus className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Add to Queue</span>
+            </button>
+
+            {/* Add to Playlist */}
+            <button
+              type="button"
+              onClick={() => setBulkPlaylistModalOpen(true)}
+              data-testid="bulk-add-playlist"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              title="Add to Playlist"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-amber-400" />
+              <span>Playlist</span>
+            </button>
+
+            {/* Favourites */}
+            <button
+              type="button"
+              onClick={handleBulkToggleFavourites}
+              data-testid="bulk-toggle-favourites"
+              className="px-2.5 py-1.5 rounded-lg hover:bg-white/10 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+              title={areAllSelectedFavourites ? 'Remove from Favourites' : 'Add to Favourites'}
+            >
+              <Heart
+                className={`w-3.5 h-3.5 ${
+                  areAllSelectedFavourites ? 'text-rose-400 fill-rose-400' : 'text-rose-400'
+                }`}
+              />
+              <span>{areAllSelectedFavourites ? 'Unfavourite' : 'Favourite'}</span>
+            </button>
+
+            {/* Context-Specific Removal: Only playlist view or imported files view */}
+            {isPlaylistView && onRemoveTracksFromPlaylist && (
+              <button
+                type="button"
+                onClick={handleBulkRemoveFromPlaylist}
+                data-testid="bulk-remove-playlist"
+                className="px-2.5 py-1.5 rounded-lg hover:bg-rose-500/20 text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                title="Remove from Playlist"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove</span>
+              </button>
+            )}
+
+            {isImportedFilesView && onRemoveImportedFiles && (
+              <button
+                type="button"
+                onClick={handleBulkRemoveFromImportedFiles}
+                data-testid="bulk-remove-imported"
+                className="px-2.5 py-1.5 rounded-lg hover:bg-rose-500/20 text-rose-300 text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
+                title="Remove from Imported Files"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Remove</span>
+              </button>
+            )}
+
+            <div className="w-px h-4 bg-white/20 mx-1 shrink-0" />
+
+            {/* Clear Selection */}
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedTrackIds(new Set());
+                setLastSelectedTrackId(null);
+              }}
+              data-testid="bulk-clear-selection"
+              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer shrink-0"
+              title="Clear selection (Esc)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Single Track to Playlist Modal */}
       <PlaylistModal
         isOpen={Boolean(playlistModalTrack)}
         mode="addToPlaylist"
@@ -461,6 +929,42 @@ export const TrackList: React.FC<TrackListProps> = ({
             showToast(`Created & added to "${newName}"`);
           }
           setPlaylistModalTrack(null);
+        }}
+      />
+
+      {/* Bulk Add Tracks to Playlist Modal */}
+      <PlaylistModal
+        isOpen={bulkPlaylistModalOpen}
+        mode="addToPlaylist"
+        playlists={playlists}
+        targetTracks={selectedTracks}
+        onClose={() => setBulkPlaylistModalOpen(false)}
+        onSelectPlaylist={(plId) => {
+          if (selectedTracks.length > 0 && onAddTracksToPlaylist) {
+            const { addedCount } = onAddTracksToPlaylist(plId, selectedTracks);
+            const pl = playlists.find((p) => p.id === plId);
+            if (addedCount > 0) {
+              showToast(`Added ${addedCount} tracks to "${pl?.name || 'Playlist'}"`);
+            } else {
+              showToast('Selected tracks already in playlist');
+            }
+          } else if (selectedTracks.length > 0 && onAddToPlaylist) {
+            for (const t of selectedTracks) {
+              onAddToPlaylist(plId, t);
+            }
+            const pl = playlists.find((p) => p.id === plId);
+            showToast(`Added tracks to "${pl?.name || 'Playlist'}"`);
+          }
+          setBulkPlaylistModalOpen(false);
+          setSelectedTrackIds(new Set());
+        }}
+        onCreateAndAdd={(newName) => {
+          if (selectedTracks.length > 0 && onCreateAndAddToPlaylist) {
+            onCreateAndAddToPlaylist(newName, selectedTracks);
+            showToast(`Created & added ${selectedTracks.length} tracks to "${newName}"`);
+          }
+          setBulkPlaylistModalOpen(false);
+          setSelectedTrackIds(new Set());
         }}
       />
     </div>

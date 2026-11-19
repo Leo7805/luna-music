@@ -33,7 +33,9 @@ export function App() {
     renamePlaylist,
     deletePlaylist,
     addTrackToPlaylist,
+    addTracksToPlaylist,
     removeTrackFromPlaylist,
+    removeTracksFromPlaylist,
     reorderPlaylistTracks,
     saveQueueAsPlaylist,
     selectPlaylist,
@@ -63,9 +65,14 @@ export function App() {
     selectAlbum,
     setSearchQuery,
     toggleFavourite,
+    addTracksToFavourites,
+    removeTracksFromFavourites,
     openFolderPicker,
+    openFilesPicker,
     refreshFolder,
     removeFolder,
+    removeImportedFiles,
+    removeAllImportedFiles,
     requestPermissionForFolder,
     handleFallbackFolderSelect,
     handleOpenFilesSelect,
@@ -91,6 +98,7 @@ export function App() {
     playTrack,
     playQueue,
     playNext,
+    playNextBulk,
     addToQueue,
     removeFromQueue,
     clearQueue,
@@ -169,6 +177,8 @@ export function App() {
         return selectedArtistName ? 'Artist' : 'Artists';
       case 'favourites':
         return 'Favourites';
+      case 'imported-files':
+        return 'Imported Files';
       default:
         return 'Music';
     }
@@ -230,8 +240,10 @@ export function App() {
           onRenamePlaylist={renamePlaylist}
           onDeletePlaylist={deletePlaylist}
           onOpenFolder={openFolderPicker}
+          onOpenFiles={openFilesPicker}
           onRefreshFolder={refreshFolder}
           onRemoveFolder={removeFolder}
+          onRemoveAllImportedFiles={removeAllImportedFiles}
           onRequestFolderPermission={requestPermissionForFolder}
           onFallbackFolderSelect={handleFallbackFolderSelect}
           onOpenFilesSelect={handleOpenFilesSelect}
@@ -267,6 +279,7 @@ export function App() {
                 isScanning={isLoading}
                 scanCount={scanProgress}
                 onOpenFolder={openFolderPicker}
+                onOpenFiles={openFilesPicker}
                 onFallbackFolderSelect={handleFallbackFolderSelect}
                 onOpenFilesSelect={handleOpenFilesSelect}
               />
@@ -284,8 +297,15 @@ export function App() {
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
                     onPlayNext={playNext}
+                    onPlayNextBulk={playNextBulk}
                     onAddToQueue={addToQueue}
                     onAddToPlaylist={addTrackToPlaylist}
+                    onAddTracksToPlaylist={addTracksToPlaylist}
+                    onCreateAndAddToPlaylist={(name, t) =>
+                      createPlaylist(name, Array.isArray(t) ? t : [t])
+                    }
+                    onAddTracksToFavourites={addTracksToFavourites}
+                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
                     emptyVariant={searchQuery ? 'search' : 'default'}
                   />
                 )}
@@ -302,9 +322,44 @@ export function App() {
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
                     onPlayNext={playNext}
+                    onPlayNextBulk={playNextBulk}
                     onAddToQueue={addToQueue}
                     onAddToPlaylist={addTrackToPlaylist}
+                    onAddTracksToPlaylist={addTracksToPlaylist}
+                    onCreateAndAddToPlaylist={(name, t) =>
+                      createPlaylist(name, Array.isArray(t) ? t : [t])
+                    }
+                    onAddTracksToFavourites={addTracksToFavourites}
+                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
                     emptyVariant="favourites"
+                  />
+                )}
+
+                {currentView === 'imported-files' && (
+                  <TrackList
+                    tracks={displayedTracks}
+                    libraryTracks={library?.flatPlaylist || []}
+                    currentTrackId={currentTrack?.id}
+                    isPlaying={isPlaying}
+                    favourites={favourites}
+                    playlists={playlists}
+                    onPlayTrack={playTrack}
+                    onTogglePlay={togglePlay}
+                    onToggleFavourite={toggleFavourite}
+                    onPlayNext={playNext}
+                    onPlayNextBulk={playNextBulk}
+                    onAddToQueue={addToQueue}
+                    onAddToPlaylist={addTrackToPlaylist}
+                    onAddTracksToPlaylist={addTracksToPlaylist}
+                    onCreateAndAddToPlaylist={(name, t) =>
+                      createPlaylist(name, Array.isArray(t) ? t : [t])
+                    }
+                    onAddTracksToFavourites={addTracksToFavourites}
+                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
+                    onRemoveImportedFiles={removeImportedFiles}
+                    isImportedFilesView={true}
+                    emptyVariant={searchQuery ? 'search' : 'default'}
+                    emptyMessage="No imported files found."
                   />
                 )}
 
@@ -329,9 +384,17 @@ export function App() {
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
                     onPlayNext={playNext}
+                    onPlayNextBulk={playNextBulk}
                     onAddToQueue={addToQueue}
                     onAddToPlaylist={addTrackToPlaylist}
+                    onAddTracksToPlaylist={addTracksToPlaylist}
+                    onCreateAndAddToPlaylist={(name, t) =>
+                      createPlaylist(name, Array.isArray(t) ? t : [t])
+                    }
                     onRemoveTrackFromPlaylist={removeTrackFromPlaylist}
+                    onRemoveTracksFromPlaylist={removeTracksFromPlaylist}
+                    onAddTracksToFavourites={addTracksToFavourites}
+                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
                     onReorderPlaylistTracks={reorderPlaylistTracks}
                   />
                 )}
@@ -339,6 +402,7 @@ export function App() {
                 {currentView === 'folder' && (
                   <FolderView
                     currentNode={currentFolderNode}
+                    libraryTracks={library?.flatPlaylist || []}
                     currentTrackId={currentTrack?.id}
                     isPlaying={isPlaying}
                     favourites={favourites}
@@ -348,8 +412,15 @@ export function App() {
                     onTogglePlay={togglePlay}
                     onToggleFavourite={toggleFavourite}
                     onPlayNext={playNext}
+                    onPlayNextBulk={playNextBulk}
                     onAddToQueue={addToQueue}
                     onAddToPlaylist={addTrackToPlaylist}
+                    onAddTracksToPlaylist={addTracksToPlaylist}
+                    onCreateAndAddToPlaylist={(name, t) =>
+                      createPlaylist(name, Array.isArray(t) ? t : [t])
+                    }
+                    onAddTracksToFavourites={addTracksToFavourites}
+                    onRemoveTracksFromFavourites={removeTracksFromFavourites}
                   />
                 )}
 

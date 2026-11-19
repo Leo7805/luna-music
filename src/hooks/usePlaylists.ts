@@ -132,6 +132,57 @@ export function usePlaylists() {
     return wasAdded;
   }, []);
 
+  // Add multiple tracks to playlist (prevents duplicates, preserves order)
+  const addTracksToPlaylist = useCallback(
+    (playlistId: string, tracks: TrackItem[]): { addedCount: number } => {
+      let addedCount = 0;
+
+      setPlaylists((prev) => {
+        const target = prev.find((p) => p.id === playlistId);
+        if (!target) return prev;
+
+        const newRefs: PlaylistTrackReference[] = [];
+        const existingTrackIds = new Set(target.tracks.map((r) => r.trackId));
+
+        for (const track of tracks) {
+          const isDuplicate =
+            existingTrackIds.has(track.id) ||
+            Boolean(track.aliases && track.aliases.some((a) => existingTrackIds.has(a))) ||
+            newRefs.some((r) => r.trackId === track.id);
+
+          if (!isDuplicate) {
+            existingTrackIds.add(track.id);
+            newRefs.push({
+              trackId: track.id,
+              name: track.metadata.title || track.name,
+              artist: track.metadata.artist,
+              album: track.metadata.album,
+              duration: track.metadata.duration,
+              addedAt: Date.now(),
+            });
+            addedCount++;
+          }
+        }
+
+        if (newRefs.length === 0) {
+          return prev;
+        }
+
+        const next = prev.map((p) =>
+          p.id === playlistId
+            ? { ...p, tracks: [...p.tracks, ...newRefs], updatedAt: Date.now() }
+            : p
+        );
+
+        storePlaylists(next);
+        return next;
+      });
+
+      return { addedCount };
+    },
+    []
+  );
+
   // Remove track from playlist
   const removeTrackFromPlaylist = useCallback(
     (playlistId: string, trackId: string, index?: number) => {
@@ -146,6 +197,26 @@ export function usePlaylists() {
             newTracks = p.tracks.filter((ref) => ref.trackId !== trackId);
           }
 
+          return { ...p, tracks: newTracks, updatedAt: Date.now() };
+        });
+
+        storePlaylists(next);
+        return next;
+      });
+    },
+    []
+  );
+
+  // Remove multiple tracks from playlist
+  const removeTracksFromPlaylist = useCallback(
+    (playlistId: string, trackIds: string[]) => {
+      if (trackIds.length === 0) return;
+      const targetIds = new Set(trackIds);
+
+      setPlaylists((prev) => {
+        const next = prev.map((p) => {
+          if (p.id !== playlistId) return p;
+          const newTracks = p.tracks.filter((ref) => !targetIds.has(ref.trackId));
           return { ...p, tracks: newTracks, updatedAt: Date.now() };
         });
 
@@ -205,7 +276,9 @@ export function usePlaylists() {
     renamePlaylist,
     deletePlaylist,
     addTrackToPlaylist,
+    addTracksToPlaylist,
     removeTrackFromPlaylist,
+    removeTracksFromPlaylist,
     reorderPlaylistTracks,
     saveQueueAsPlaylist,
     selectPlaylist: setSelectedPlaylistId,

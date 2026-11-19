@@ -7,6 +7,7 @@ interface OpenMusicControlProps {
   isScanning?: boolean;
   scanCount?: number;
   onOpenFolder: () => void;
+  onOpenFiles?: () => void;
   onFallbackFolderSelect: (files: FileList | null) => void;
   onOpenFilesSelect: (files: FileList | null) => void;
   isFsaSupported?: boolean;
@@ -17,6 +18,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
   isScanning = false,
   scanCount = 0,
   onOpenFolder,
+  onOpenFiles,
   onFallbackFolderSelect,
   onOpenFilesSelect,
   isFsaSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window,
@@ -126,7 +128,11 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
 
   const triggerOpenFiles = () => {
     setMenuOpen(false);
-    filesInputRef.current?.click();
+    if (isFsaSupported && onOpenFiles) {
+      onOpenFiles();
+    } else {
+      filesInputRef.current?.click();
+    }
   };
 
   const triggerDefaultOpen = () => {

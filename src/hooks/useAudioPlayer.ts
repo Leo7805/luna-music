@@ -7,6 +7,7 @@ import {
   isFormatSupportedByBrowser,
   isSameTrack,
   applyPlayNext,
+  applyBulkPlayNext,
   applyAddToQueue,
   getNextTrackToPlay,
 } from '../utils/musicTree';
@@ -340,6 +341,35 @@ export function useAudioPlayer({
       // Override shuffle for the very next track
       playNextTrackIdRef.current = track.id;
       return outcome;
+    },
+    [playTrack]
+  );
+
+  // Insert multiple tracks to play next in visible order
+  const playNextBulk = useCallback(
+    (tracks: TrackItem[]): { movedCount: number; addedCount: number } => {
+      if (tracks.length === 0) return { movedCount: 0, addedCount: 0 };
+
+      if (!currentTrackRef.current && queueRef.current.length === 0) {
+        playTrack(tracks[0], tracks, true);
+        playNextTrackIdRef.current = null;
+        return { movedCount: 0, addedCount: tracks.length };
+      }
+
+      const { nextQueue, movedCount, addedCount } = applyBulkPlayNext(
+        queueRef.current,
+        currentTrackRef.current,
+        tracks
+      );
+
+      setQueue(nextQueue);
+      queueRef.current = nextQueue;
+
+      if (tracks.length > 0) {
+        playNextTrackIdRef.current = tracks[0].id;
+      }
+
+      return { movedCount, addedCount };
     },
     [playTrack]
   );
@@ -721,6 +751,7 @@ export function useAudioPlayer({
     playTrack,
     playQueue,
     playNext,
+    playNextBulk,
     addToQueue,
     removeFromQueue,
     clearQueue,

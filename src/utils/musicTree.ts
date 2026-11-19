@@ -686,6 +686,90 @@ export function applyPlayNext(
 }
 
 /**
+ * Computes updated queue for bulk Play Next operation.
+ * - Inserts tracksToInsert immediately after currentTrack in their visible order.
+ * - If any selected track already exists in upcoming queue, moves it rather than duplicating.
+ * - Preserves visible order of tracksToInsert.
+ * - Preserves relative order of unrelated queue entries.
+ * - Atomic and non-destructive.
+ */
+export function applyBulkPlayNext(
+  queue: TrackItem[],
+  currentTrack: TrackItem | null,
+  tracksToInsert: TrackItem[]
+): { nextQueue: TrackItem[]; movedCount: number; addedCount: number } {
+  if (tracksToInsert.length === 0) {
+    return { nextQueue: queue, movedCount: 0, addedCount: 0 };
+  }
+
+  // Deduplicate incoming list internally while preserving visible order
+  const uniqueIncoming: TrackItem[] = [];
+  for (const t of tracksToInsert) {
+    if (!uniqueIncoming.some((item) => isSameTrack(item, t))) {
+      uniqueIncoming.push(t);
+    }
+  }
+
+  if (queue.length === 0 && !currentTrack) {
+    return { nextQueue: uniqueIncoming, movedCount: 0, addedCount: uniqueIncoming.length };
+  }
+
+  const curIdx = currentTrack
+    ? queue.findIndex((t) => isSameTrack(t, currentTrack))
+    : -1;
+
+  if (curIdx >= 0) {
+    const prefix = queue.slice(0, curIdx + 1);
+    const upcoming = queue.slice(curIdx + 1);
+
+    let movedCount = 0;
+    let addedCount = 0;
+
+    for (const inc of uniqueIncoming) {
+      if (upcoming.some((u) => isSameTrack(u, inc))) {
+        movedCount++;
+      } else {
+        addedCount++;
+      }
+    }
+
+    // Filter upcoming to remove any items that are being inserted/moved
+    const filteredUpcoming = upcoming.filter(
+      (u) => !uniqueIncoming.some((inc) => isSameTrack(inc, u))
+    );
+
+    return {
+      nextQueue: [...prefix, ...uniqueIncoming, ...filteredUpcoming],
+      movedCount,
+      addedCount,
+    };
+  } else {
+    // No current track playing
+    let movedCount = 0;
+    let addedCount = 0;
+    for (const inc of uniqueIncoming) {
+      if (queue.some((q) => isSameTrack(q, inc))) {
+        movedCount++;
+      } else {
+        addedCount++;
+      }
+    }
+
+    const filteredQueue = queue.filter(
+      (q) => !uniqueIncoming.some((inc) => isSameTrack(inc, q))
+    );
+
+    return {
+      nextQueue: currentTrack
+        ? [currentTrack, ...uniqueIncoming, ...filteredQueue]
+        : [...uniqueIncoming, ...filteredQueue],
+      movedCount,
+      addedCount,
+    };
+  }
+}
+
+/**
  * Computes the updated queue and outcome for an Add to Queue operation.
  * - If an incoming track is already in the upcoming queue, do not append another occurrence.
  * - If an incoming track is not in the upcoming queue, append it normally.

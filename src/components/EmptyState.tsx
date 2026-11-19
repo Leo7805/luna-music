@@ -11,6 +11,7 @@ interface EmptyStateProps {
   isScanning?: boolean;
   scanCount?: number;
   onOpenFolder: () => void;
+  onOpenFiles?: () => void;
   onFallbackFolderSelect: (files: FileList | null) => void;
   onOpenFilesSelect: (files: FileList | null) => void;
 }
@@ -19,6 +20,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   isScanning,
   scanCount,
   onOpenFolder,
+  onOpenFiles,
   onFallbackFolderSelect,
   onOpenFilesSelect,
 }) => {
@@ -53,6 +55,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           isScanning={isScanning}
           scanCount={scanCount}
           onOpenFolder={onOpenFolder}
+          onOpenFiles={onOpenFiles}
           onFallbackFolderSelect={onFallbackFolderSelect}
           onOpenFilesSelect={onOpenFilesSelect}
         />

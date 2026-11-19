@@ -34,9 +34,15 @@ interface PlaylistsViewProps {
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
+  onPlayNextBulk?: (tracks: TrackItem[]) => { movedCount: number; addedCount: number } | void;
   onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => boolean | void;
   onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
+  onAddTracksToPlaylist?: (playlistId: string, tracks: TrackItem[]) => { addedCount: number };
+  onCreateAndAddToPlaylist?: (playlistName: string, trackOrTracks: TrackItem | TrackItem[]) => void;
   onRemoveTrackFromPlaylist: (playlistId: string, trackId: string, index?: number) => void;
+  onRemoveTracksFromPlaylist?: (playlistId: string, trackIds: string[]) => void;
+  onAddTracksToFavourites?: (tracks: TrackItem[]) => void;
+  onRemoveTracksFromFavourites?: (tracks: TrackItem[]) => void;
   onReorderPlaylistTracks: (playlistId: string, fromIndex: number, toIndex: number) => void;
 }
 
@@ -56,9 +62,15 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
   onTogglePlay,
   onToggleFavourite,
   onPlayNext,
+  onPlayNextBulk,
   onAddToQueue,
   onAddToPlaylist,
+  onAddTracksToPlaylist,
+  onCreateAndAddToPlaylist,
   onRemoveTrackFromPlaylist,
+  onRemoveTracksFromPlaylist,
+  onAddTracksToFavourites,
+  onRemoveTracksFromFavourites,
   onReorderPlaylistTracks,
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
@@ -185,6 +197,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
             <div className="space-y-2">
               <TrackList
                 tracks={resolvedTracks}
+                libraryTracks={libraryTracks}
                 currentTrackId={currentTrackId}
                 isPlaying={isPlaying}
                 favourites={favourites}
@@ -193,17 +206,26 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 onTogglePlay={onTogglePlay}
                 onToggleFavourite={onToggleFavourite}
                 onPlayNext={onPlayNext}
+                onPlayNextBulk={onPlayNextBulk}
                 onAddToQueue={onAddToQueue}
                 onAddToPlaylist={onAddToPlaylist}
+                onAddTracksToPlaylist={onAddTracksToPlaylist}
+                onCreateAndAddToPlaylist={onCreateAndAddToPlaylist}
                 onRemoveFromPlaylist={(_, idx) =>
                   onRemoveTrackFromPlaylist(selectedPlaylist.id, '', idx)
                 }
+                onRemoveTracksFromPlaylist={(trackIds) =>
+                  onRemoveTracksFromPlaylist?.(selectedPlaylist.id, trackIds)
+                }
+                onAddTracksToFavourites={onAddTracksToFavourites}
+                onRemoveTracksFromFavourites={onRemoveTracksFromFavourites}
                 onMoveTrackUp={(idx) =>
                   onReorderPlaylistTracks(selectedPlaylist.id, idx, idx - 1)
                 }
                 onMoveTrackDown={(idx) =>
                   onReorderPlaylistTracks(selectedPlaylist.id, idx, idx + 1)
                 }
+                isPlaylistView={true}
               />
             </div>
           ) : (
