@@ -10,8 +10,10 @@ export function useTrackSelection({ tracks }: UseTrackSelectionOptions) {
   const [lastSelectedTrackId, setLastSelectedTrackId] = useState<string | null>(null);
   const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
 
-  // Touch long-press timer ref
+  // Touch long-press and scrolling suppression refs
   const touchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+  const isTouchScrollingRef = useRef<boolean>(false);
   const isTouchLongPressTriggeredRef = useRef<boolean>(false);
 
   // Reconcile selection if displayed tracks change (prune deleted/promoted IDs)
@@ -169,19 +171,57 @@ export function useTrackSelection({ tracks }: UseTrackSelectionOptions) {
     setLastSelectedTrackId(null);
   }, []);
 
-  // Touch long press handlers
-  const handleTouchStart = useCallback((track: TrackItem) => {
-    isTouchLongPressTriggeredRef.current = false;
-    touchTimerRef.current = setTimeout(() => {
-      isTouchLongPressTriggeredRef.current = true;
-      setIsSelectMode(true);
-      setSelectedTrackIds((prev) => {
-        const next = new Set(prev);
-        next.add(track.id);
-        return next;
-      });
-      setLastSelectedTrackId(track.id);
-    }, 500);
+  // Touch handlers (supports tap, scrolling cancellation, and long-press selection)
+  const handleTouchStart = useCallback(
+    (eOrTrack: React.TouchEvent | TrackItem, maybeTrack?: TrackItem) => {
+      isTouchScrollingRef.current = false;
+      isTouchLongPressTriggeredRef.current = false;
+
+      let track: TrackItem | undefined;
+      if ('touches' in eOrTrack) {
+        if (eOrTrack.touches.length > 0) {
+          touchStartPosRef.current = {
+            x: eOrTrack.touches[0].clientX,
+            y: eOrTrack.touches[0].clientY,
+          };
+        }
+        track = maybeTrack;
+      } else {
+        track = eOrTrack;
+      }
+
+      if (!track) return;
+
+      if (touchTimerRef.current) {
+        clearTimeout(touchTimerRef.current);
+      }
+
+      touchTimerRef.current = setTimeout(() => {
+        isTouchLongPressTriggeredRef.current = true;
+        setIsSelectMode(true);
+        setSelectedTrackIds((prev) => {
+          const next = new Set(prev);
+          next.add(track!.id);
+          return next;
+        });
+        setLastSelectedTrackId(track!.id);
+      }, 500);
+    },
+    []
+  );
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (touchStartPosRef.current && e.touches.length > 0) {
+      const dx = e.touches[0].clientX - touchStartPosRef.current.x;
+      const dy = e.touches[0].clientY - touchStartPosRef.current.y;
+      if (Math.hypot(dx, dy) > 8) {
+        isTouchScrollingRef.current = true;
+        if (touchTimerRef.current) {
+          clearTimeout(touchTimerRef.current);
+          touchTimerRef.current = null;
+        }
+      }
+    }
   }, []);
 
   const handleTouchEnd = useCallback(() => {
@@ -189,6 +229,15 @@ export function useTrackSelection({ tracks }: UseTrackSelectionOptions) {
       clearTimeout(touchTimerRef.current);
       touchTimerRef.current = null;
     }
+  }, []);
+
+  const isTouchActionSuppressed = useCallback(() => {
+    if (isTouchScrollingRef.current || isTouchLongPressTriggeredRef.current) {
+      isTouchScrollingRef.current = false;
+      isTouchLongPressTriggeredRef.current = false;
+      return true;
+    }
+    return false;
   }, []);
 
   return {
@@ -203,6 +252,8 @@ export function useTrackSelection({ tracks }: UseTrackSelectionOptions) {
     toggleSelectAll,
     clearSelection,
     handleTouchStart,
+    handleTouchMove,
     handleTouchEnd,
+    isTouchActionSuppressed,
   };
 }

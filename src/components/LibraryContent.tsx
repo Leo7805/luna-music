@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { TrackList } from './TrackList';
 import { PlaylistsView } from './PlaylistsView';
 import { FolderView } from './FolderView';
@@ -5,6 +6,8 @@ import { AlbumsView } from './AlbumsView';
 import { ArtistsView } from './ArtistsView';
 import { EmptyState } from './EmptyState';
 import { resolvePlaylistTracks } from '../utils/musicTree';
+import { isSameTrack } from '../utils/trackIdentity';
+import { isTrackPlayable } from '../utils/audioFileTypes';
 import { useMusicLibrary } from '../hooks/useMusicLibrary';
 import { usePlaylists } from '../hooks/usePlaylists';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
@@ -103,6 +106,22 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
 
   const libraryTracks = library.library?.flatPlaylist || [];
 
+  const handlePlayAllDisplayed = useCallback(() => {
+    const playable = displayedTracks.filter(isTrackPlayable);
+    if (playable.length === 0) return;
+
+    // Deduplicate logical tracks while preserving active search & sort order
+    const uniqueTracks: TrackItem[] = [];
+    for (const track of playable) {
+      if (!uniqueTracks.some((existing) => isSameTrack(existing, track))) {
+        uniqueTracks.push(track);
+      }
+    }
+    if (uniqueTracks.length === 0) return;
+
+    audioPlayer.playQueue(uniqueTracks, 0, true);
+  }, [displayedTracks, audioPlayer]);
+
   const commonTrackListProps = {
     tracks: displayedTracks,
     libraryTracks,
@@ -110,6 +129,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
     isPlaying,
     favourites,
     playlists: playlistList,
+    onPlayAll: handlePlayAllDisplayed,
     onPlayTrack: playTrack,
     onTogglePlay: togglePlay,
     onToggleFavourite: toggleFavourite,
@@ -197,6 +217,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
           playlists={playlistList}
           onSelectFolder={selectFolder}
           onPlayTrack={playTrack}
+          onPlayQueue={playQueue}
           onTogglePlay={togglePlay}
           onToggleFavourite={toggleFavourite}
           onPlayNext={playNext}
@@ -221,6 +242,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
           playlists={playlistList}
           onSelectAlbum={selectAlbum}
           onPlayTrack={playTrack}
+          onPlayQueue={playQueue}
           onTogglePlay={togglePlay}
           onToggleFavourite={toggleFavourite}
           onPlayNext={playNext}
@@ -240,6 +262,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
           playlists={playlistList}
           onSelectArtist={selectArtist}
           onPlayTrack={playTrack}
+          onPlayQueue={playQueue}
           onTogglePlay={togglePlay}
           onToggleFavourite={toggleFavourite}
           onPlayNext={playNext}

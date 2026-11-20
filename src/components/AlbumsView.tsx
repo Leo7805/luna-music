@@ -13,6 +13,7 @@ interface AlbumsViewProps {
   playlists?: Playlist[];
   onSelectAlbum: (albumId: string | null) => void;
   onPlayTrack: (track: TrackItem) => void;
+  onPlayQueue?: (tracks: TrackItem[], startIndex?: number, shuffle?: boolean) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
@@ -29,6 +30,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
   playlists,
   onSelectAlbum,
   onPlayTrack,
+  onPlayQueue,
   onTogglePlay,
   onToggleFavourite,
   onPlayNext,
@@ -86,7 +88,16 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
               <button
                 onClick={() => {
                   if (selectedAlbum.tracks.length > 0) {
-                    onPlayTrack(selectedAlbum.tracks[0]);
+                    if (onPlayQueue) {
+                      const playable = selectedAlbum.tracks.filter(
+                        (t) => (t.status || 'normal') === 'normal'
+                      );
+                      if (playable.length > 0) {
+                        onPlayQueue(playable, 0, false);
+                      }
+                    } else {
+                      onPlayTrack(selectedAlbum.tracks[0]);
+                    }
                   }
                 }}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold shadow-lg shadow-[var(--accent-primary)]/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"

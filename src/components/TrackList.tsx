@@ -31,6 +31,7 @@ export interface TrackListProps {
   onRemoveTracksFromFavourites?: (tracks: TrackItem[]) => void;
   onMoveTrackUp?: (index: number) => void;
   onMoveTrackDown?: (index: number) => void;
+  onPlayAll?: () => void;
   emptyVariant?: 'default' | 'favourites' | 'search';
   emptyMessage?: string;
   isPlaylistView?: boolean;
@@ -60,6 +61,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   onRemoveTracksFromFavourites,
   onMoveTrackUp,
   onMoveTrackDown,
+  onPlayAll,
   emptyVariant = 'default',
   emptyMessage,
   isPlaylistView = false,
@@ -73,7 +75,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   const {
     selectedTrackIds, selectedTracks, isSelectMode, setIsSelectMode,
     handleRowClick, handleCheckboxClick, toggleSelectAll, clearSelection,
-    handleTouchStart, handleTouchEnd,
+    handleTouchStart, handleTouchMove, handleTouchEnd, isTouchActionSuppressed,
   } = useTrackSelection({ tracks });
 
   // Close context menu on outside click or escape
@@ -220,6 +222,7 @@ export const TrackList: React.FC<TrackListProps> = ({
         showCheckboxes={showCheckboxes}
         onToggleSelectMode={handleToggleSelectMode}
         onToggleSelectAll={toggleSelectAll}
+        onPlayAll={onPlayAll}
       />
 
       {/* Track Rows */}
@@ -254,7 +257,9 @@ export const TrackList: React.FC<TrackListProps> = ({
             onMoveTrackUp={onMoveTrackUp}
             onMoveTrackDown={onMoveTrackDown}
             onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            isTouchActionSuppressed={isTouchActionSuppressed}
             showToast={showToast}
           />
         ))}

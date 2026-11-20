@@ -1,6 +1,8 @@
 import React from 'react';
 import { Folder, ArrowUpLeft } from 'lucide-react';
 import { FolderNode, Playlist, TrackItem } from '../types/music';
+import { isSameTrack } from '../utils/trackIdentity';
+import { isTrackPlayable } from '../utils/audioFileTypes';
 import { TrackList } from './TrackList';
 
 interface FolderViewProps {
@@ -12,6 +14,8 @@ interface FolderViewProps {
   playlists?: Playlist[];
   onSelectFolder: (path: string) => void;
   onPlayTrack: (track: TrackItem) => void;
+  onPlayAll?: (tracks: TrackItem[]) => void;
+  onPlayQueue?: (tracks: TrackItem[], startIndex?: number, shuffle?: boolean) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
@@ -33,6 +37,8 @@ export const FolderView: React.FC<FolderViewProps> = ({
   playlists,
   onSelectFolder,
   onPlayTrack,
+  onPlayAll,
+  onPlayQueue,
   onTogglePlay,
   onToggleFavourite,
   onPlayNext,
@@ -57,6 +63,28 @@ export const FolderView: React.FC<FolderViewProps> = ({
   const parentPath = currentPath.includes('/')
     ? currentPath.substring(0, currentPath.lastIndexOf('/'))
     : '';
+
+  const handlePlayAll = () => {
+    if (!currentNode) return;
+    const playable = currentNode.tracks.filter(isTrackPlayable);
+    if (playable.length === 0) return;
+
+    const uniqueTracks: TrackItem[] = [];
+    for (const track of playable) {
+      if (!uniqueTracks.some((existing) => isSameTrack(existing, track))) {
+        uniqueTracks.push(track);
+      }
+    }
+    if (uniqueTracks.length === 0) return;
+
+    if (onPlayQueue) {
+      onPlayQueue(uniqueTracks, 0, false);
+    } else if (onPlayAll) {
+      onPlayAll(uniqueTracks);
+    } else {
+      onPlayTrack(uniqueTracks[0]);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -106,7 +134,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
           <span>Folder Tracks ({currentNode.tracks.length})</span>
           {currentNode.tracks.length > 0 && (
             <button
-              onClick={() => onPlayTrack(currentNode.tracks[0])}
+              onClick={handlePlayAll}
               className="text-xs text-[#565ECF] dark:text-indigo-400 hover:text-[#4B52BA] dark:hover:text-indigo-300 font-semibold normal-case cursor-pointer"
             >
               Play All
@@ -121,6 +149,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
           isPlaying={isPlaying}
           favourites={favourites}
           playlists={playlists}
+          onPlayAll={handlePlayAll}
           onPlayTrack={onPlayTrack}
           onTogglePlay={onTogglePlay}
           onToggleFavourite={onToggleFavourite}

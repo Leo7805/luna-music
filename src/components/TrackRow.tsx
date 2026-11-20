@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import {
   Play,
   Pause,
@@ -43,8 +44,10 @@ export interface TrackRowProps {
   onRemoveImportedFiles?: (trackIds: string[]) => void;
   onMoveTrackUp?: (index: number) => void;
   onMoveTrackDown?: (index: number) => void;
-  onTouchStart: (track: TrackItem) => void;
+  onTouchStart: (e: React.TouchEvent | any, track?: TrackItem) => void;
+  onTouchMove?: (e: React.TouchEvent) => void;
   onTouchEnd: () => void;
+  isTouchActionSuppressed?: () => boolean;
   showToast: (msg: string) => void;
 }
 
@@ -76,22 +79,74 @@ export function TrackRow({
   onMoveTrackUp,
   onMoveTrackDown,
   onTouchStart,
+  onTouchMove,
   onTouchEnd,
+  isTouchActionSuppressed,
   showToast,
 }: TrackRowProps) {
+  const lastPlayClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
   const isFav = isFavouriteTrack(track, favourites, libraryTracks || allTracks);
   const extension = track.name.split('.').pop()?.toUpperCase() || '';
   const status = getTrackStatus(track);
   const isAbnormal = status !== 'normal';
   const isMenuOpen = activeMenuTrackId === track.id;
 
+  const handleRowClick = (e: React.MouseEvent) => {
+    // 1. Interactive child controls: do not trigger row-level playback or selection
+    const target = e.target as HTMLElement;
+    if (target.closest('button, [data-track-menu], input[type="checkbox"], a')) {
+      return;
+    }
+
+    // 5. Touch scrolling or longpress suppression
+    if (isTouchActionSuppressed && isTouchActionSuppressed()) {
+      return;
+    }
+
+    // 2. Selection modifier keys (Cmd/Ctrl and Shift)
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
+      onRowClick(e, track, index);
+      return;
+    }
+
+    // 3. Active Select mode (or active selection with checkboxes visible)
+    if (showCheckboxes) {
+      onRowClick(e, track, index);
+      return;
+    }
+
+    // Clear any previous selection if present
+    if (isSelected) {
+      onRowClick(e, track, index);
+    }
+
+    // 4. Normal song-row click: Single-click playback
+    const now = Date.now();
+    if (
+      lastPlayClickRef.current.id === track.id &&
+      now - lastPlayClickRef.current.time < 350
+    ) {
+      return;
+    }
+    lastPlayClickRef.current = { id: track.id, time: now };
+
+    if (isCurrent) {
+      // If currently playing, preserve playback without audio reload or queue reset
+      if (!isPlaying) {
+        onTogglePlay();
+      }
+      return;
+    }
+
+    onPlayTrack(track);
+  };
+
   return (
     <div
-      onClick={(e) => onRowClick(e, track, index)}
-      onDoubleClick={() => onPlayTrack(track)}
-      onTouchStart={() => onTouchStart(track)}
+      onClick={handleRowClick}
+      onTouchStart={(e) => onTouchStart(e, track)}
       onTouchEnd={onTouchEnd}
-      onTouchMove={onTouchEnd}
+      onTouchMove={onTouchMove || onTouchEnd}
       data-testid={`track-row-${track.id}`}
       className={`group grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 items-center rounded-xl border transition-colors duration-150 cursor-pointer select-none text-xs relative ${
         isMenuOpen ? 'z-30' : 'z-0'

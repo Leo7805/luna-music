@@ -71,6 +71,8 @@ export function useAudioPlayer({
     isMuted: false,
   });
 
+  const lastPlayRequestRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
+
   const currentTrackRef = useRef<TrackItem | null>(null);
   currentTrackRef.current = currentTrack;
 
@@ -134,6 +136,17 @@ export function useAudioPlayer({
   // Play a specific track, optionally providing a new playback queue
   const playTrack = useCallback(
     (track: TrackItem, newQueue?: TrackItem[], autoPlay = true) => {
+      // Rapid duplicate play protection (e.g. from rapid double-clicks)
+      const now = Date.now();
+      if (
+        !newQueue &&
+        lastPlayRequestRef.current.id === track.id &&
+        now - lastPlayRequestRef.current.time < 350
+      ) {
+        return;
+      }
+      lastPlayRequestRef.current = { id: track.id, time: now };
+
       clearPlayNextOverride();
       if (newQueue && newQueue.length > 0) {
         setQueueImmediate(newQueue);
