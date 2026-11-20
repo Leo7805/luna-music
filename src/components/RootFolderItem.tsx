@@ -67,27 +67,7 @@ export function RootFolderItem({
         onClick={() => onSelectFolder(folder.tree.relativePath)}
       >
         {/* Left icon + name */}
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {hasSubfolders ? (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(!isOpen);
-              }}
-              aria-label={isOpen ? `Collapse ${folder.name}` : `Expand ${folder.name}`}
-              className="p-0.5 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0 cursor-pointer"
-            >
-              {isOpen ? (
-                <ChevronDown className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronRight className="w-3.5 h-3.5" />
-              )}
-            </button>
-          ) : (
-            <span className="w-4.5 shrink-0" />
-          )}
-
+        <div className="flex items-center gap-2 min-w-0 flex-1">
           <Folder
             className={`w-3.5 h-3.5 shrink-0 ${
               isNeedsPermission
@@ -98,6 +78,25 @@ export function RootFolderItem({
           <span className="truncate text-xs font-medium" title={folder.name}>
             {folder.name}
           </span>
+
+          {hasSubfolders && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(!isOpen);
+              }}
+              aria-label={isOpen ? `Collapse ${folder.name}` : `Expand ${folder.name}`}
+              title={isOpen ? `Collapse ${folder.name}` : `Expand ${folder.name}`}
+              className="p-0.5 -ml-0.5 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
+            >
+              {isOpen ? (
+                <ChevronDown className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronRight className="w-3.5 h-3.5" />
+              )}
+            </button>
+          )}
         </div>
 
         {/* Right side: status, track count, menu */}

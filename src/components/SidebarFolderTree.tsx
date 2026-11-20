@@ -47,8 +47,12 @@ export function SubfolderTreeNode({
         style={{ paddingLeft: `${depth * 14 + 10}px` }}
         onClick={() => onSelect(node.relativePath)}
       >
-        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-          {hasSubfolders ? (
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Folder className="w-3.5 h-3.5 shrink-0 text-slate-400 group-hover:text-amber-500 dark:group-hover:text-amber-300" />
+          <span className="truncate text-xs" title={node.name}>
+            {node.name}
+          </span>
+          {hasSubfolders && (
             <button
               type="button"
               onClick={(e) => {
@@ -56,7 +60,8 @@ export function SubfolderTreeNode({
                 setIsOpen(!isOpen);
               }}
               aria-label={isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`}
-              className="p-0.5 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0 cursor-pointer"
+              title={isOpen ? `Collapse ${node.name}` : `Expand ${node.name}`}
+              className="p-0.5 -ml-0.5 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0 cursor-pointer focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500"
             >
               {isOpen ? (
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -64,21 +69,18 @@ export function SubfolderTreeNode({
                 <ChevronRight className="w-3.5 h-3.5" />
               )}
             </button>
-          ) : (
-            <span className="w-4.5 shrink-0" />
           )}
-
-          <Folder className="w-3.5 h-3.5 shrink-0 text-slate-400 group-hover:text-amber-500 dark:group-hover:text-amber-300" />
-          <span className="truncate text-xs" title={node.name}>
-            {node.name}
-          </span>
         </div>
 
-        {node.totalTrackCount > 0 && (
-          <span className="text-[10px] text-[var(--text-secondary)] dark:text-slate-400 px-1.5 py-0.2 rounded bg-[var(--border-subtle)]/70 dark:bg-white/[0.04] shrink-0 font-medium">
-            {node.totalTrackCount}
-          </span>
-        )}
+        <div className="flex items-center gap-1 shrink-0 ml-1.5">
+          {node.totalTrackCount > 0 && (
+            <span className="text-[10px] text-[var(--text-secondary)] dark:text-slate-400 px-1.5 py-0.2 rounded bg-[var(--border-subtle)]/70 dark:bg-white/[0.04] shrink-0 font-medium">
+              {node.totalTrackCount}
+            </span>
+          )}
+          {/* Spacer to align badge with root items that have a 22px menu button */}
+          <span className="w-[22px] shrink-0" aria-hidden="true" />
+        </div>
       </div>
 
       {hasSubfolders && isOpen && (
@@ -152,15 +154,21 @@ export function LegacyFolderTreeNode({
         style={{ paddingLeft: `${depth * 14 + 8}px` }}
         onClick={() => onSelect(node.relativePath)}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
-          {hasSubfolders ? (
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          <Folder
+            className={`w-3.5 h-3.5 shrink-0 ${
+              isRoot ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 group-hover:text-amber-500 dark:group-hover:text-amber-300'
+            }`}
+          />
+          <span className="truncate text-xs">{node.name}</span>
+          {hasSubfolders && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsOpen(!isOpen);
               }}
-              className="p-0.5 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white"
+              className="p-0.5 -ml-0.5 rounded hover:bg-slate-300/60 dark:hover:bg-white/[0.1] text-slate-400 hover:text-slate-700 dark:hover:text-white shrink-0 cursor-pointer"
             >
               {isOpen ? (
                 <ChevronDown className="w-3.5 h-3.5" />
@@ -168,20 +176,11 @@ export function LegacyFolderTreeNode({
                 <ChevronRight className="w-3.5 h-3.5" />
               )}
             </button>
-          ) : (
-            <span className="w-4.5" />
           )}
-
-          <Folder
-            className={`w-3.5 h-3.5 shrink-0 ${
-              isRoot ? 'text-indigo-500 dark:text-indigo-400' : 'text-slate-400 group-hover:text-amber-500 dark:group-hover:text-amber-300'
-            }`}
-          />
-          <span className="truncate text-xs">{node.name}</span>
         </div>
 
         {node.totalTrackCount > 0 && (
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/[0.04]">
+          <span className="text-[10px] text-[var(--text-secondary)] dark:text-slate-400 px-1.5 py-0.2 rounded bg-[var(--border-subtle)]/70 dark:bg-white/[0.04] shrink-0 font-medium">
             {node.totalTrackCount}
           </span>
         )}

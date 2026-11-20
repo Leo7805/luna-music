@@ -50,18 +50,18 @@ describe('OpenMusicControl platform detection & default opening mode', () => {
   });
 });
 
-describe('Single opening control visibility logic', () => {
+describe('Open Music control visibility logic', () => {
   function getVisibleControls(hasLibrary: boolean) {
     return {
       emptyStateControlVisible: !hasLibrary,
-      sidebarControlVisible: hasLibrary,
+      sidebarControlVisible: true, // Always visible in sidebar
     };
   }
 
-  it('shows only the empty state control when no music library is loaded', () => {
+  it('shows both empty state and sidebar controls when no music library is loaded', () => {
     const controls = getVisibleControls(false);
     expect(controls.emptyStateControlVisible).toBe(true);
-    expect(controls.sidebarControlVisible).toBe(false);
+    expect(controls.sidebarControlVisible).toBe(true);
   });
 
   it('shows only the sidebar compact control when a library is loaded', () => {

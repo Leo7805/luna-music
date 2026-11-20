@@ -49,7 +49,7 @@ export function Sidebar({
   selectedPlaylistId,
   favouritesCount,
   totalTracksCount,
-  hasLibrary,
+  hasLibrary: _hasLibrary,
   isScanning,
   scanCount,
   onSelectView,
@@ -192,23 +192,21 @@ export function Sidebar({
         <div className="flex-1" />
       )}
 
-      {/* Loaded State: Single Compact Open Music Split Button */}
-      {hasLibrary && (
-        <div
-          data-testid="sidebar-open-music-container"
-          className="p-3 border-t border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-hover)]/60 dark:bg-[#071427]/80"
-        >
-          <OpenMusicControl
-            variant="sidebar"
-            isScanning={isScanning}
-            scanCount={scanCount}
-            onOpenFolder={onOpenFolder}
-            onOpenFiles={onOpenFiles}
-            onFallbackFolderSelect={onFallbackFolderSelect}
-            onOpenFilesSelect={onOpenFilesSelect}
-          />
-        </div>
-      )}
+      {/* Always Visible: Single Compact Open Music Split Button */}
+      <div
+        data-testid="sidebar-open-music-container"
+        className="p-3 border-t border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-hover)]/60 dark:bg-[#071427]/80 shrink-0"
+      >
+        <OpenMusicControl
+          variant="sidebar"
+          isScanning={isScanning}
+          scanCount={scanCount}
+          onOpenFolder={onOpenFolder}
+          onOpenFiles={onOpenFiles}
+          onFallbackFolderSelect={onFallbackFolderSelect}
+          onOpenFilesSelect={onOpenFilesSelect}
+        />
+      </div>
 
       {/* Remove All Imported Files Modal */}
       <ConfirmModal
