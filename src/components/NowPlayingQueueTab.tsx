@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ListMusic, Trash2, Play, Save, X } from 'lucide-react';
+import { ListMusic, Trash2, Save, X } from 'lucide-react';
 import { TrackItem } from '../types/music';
 import { formatDuration } from '../utils/formatters';
 import { isSameTrack } from '../utils/musicTree';
@@ -7,6 +7,7 @@ import { isSameTrack } from '../utils/musicTree';
 interface NowPlayingQueueTabProps {
   queue: TrackItem[];
   currentTrack: TrackItem | null;
+  isPlaying?: boolean;
   isOpen: boolean;
   isActiveTab: boolean;
   onPlayTrack?: (track: TrackItem) => void;
@@ -38,6 +39,7 @@ export function calculateQueueScrollOffset(
 export const NowPlayingQueueTab: React.FC<NowPlayingQueueTabProps> = ({
   queue,
   currentTrack,
+  isPlaying = false,
   isOpen,
   isActiveTab,
   onPlayTrack,
@@ -201,9 +203,30 @@ export const NowPlayingQueueTab: React.FC<NowPlayingQueueTabProps> = ({
                 className="group flex items-center justify-between p-2 rounded-xl text-xs border border-transparent transition-colors duration-150 cursor-pointer hover:bg-[var(--bg-hover)]/70 dark:hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 focus-visible:border-transparent"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="w-4 text-center text-[10px] text-[var(--text-secondary)]">
+                  <span className="w-4 flex items-center justify-center text-[10px] text-[var(--text-secondary)]">
                     {isCurrent ? (
-                      <Play className="w-3 h-3 mx-auto text-[var(--accent-primary)] fill-[var(--accent-primary)] dark:text-slate-100 dark:fill-slate-100" />
+                      <span
+                        data-testid="queue-playing-indicator"
+                        data-playing={isPlaying ? 'true' : 'false'}
+                        aria-label={isPlaying ? 'Playing' : 'Paused'}
+                        className="w-3.5 h-3.5 inline-flex items-end justify-center gap-[2px]"
+                      >
+                        <span
+                          className={`w-[2.5px] rounded-full bg-[var(--accent-primary)] dark:bg-indigo-300 ${
+                            isPlaying ? 'animate-bar-1' : 'h-[45%]'
+                          }`}
+                        />
+                        <span
+                          className={`w-[2.5px] rounded-full bg-[var(--accent-primary)] dark:bg-indigo-300 ${
+                            isPlaying ? 'animate-bar-2' : 'h-[85%]'
+                          }`}
+                        />
+                        <span
+                          className={`w-[2.5px] rounded-full bg-[var(--accent-primary)] dark:bg-indigo-300 ${
+                            isPlaying ? 'animate-bar-3' : 'h-[60%]'
+                          }`}
+                        />
+                      </span>
                     ) : (
                       idx + 1
                     )}

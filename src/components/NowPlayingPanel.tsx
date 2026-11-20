@@ -16,6 +16,7 @@ import { NowPlayingQueueTab } from './NowPlayingQueueTab';
 
 interface NowPlayingPanelProps {
   currentTrack: TrackItem | null;
+  isPlaying?: boolean;
   currentTime: number;
   lyrics: LrcLine[];
   ambientColors: { primary: string; glow: string };
@@ -31,6 +32,7 @@ interface NowPlayingPanelProps {
 
 export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
   currentTrack,
+  isPlaying = false,
   currentTime,
   lyrics,
   ambientColors,
@@ -194,6 +196,7 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
             <NowPlayingQueueTab
               queue={queue}
               currentTrack={currentTrack}
+              isPlaying={isPlaying}
               isOpen={isOpen}
               isActiveTab={activeTab === 'queue'}
               onPlayTrack={onPlayTrack}

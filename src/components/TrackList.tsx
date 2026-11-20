@@ -32,6 +32,8 @@ export interface TrackListProps {
   onMoveTrackUp?: (index: number) => void;
   onMoveTrackDown?: (index: number) => void;
   onPlayAll?: () => void;
+  hideTrackCount?: boolean;
+  beforeTable?: React.ReactNode;
   emptyVariant?: 'default' | 'favourites' | 'search';
   emptyMessage?: string;
   isPlaylistView?: boolean;
@@ -62,6 +64,8 @@ export const TrackList: React.FC<TrackListProps> = ({
   onMoveTrackUp,
   onMoveTrackDown,
   onPlayAll,
+  hideTrackCount = false,
+  beforeTable,
   emptyVariant = 'default',
   emptyMessage,
   isPlaylistView = false,
@@ -220,6 +224,8 @@ export const TrackList: React.FC<TrackListProps> = ({
         selectedCount={selectedTrackIds.size}
         isSelectMode={isSelectMode}
         showCheckboxes={showCheckboxes}
+        hideTrackCount={hideTrackCount}
+        beforeTable={beforeTable}
         onToggleSelectMode={handleToggleSelectMode}
         onToggleSelectAll={toggleSelectAll}
         onPlayAll={onPlayAll}

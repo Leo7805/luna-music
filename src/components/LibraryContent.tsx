@@ -148,6 +148,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
       return (
         <TrackList
           {...commonTrackListProps}
+          hideTrackCount={true}
           emptyVariant={searchQuery ? 'search' : 'default'}
         />
       );
@@ -156,6 +157,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
       return (
         <TrackList
           {...commonTrackListProps}
+          hideTrackCount={true}
           emptyVariant="favourites"
         />
       );
@@ -164,6 +166,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
       return (
         <TrackList
           {...commonTrackListProps}
+          hideTrackCount={true}
           onRemoveImportedFiles={removeImportedFiles}
           isImportedFilesView={true}
           emptyVariant={searchQuery ? 'search' : 'default'}

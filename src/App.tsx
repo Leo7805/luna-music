@@ -180,7 +180,7 @@ export function App() {
           />
 
           {/* Central View Container */}
-          <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 custom-scrollbar">
             <LibraryContent
               library={library}
               playlists={playlists}
@@ -192,6 +192,7 @@ export function App() {
         {/* Right Now Playing Panel */}
         <NowPlayingPanel
           currentTrack={audioPlayer.currentTrack}
+          isPlaying={audioPlayer.isPlaying}
           currentTime={audioPlayer.currentTime}
           lyrics={audioPlayer.lyrics}
           ambientColors={audioPlayer.ambientColors}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Folder, ArrowUpLeft } from 'lucide-react';
+import { Folder } from 'lucide-react';
 import { FolderNode, Playlist, TrackItem } from '../types/music';
 import { isSameTrack } from '../utils/trackIdentity';
 import { isTrackPlayable } from '../utils/audioFileTypes';
@@ -59,11 +59,6 @@ export const FolderView: React.FC<FolderViewProps> = ({
     );
   }
 
-  const currentPath = currentNode.relativePath;
-  const parentPath = currentPath.includes('/')
-    ? currentPath.substring(0, currentPath.lastIndexOf('/'))
-    : '';
-
   const handlePlayAll = () => {
     if (!currentNode) return;
     const playable = currentNode.tracks.filter(isTrackPlayable);
@@ -86,83 +81,73 @@ export const FolderView: React.FC<FolderViewProps> = ({
     }
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Subfolder Cards Grid */}
-      {currentNode.subfolders.length > 0 || currentPath ? (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[#687995] dark:text-slate-400 px-1">
-            <span>Subfolders ({currentNode.subfolders.length})</span>
-            {currentPath && (
-              <button
-                onClick={() => onSelectFolder(parentPath)}
-                className="flex items-center gap-1 text-[#565ECF] dark:text-indigo-400 hover:text-[#4B52BA] dark:hover:text-indigo-300 font-medium normal-case cursor-pointer"
-              >
-                <ArrowUpLeft className="w-3.5 h-3.5" />
-                <span>Go Up</span>
-              </button>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-            {currentNode.subfolders.map((sub) => (
-              <div
-                key={sub.id}
-                onClick={() => onSelectFolder(sub.relativePath)}
-                className="group p-3 rounded-xl glass-panel hover:bg-[#E9EDF7] dark:hover:bg-white/[0.08] hover:border-[#565ECF]/40 transition-colors duration-150 cursor-pointer flex items-center gap-3 select-none"
-              >
-                <div className="w-9 h-9 rounded-lg bg-[#565ECF]/10 border border-[#565ECF]/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <Folder className="w-4 h-4 text-[#565ECF] dark:text-indigo-400 group-hover:text-[#4B52BA] dark:group-hover:text-indigo-300" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-[#182238] dark:text-slate-200 group-hover:text-black dark:group-hover:text-white truncate">
-                    {sub.name}
-                  </p>
-                  <p className="text-[10px] text-[#687995] mt-0.5">
-                    {sub.totalTrackCount} {sub.totalTrackCount === 1 ? 'track' : 'tracks'}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {/* Direct Tracks in this Folder */}
-      <div className="space-y-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-[#687995] dark:text-slate-400 px-1 flex items-center justify-between">
-          <span>Folder Tracks ({currentNode.tracks.length})</span>
-          {currentNode.tracks.length > 0 && (
-            <button
-              onClick={handlePlayAll}
-              className="text-xs text-[#565ECF] dark:text-indigo-400 hover:text-[#4B52BA] dark:hover:text-indigo-300 font-semibold normal-case cursor-pointer"
+  const subfoldersSection =
+    currentNode.subfolders.length > 0 ? (
+      <div data-testid="folder-subfolders-section" className="pb-4 pt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {currentNode.subfolders.map((sub) => (
+            <div
+              key={sub.id}
+              onClick={() => onSelectFolder(sub.relativePath)}
+              className="group p-3 rounded-xl glass-panel hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] hover:border-[var(--accent-primary)]/30 transition-colors duration-150 cursor-pointer flex items-center gap-3 select-none"
             >
-              Play All
-            </button>
-          )}
+              <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Folder className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-[var(--text-primary)] dark:text-slate-200 group-hover:text-black dark:group-hover:text-white truncate">
+                  {sub.name}
+                </p>
+                <p className="text-[10px] text-[var(--text-secondary)] mt-0.5">
+                  {sub.totalTrackCount} {sub.totalTrackCount === 1 ? 'track' : 'tracks'}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
-
-        <TrackList
-          tracks={currentNode.tracks}
-          libraryTracks={libraryTracks}
-          currentTrackId={currentTrackId}
-          isPlaying={isPlaying}
-          favourites={favourites}
-          playlists={playlists}
-          onPlayAll={handlePlayAll}
-          onPlayTrack={onPlayTrack}
-          onTogglePlay={onTogglePlay}
-          onToggleFavourite={onToggleFavourite}
-          onPlayNext={onPlayNext}
-          onPlayNextBulk={onPlayNextBulk}
-          onAddToQueue={onAddToQueue}
-          onAddToPlaylist={onAddToPlaylist}
-          onAddTracksToPlaylist={onAddTracksToPlaylist}
-          onCreateAndAddToPlaylist={onCreateAndAddToPlaylist}
-          onAddTracksToFavourites={onAddTracksToFavourites}
-          onRemoveTracksFromFavourites={onRemoveTracksFromFavourites}
-        />
       </div>
-    </div>
+    ) : null;
+
+  if (currentNode.tracks.length === 0 && currentNode.subfolders.length > 0) {
+    return (
+      <div className="space-y-3">
+        <div
+          data-testid="tracklist-toolbar"
+          className="flex items-center justify-between pb-1 px-1"
+        >
+          <span
+            data-testid="tracklist-count"
+            className="text-xs text-[var(--text-secondary)] dark:text-slate-400 font-medium"
+          >
+            0 tracks
+          </span>
+        </div>
+        {subfoldersSection}
+      </div>
+    );
+  }
+
+  return (
+    <TrackList
+      tracks={currentNode.tracks}
+      libraryTracks={libraryTracks}
+      currentTrackId={currentTrackId}
+      isPlaying={isPlaying}
+      favourites={favourites}
+      playlists={playlists}
+      beforeTable={subfoldersSection}
+      onPlayAll={handlePlayAll}
+      onPlayTrack={onPlayTrack}
+      onTogglePlay={onTogglePlay}
+      onToggleFavourite={onToggleFavourite}
+      onPlayNext={onPlayNext}
+      onPlayNextBulk={onPlayNextBulk}
+      onAddToQueue={onAddToQueue}
+      onAddToPlaylist={onAddToPlaylist}
+      onAddTracksToPlaylist={onAddTracksToPlaylist}
+      onCreateAndAddToPlaylist={onCreateAndAddToPlaylist}
+      onAddTracksToFavourites={onAddTracksToFavourites}
+      onRemoveTracksFromFavourites={onRemoveTracksFromFavourites}
+    />
   );
 };

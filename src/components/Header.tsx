@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, X, Command, Folder, ChevronRight, SlidersHorizontal } from 'lucide-react';
+import { Search, X, Command, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { BreadcrumbItem } from '../utils/musicTree';
 import { Theme, LightStyle } from '../hooks/useTheme';
 import { AppearancePopover } from './AppearancePopover';
@@ -35,24 +35,30 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="relative z-30 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-main)]/80 dark:bg-[#071427]/60 backdrop-blur-md transition-colors duration-200">
-      {/* View Title & Breadcrumbs */}
+      {/* View Title or Inline Folder Breadcrumb (Row 1) */}
       <div className="flex-1 min-w-0">
-        {breadcrumbs && breadcrumbs.length > 1 ? (
-          <nav className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] dark:text-slate-400 mb-1 flex-wrap">
+        {!searchQuery && breadcrumbs && breadcrumbs.length > 1 ? (
+          <nav
+            aria-label="Folder breadcrumb"
+            data-testid="folder-breadcrumb"
+            className="flex items-center gap-1.5 min-w-0 flex-wrap"
+          >
             {breadcrumbs.map((crumb, idx) => {
               const isLast = idx === breadcrumbs.length - 1;
               return (
-                <div key={crumb.path || 'root'} className="flex items-center gap-1.5">
-                  {idx > 0 && <ChevronRight className="w-3 h-3 text-slate-400 dark:text-slate-600" />}
+                <div key={crumb.path || 'root'} className="flex items-center gap-1.5 min-w-0">
+                  {idx > 0 && (
+                    <ChevronRight className="w-3.5 h-3.5 text-[var(--text-secondary)]/60 dark:text-slate-600 shrink-0" />
+                  )}
                   {isLast ? (
-                    <span className="text-[var(--text-primary)] dark:text-white font-medium flex items-center gap-1">
-                      <Folder className="w-3 h-3 text-[var(--accent-primary)] dark:text-indigo-400" />
+                    <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
                       {crumb.name}
-                    </span>
+                    </h1>
                   ) : (
                     <button
+                      type="button"
                       onClick={() => onBreadcrumbClick?.(crumb.path)}
-                      className="hover:text-[var(--accent-primary)] dark:hover:text-indigo-300 transition-colors cursor-pointer"
+                      className="text-sm font-medium text-[var(--text-secondary)] dark:text-slate-400 hover:text-[var(--text-primary)] dark:hover:text-white transition-colors cursor-pointer truncate"
                     >
                       {crumb.name}
                     </button>
@@ -61,18 +67,21 @@ export const Header: React.FC<HeaderProps> = ({
               );
             })}
           </nav>
-        ) : null}
-
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
-            {title}
-          </h1>
-          {subtitle && (
-            <span className="text-xs text-[var(--text-secondary)] dark:text-slate-400 font-medium">
-              {subtitle}
-            </span>
-          )}
-        </div>
+        ) : (
+          <div className="flex items-baseline gap-3">
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
+              {title}
+            </h1>
+            {subtitle && (
+              <span
+                data-testid="header-subtitle"
+                className="text-xs text-[var(--text-secondary)] dark:text-slate-400 font-medium shrink-0"
+              >
+                {subtitle}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Right Controls: Search & Appearance Menu */}

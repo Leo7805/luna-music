@@ -39,36 +39,58 @@ function makeTrack(id: string, name: string): TrackItem {
 }
 
 describe('Queue Auto-Scroll, Text-Emphasis Styling & Direct Queue Navigation', () => {
-  it('renders queue active row with text emphasis and playing icon only (no active fill, border, or shadow)', () => {
+  it('renders queue active row with animated equalizer when playing, static equalizer when paused, and no active fill/border/shadow', () => {
     const tracks = [
       makeTrack('t1', 'Track 1'),
       makeTrack('t2', 'Track 2'),
       makeTrack('t3', 'Track 3'),
     ];
 
-    const html = renderToStaticMarkup(
+    const htmlPlaying = renderToStaticMarkup(
       <NowPlayingQueueTab
         queue={tracks}
         currentTrack={tracks[1]}
+        isPlaying={true}
         isOpen={true}
         isActiveTab={true}
       />
     );
 
-    expect(html).toContain('Track 1');
-    expect(html).toContain('Track 2');
-    expect(html).toContain('Track 3');
-    // Active track uses data-current, playing icon, and semibold title text
-    expect(html).toContain('data-current="true"');
-    expect(html).toContain('lucide-play');
-    expect(html).toContain('font-semibold text-[var(--accent-primary)] dark:text-white');
+    expect(htmlPlaying).toContain('Track 1');
+    expect(htmlPlaying).toContain('Track 2');
+    expect(htmlPlaying).toContain('Track 3');
+    // Active track uses data-current, animated equalizer bars, and semibold title text
+    expect(htmlPlaying).toContain('data-current="true"');
+    expect(htmlPlaying).toContain('data-testid="queue-playing-indicator" data-playing="true"');
+    expect(htmlPlaying).toContain('animate-bar-1');
+    expect(htmlPlaying).toContain('animate-bar-2');
+    expect(htmlPlaying).toContain('animate-bar-3');
+    expect(htmlPlaying).toContain('font-semibold text-[var(--accent-primary)] dark:text-white');
+    // Inactive rows retain track numbers (1 and 3)
+    expect(htmlPlaying).toContain('>1</span>');
+    expect(htmlPlaying).toContain('>3</span>');
     // No persistent filled background, colored border, or drop shadow on active row
-    expect(html).not.toContain('bg-[var(--bg-active)]');
-    expect(html).not.toContain('dark:bg-indigo-600/25');
-    expect(html).not.toContain('border-[var(--accent-primary)]/30');
-    expect(html).not.toContain('shadow-sm');
+    expect(htmlPlaying).not.toContain('bg-[var(--bg-active)]');
+    expect(htmlPlaying).not.toContain('dark:bg-indigo-600/25');
+    expect(htmlPlaying).not.toContain('border-[var(--accent-primary)]/30');
+    expect(htmlPlaying).not.toContain('shadow-sm');
     // Accessible focus-visible indicator preserved
-    expect(html).toContain('focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50');
+    expect(htmlPlaying).toContain('focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50');
+
+    // Paused state: indicator stays visible but stops animating
+    const htmlPaused = renderToStaticMarkup(
+      <NowPlayingQueueTab
+        queue={tracks}
+        currentTrack={tracks[1]}
+        isPlaying={false}
+        isOpen={true}
+        isActiveTab={true}
+      />
+    );
+    expect(htmlPaused).toContain('data-testid="queue-playing-indicator" data-playing="false"');
+    expect(htmlPaused).not.toContain('animate-bar-1');
+    expect(htmlPaused).not.toContain('animate-bar-2');
+    expect(htmlPaused).not.toContain('animate-bar-3');
   });
 
   it('direct Queue click (playQueueTrack) navigates without reordering and preserves Prev/Next and session restoration', () => {

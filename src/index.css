@@ -224,3 +224,18 @@ body {
 .animate-bar-3 {
   animation: barBounce3 0.9s ease-in-out infinite;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-bar-1 {
+    animation: none;
+    height: 45%;
+  }
+  .animate-bar-2 {
+    animation: none;
+    height: 85%;
+  }
+  .animate-bar-3 {
+    animation: none;
+    height: 60%;
+  }
+}

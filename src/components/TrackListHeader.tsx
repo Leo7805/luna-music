@@ -1,3 +1,4 @@
+import React from 'react';
 import { Clock, CheckSquare, Square } from 'lucide-react';
 
 export interface TrackListHeaderProps {
@@ -5,6 +6,8 @@ export interface TrackListHeaderProps {
   selectedCount: number;
   isSelectMode: boolean;
   showCheckboxes: boolean;
+  hideTrackCount?: boolean;
+  beforeTable?: React.ReactNode;
   onToggleSelectMode: () => void;
   onToggleSelectAll: () => void;
   onPlayAll?: () => void;
@@ -16,6 +19,8 @@ export function TrackListHeader({
   selectedCount,
   isSelectMode,
   showCheckboxes,
+  hideTrackCount = false,
+  beforeTable,
   onToggleSelectMode,
   onToggleSelectAll,
   onPlayAll,
@@ -24,11 +29,18 @@ export function TrackListHeader({
   return (
     <>
       {/* Select Mode & Play All Toolbar Controls */}
-      <div className="flex items-center justify-between pb-2 px-1">
-        <div className="text-[11px] text-[var(--text-secondary)] dark:text-slate-500 font-medium">
-          {selectedCount > 0
-            ? `${selectedCount} of ${tracksCount} selected`
-            : `${tracksCount} tracks`}
+      <div
+        data-testid="tracklist-toolbar"
+        className="flex items-center justify-between pb-2 px-1"
+      >
+        <div className="text-xs text-[var(--text-secondary)] dark:text-slate-400 font-medium">
+          {selectedCount > 0 ? (
+            `${selectedCount} of ${tracksCount} selected`
+          ) : !hideTrackCount ? (
+            <span data-testid="tracklist-count">
+              {tracksCount} {tracksCount === 1 ? 'track' : 'tracks'}
+            </span>
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           {onPlayAll && (
@@ -56,6 +68,8 @@ export function TrackListHeader({
           </button>
         </div>
       </div>
+
+      {beforeTable}
 
       {/* Table Header */}
       <div className="grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] dark:text-slate-400 border-b border-[var(--border-subtle)] dark:border-white/[0.06] select-none">
