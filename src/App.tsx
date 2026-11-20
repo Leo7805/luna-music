@@ -141,6 +141,8 @@ export function App() {
           selectedPlaylistId={playlists.selectedPlaylistId}
           favouritesCount={library.favouritesCount}
           totalTracksCount={library.library?.flatPlaylist.length || 0}
+          albumsCount={library.albums.length}
+          artistsCount={library.artists.length}
           hasLibrary={hasLibrary}
           isScanning={library.isLoading}
           scanCount={library.scanProgress}
