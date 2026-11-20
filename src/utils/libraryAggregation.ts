@@ -157,6 +157,64 @@ export function deriveDisplayedTracks({
 }
 
 /**
+ * Safely merges incoming partial metadata into existing TrackMetadata without
+ * overwriting valid values with undefined, empty strings, invalid durations, or placeholders.
+ */
+export function mergeTrackMetadataSafely(
+  existing: TrackItem['metadata'],
+  incoming: Partial<TrackItem['metadata']>
+): TrackItem['metadata'] {
+  const next = { ...existing };
+
+  const incomingTitle = incoming.title?.trim();
+  if (incomingTitle) {
+    next.title = incomingTitle;
+  }
+
+  const incomingArtist = incoming.artist?.trim();
+  if (
+    incomingArtist &&
+    (incomingArtist !== 'Unknown Artist' || !existing.artist || existing.artist === 'Unknown Artist')
+  ) {
+    next.artist = incomingArtist;
+  }
+
+  const incomingAlbum = incoming.album?.trim();
+  if (
+    incomingAlbum &&
+    (incomingAlbum !== 'Unknown Album' || !existing.album || existing.album === 'Unknown Album')
+  ) {
+    next.album = incomingAlbum;
+  }
+
+  if (
+    typeof incoming.duration === 'number' &&
+    Number.isFinite(incoming.duration) &&
+    incoming.duration > 0
+  ) {
+    next.duration = incoming.duration;
+  }
+
+  if (incoming.trackNo !== undefined) next.trackNo = incoming.trackNo;
+  if (incoming.diskNo !== undefined) next.diskNo = incoming.diskNo;
+  if (incoming.year !== undefined && String(incoming.year).trim() !== '') {
+    next.year = incoming.year;
+  }
+  if (incoming.genre?.trim()) next.genre = incoming.genre.trim();
+  if (incoming.artworkUrl) next.artworkUrl = incoming.artworkUrl;
+  if (incoming.placeholderGradient && !existing.placeholderGradient) {
+    next.placeholderGradient = incoming.placeholderGradient;
+  }
+  if (incoming.codec?.trim()) next.codec = incoming.codec.trim();
+  if (typeof incoming.bitrate === 'number' && incoming.bitrate > 0) {
+    next.bitrate = incoming.bitrate;
+  }
+  next.isMetadataLoaded = existing.isMetadataLoaded || Boolean(incoming.isMetadataLoaded);
+
+  return next;
+}
+
+/**
  * Immutably updates a track's status, size, or metadata throughout the library structure.
  */
 export function updateTrackInLibrary(
@@ -172,13 +230,7 @@ export function updateTrackInLibrary(
       ...t,
       status,
       size: size !== undefined ? size : t.size,
-      metadata: metadata
-        ? {
-            ...t.metadata,
-            ...metadata,
-            isMetadataLoaded: true,
-          }
-        : t.metadata,
+      metadata: metadata ? mergeTrackMetadataSafely(t.metadata, metadata) : t.metadata,
     };
   };
 
@@ -207,7 +259,8 @@ export function updateTrackInLibrary(
 }
 
 /**
- * Immutably updates metadata for an individual track (used during background extraction).
+ * Immutably updates metadata for an individual track (used during background extraction or playback duration discovery).
+ * Never mutates track status, file size, or permissions.
  */
 export function updateTrackMetadataInLibrary(
   prevLib: MusicLibrary,
@@ -218,12 +271,7 @@ export function updateTrackMetadataInLibrary(
     if (t.id !== trackId && (!t.aliases || !t.aliases.includes(trackId))) return t;
     return {
       ...t,
-      metadata: {
-        ...t.metadata,
-        ...meta,
-        artworkUrl: meta.artworkUrl || t.metadata.artworkUrl,
-        isMetadataLoaded: true,
-      },
+      metadata: mergeTrackMetadataSafely(t.metadata, meta),
     };
   };
 

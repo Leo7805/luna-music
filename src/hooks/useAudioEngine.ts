@@ -9,12 +9,8 @@ export interface UseAudioEngineProps {
   initialMuted?: boolean;
   initialPosition?: number;
   currentTrack: TrackItem | null;
-  onTrackStatusChanged?: (
-    trackId: string,
-    status: FileStatus,
-    size?: number,
-    metadata?: Partial<TrackItem['metadata']>
-  ) => void;
+  onTrackStatusChanged?: (trackId: string, status: FileStatus, size?: number, metadata?: Partial<TrackItem['metadata']>) => void;
+  onTrackMetadataUpdated?: (trackId: string, metadata: Partial<TrackItem['metadata']>) => void;
   onTrackUpdated?: (track: TrackItem) => void;
   onEnded: () => void;
 }
@@ -52,6 +48,7 @@ export function useAudioEngine({
   initialPosition = 0,
   currentTrack,
   onTrackStatusChanged,
+  onTrackMetadataUpdated,
   onTrackUpdated,
   onEnded,
 }: UseAudioEngineProps): UseAudioEngineReturn {
@@ -66,12 +63,16 @@ export function useAudioEngine({
   const activeUrlRef = useRef<string | null>(null);
   const pendingSeekRef = useRef<number | null>(initialPosition > 0 ? initialPosition : null);
   const loadRequestIdRef = useRef<number>(0);
+  const loadedAudioTrackIdRef = useRef<string | null>(null);
 
   const currentTrackRef = useRef<TrackItem | null>(currentTrack);
   currentTrackRef.current = currentTrack;
 
   const onTrackStatusChangedRef = useRef(onTrackStatusChanged);
   onTrackStatusChangedRef.current = onTrackStatusChanged;
+
+  const onTrackMetadataUpdatedRef = useRef(onTrackMetadataUpdated);
+  onTrackMetadataUpdatedRef.current = onTrackMetadataUpdated;
 
   const onTrackUpdatedRef = useRef(onTrackUpdated);
   onTrackUpdatedRef.current = onTrackUpdated;
@@ -98,6 +99,7 @@ export function useAudioEngine({
     }
 
     const requestId = ++loadRequestIdRef.current;
+    loadedAudioTrackIdRef.current = null;
     setPlaybackError(null);
 
     // Revoke previous blob object URL to free memory safely
@@ -158,9 +160,7 @@ export function useAudioEngine({
       if (file.size === 0) {
         track.status = 'empty';
         track.size = 0;
-        if (onTrackStatusChangedRef.current) {
-          onTrackStatusChangedRef.current(track.id, 'empty', 0);
-        }
+        if (onTrackStatusChangedRef.current) onTrackStatusChangedRef.current(track.id, 'empty', 0);
         audio.pause();
         audio.removeAttribute('src');
         audio.load();
@@ -201,9 +201,7 @@ export function useAudioEngine({
               ...extracted,
               isMetadataLoaded: true,
             };
-            if (onTrackUpdatedRef.current) {
-              onTrackUpdatedRef.current({ ...track });
-            }
+            if (onTrackUpdatedRef.current) onTrackUpdatedRef.current({ ...track });
           }
         } catch {
           // Ignore metadata parse error on raw audio
@@ -211,15 +209,14 @@ export function useAudioEngine({
 
         if (loadRequestIdRef.current !== requestId) return;
 
-        if (onTrackStatusChangedRef.current) {
-          onTrackStatusChangedRef.current(track.id, 'normal', file.size, freshMetadata);
-        }
+        if (onTrackStatusChangedRef.current) onTrackStatusChangedRef.current(track.id, 'normal', file.size, freshMetadata);
       }
 
       if (loadRequestIdRef.current !== requestId) return;
 
       const objectUrl = URL.createObjectURL(file);
       activeUrlRef.current = objectUrl;
+      loadedAudioTrackIdRef.current = track.id;
       audio.src = objectUrl;
       audio.load();
 
@@ -355,10 +352,18 @@ export function useAudioEngine({
     const onPlay = () => setIsPlaying(true);
     const onPause = () => setIsPlaying(false);
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
-    const onDurationChange = () => setDuration(audio.duration || 0);
-
+    const syncMeasuredDuration = (measured: number) => {
+      if (!Number.isFinite(measured) || measured <= 0) return;
+      setDuration(measured);
+      const activeTrack = currentTrackRef.current;
+      if (!activeTrack || loadedAudioTrackIdRef.current !== activeTrack.id) return;
+      const existing = activeTrack.metadata.duration;
+      if (typeof existing === 'number' && Number.isFinite(existing) && existing > 0 && Math.abs(existing - measured) < 0.5) return;
+      onTrackMetadataUpdatedRef.current?.(activeTrack.id, { duration: measured });
+    };
+    const onDurationChange = () => syncMeasuredDuration(audio.duration);
     const onLoadedMetadata = () => {
-      setDuration(audio.duration || 0);
+      syncMeasuredDuration(audio.duration);
       if (pendingSeekRef.current !== null) {
         audio.currentTime = pendingSeekRef.current;
         setCurrentTime(pendingSeekRef.current);
@@ -425,6 +430,7 @@ export function useAudioEngine({
   // Cleanly stop playback and reset audio element without leaving stale source/state
   const stopPlayback = useCallback(() => {
     loadRequestIdRef.current++;
+    loadedAudioTrackIdRef.current = null;
     pendingSeekRef.current = null;
     if (activeUrlRef.current) {
       URL.revokeObjectURL(activeUrlRef.current);

@@ -67,7 +67,7 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
   try {
     const parsed = await parseBlob(file, {
       duration: true,
-      skipPostHeaders: true,
+      skipPostHeaders: false,
     });
 
     const common = parsed.common;
@@ -99,20 +99,22 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
     const codec = format.codec;
     const bitrate = format.bitrate;
 
-    return {
-      title: title || undefined,
-      artist: artist || undefined,
-      album: album || undefined,
-      duration: duration && duration > 0 ? duration : undefined,
-      trackNo: trackNo || undefined,
-      diskNo: diskNo || undefined,
-      year: year || undefined,
-      genre: genre || undefined,
-      artworkUrl,
-      codec,
-      bitrate,
-      isMetadataLoaded: true,
-    };
+    const result: Partial<TrackMetadata> = { isMetadataLoaded: true };
+    if (title) result.title = title;
+    if (artist) result.artist = artist;
+    if (album) result.album = album;
+    if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
+      result.duration = duration;
+    }
+    if (trackNo) result.trackNo = trackNo;
+    if (diskNo) result.diskNo = diskNo;
+    if (year) result.year = year;
+    if (genre) result.genre = genre;
+    if (artworkUrl) result.artworkUrl = artworkUrl;
+    if (codec) result.codec = codec;
+    if (bitrate) result.bitrate = bitrate;
+
+    return result;
   } catch {
     // If parsing fails, retain fallback metadata
     return {

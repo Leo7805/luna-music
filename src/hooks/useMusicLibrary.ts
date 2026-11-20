@@ -9,6 +9,7 @@ import {
   deriveArtists,
   deriveDisplayedTracks,
   updateTrackInLibrary,
+  updateTrackMetadataInLibrary,
 } from '../utils/libraryAggregation';
 import { useLibraryNavigation } from './useLibraryNavigation';
 import { useLibraryFavourites } from './useLibraryFavourites';
@@ -113,6 +114,17 @@ export function useMusicLibrary() {
     []
   );
 
+  // Update track metadata only across the library tree without altering status or size
+  const updateTrackMetadata = useCallback(
+    (trackId: string, metadata: Partial<TrackItem['metadata']>) => {
+      setLibrary((prevLib) => {
+        if (!prevLib) return null;
+        return updateTrackMetadataInLibrary(prevLib, trackId, metadata);
+      });
+    },
+    []
+  );
+
   return {
     library,
     folders: library?.folders || [],
@@ -154,5 +166,6 @@ export function useMusicLibrary() {
     requestPermissionAndLoad: initialization.requestPermissionAndLoad,
     requestPermissionForFolder: initialization.requestPermissionForFolder,
     updateTrackStatus,
+    updateTrackMetadata,
   };
 }

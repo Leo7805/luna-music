@@ -11,6 +11,14 @@ import {
   getPrevTrackToPlay,
   PlayNowResult,
 } from '../utils/musicTree';
+import {
+  ShufflePlaybackState,
+  MAX_SHUFFLE_HISTORY,
+  createShuffleState,
+  recordShuffleTrack,
+  pickNextShuffledTrack,
+  stepBackwardInHistory,
+} from '../utils/shufflePlayback';
 
 export interface UsePlaybackQueueProps {
   initialQueue?: TrackItem[];
@@ -54,9 +62,12 @@ export interface UsePlaybackQueueReturn {
   ) => TrackItem | null;
   getPrevTrack: (
     currentTrack: TrackItem | null,
-    repeatMode: RepeatMode
+    repeatMode: RepeatMode,
+    shuffle?: boolean
   ) => { targetTrack: TrackItem | null; shouldRestartCurrent: boolean };
   clearPlayNextOverride: () => void;
+  recordPlayedTrack: (track: TrackItem | null, truncateForward?: boolean) => void;
+  resetShuffleCycle: (currentTrack: TrackItem | null) => void;
 }
 
 /**
@@ -71,9 +82,36 @@ export function usePlaybackQueue({
   queueRef.current = queue;
 
   const playNextTrackIdRef = useRef<string | null>(null);
+  const shuffleStateRef = useRef<ShufflePlaybackState>(createShuffleState());
 
   const clearPlayNextOverride = useCallback(() => {
     playNextTrackIdRef.current = null;
+  }, []);
+
+  const recordPlayedTrack = useCallback(
+    (track: TrackItem | null, truncateForward = true) => {
+      if (!track) return;
+      const cap = Math.max(MAX_SHUFFLE_HISTORY, queueRef.current.length * 2);
+      shuffleStateRef.current = recordShuffleTrack(
+        shuffleStateRef.current,
+        track.id,
+        truncateForward,
+        cap
+      );
+    },
+    []
+  );
+
+  const resetShuffleCycle = useCallback((currentTrack: TrackItem | null) => {
+    const prev = shuffleStateRef.current;
+    if (prev.history.length === 0 && currentTrack) {
+      shuffleStateRef.current = createShuffleState(currentTrack.id);
+    } else {
+      shuffleStateRef.current = {
+        ...prev,
+        playedIds: new Set(currentTrack ? [currentTrack.id] : []),
+      };
+    }
   }, []);
 
   const setQueueImmediate = useCallback((newQueue: TrackItem[]) => {
@@ -281,7 +319,7 @@ export function usePlaybackQueue({
     });
   }, []);
 
-  // Compute next track using queue algorithms
+  // Compute next track using Play Next overrides, Shuffle cycle/history, and Repeat modes
   const getNextTrack = useCallback(
     (
       currentTrack: TrackItem | null,
@@ -291,32 +329,77 @@ export function usePlaybackQueue({
       const currentList = queueRef.current;
       if (currentList.length === 0) return null;
 
-      const { nextTrack: targetTrack, shouldClearOverride } = getNextTrackToPlay(
-        currentList,
-        currentTrack,
-        shuffle,
-        repeatMode,
-        playNextTrackIdRef.current
-      );
-
-      if (shouldClearOverride) {
-        playNextTrackIdRef.current = null;
+      // 1. Manual Play Next override always takes priority over Shuffle & forward history
+      if (playNextTrackIdRef.current) {
+        const { nextTrack: overrideTrack, shouldClearOverride } = getNextTrackToPlay(
+          currentList,
+          currentTrack,
+          false,
+          repeatMode,
+          playNextTrackIdRef.current
+        );
+        if (shouldClearOverride) {
+          playNextTrackIdRef.current = null;
+        }
+        if (overrideTrack) {
+          recordPlayedTrack(overrideTrack, true);
+          return overrideTrack;
+        }
       }
 
-      return targetTrack;
+      // 2. Shuffle ON: follow forward history or pick random unplayed track without reordering Queue
+      if (shuffle) {
+        const { nextTrack, nextState } = pickNextShuffledTrack(
+          shuffleStateRef.current,
+          currentList,
+          currentTrack,
+          repeatMode
+        );
+        shuffleStateRef.current = nextState;
+        return nextTrack;
+      }
+
+      // 3. Shuffle OFF: normal sequential Queue order
+      const { nextTrack: seqTrack } = getNextTrackToPlay(
+        currentList,
+        currentTrack,
+        false,
+        repeatMode,
+        null
+      );
+      if (seqTrack) {
+        recordPlayedTrack(seqTrack, true);
+      }
+      return seqTrack;
     },
-    []
+    [recordPlayedTrack]
   );
 
-  // Compute previous track in queue
+  // Compute previous track: actual listening history in Shuffle mode, or sequential order when Shuffle OFF
   const getPrevTrack = useCallback(
     (
       currentTrack: TrackItem | null,
-      repeatMode: RepeatMode
+      repeatMode: RepeatMode,
+      shuffle = false
     ): { targetTrack: TrackItem | null; shouldRestartCurrent: boolean } => {
-      return getPrevTrackToPlay(queueRef.current, currentTrack, repeatMode);
+      if (shuffle) {
+        const { track, nextState } = stepBackwardInHistory(
+          shuffleStateRef.current,
+          queueRef.current,
+          currentTrack
+        );
+        if (track) {
+          shuffleStateRef.current = nextState;
+          return { targetTrack: track, shouldRestartCurrent: false };
+        }
+      }
+      const prevRes = getPrevTrackToPlay(queueRef.current, currentTrack, repeatMode);
+      if (prevRes.targetTrack) {
+        recordPlayedTrack(prevRes.targetTrack, true);
+      }
+      return prevRes;
     },
-    []
+    [recordPlayedTrack]
   );
 
   return {
@@ -336,5 +419,7 @@ export function usePlaybackQueue({
     getNextTrack,
     getPrevTrack,
     clearPlayNextOverride,
+    recordPlayedTrack,
+    resetShuffleCycle,
   };
 }

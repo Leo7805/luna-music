@@ -46,6 +46,7 @@ export function App() {
   const audioPlayer = useAudioPlayer({
     libraryTracks,
     onTrackStatusChanged: library.updateTrackStatus,
+    onTrackMetadataUpdated: library.updateTrackMetadata,
   });
 
   // Keyboard shortcuts dispatcher

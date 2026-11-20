@@ -5,8 +5,6 @@ import { isTrackPlayable } from '../utils/audioFileTypes';
 import { resolveInitialQueue, resolveInitialTrack } from '../utils/playbackSession';
 import {
   reconcileQueueWithLibrary,
-  shuffleUpcomingTracks,
-  restoreUnshuffledOrder,
   computeQueueRemovalTransition,
 } from '../utils/queueMetadata';
 import {
@@ -36,6 +34,10 @@ export interface UseAudioPlayerProps {
     size?: number,
     metadata?: Partial<TrackItem['metadata']>
   ) => void;
+  onTrackMetadataUpdated?: (
+    trackId: string,
+    metadata: Partial<TrackItem['metadata']>
+  ) => void;
 }
 
 /**
@@ -54,6 +56,7 @@ export function useAudioPlayer({
   initialTrackId = null,
   initialPosition = 0,
   onTrackStatusChanged,
+  onTrackMetadataUpdated,
 }: UseAudioPlayerProps = {}) {
   // Synchronous restoration from localStorage cache for instant hydration
   const syncState = getStoredPlaybackStateSync();
@@ -89,7 +92,6 @@ export function useAudioPlayer({
   const lastPlayRequestRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
   const currentTrackRef = useRef<TrackItem | null>(currentTrack);
   currentTrackRef.current = currentTrack;
-  const unshuffledOrderRef = useRef<string[]>([]);
 
   // Queue state and algorithms
   const queueControls = usePlaybackQueue({ initialQueue: resolvedInitialQueue, playlist });
@@ -105,6 +107,7 @@ export function useAudioPlayer({
     initialPosition: effectiveInitialPosition,
     currentTrack,
     onTrackStatusChanged,
+    onTrackMetadataUpdated,
     onTrackUpdated: setCurrentTrack,
     onEnded: () => {
       if (prefs.repeatModeRef.current === 'one') {
@@ -156,6 +159,7 @@ export function useAudioPlayer({
 
       if (targetTrack) {
         setCurrentTrack(targetTrack);
+        queueControls.resetShuffleCycle(targetTrack);
         loadAudioSource(targetTrack, false);
       }
     }
@@ -179,12 +183,18 @@ export function useAudioPlayer({
 
   // Navigate to track without reordering or mutating the queue
   const navigateToTrack = useCallback(
-    (track: TrackItem, autoPlay = true) => {
+    (track: TrackItem, autoPlay = true, recordHistory = true) => {
       clearPlayNextOverride();
+      if (recordHistory) {
+        if (currentTrackRef.current) {
+          queueControls.recordPlayedTrack(currentTrackRef.current, false);
+        }
+        queueControls.recordPlayedTrack(track, true);
+      }
       setCurrentTrack(track);
       loadAudioSource(track, autoPlay);
     },
-    [clearPlayNextOverride, loadAudioSource]
+    [clearPlayNextOverride, queueControls, loadAudioSource]
   );
 
   // Direct click on a Queue row: jump to its existing position without reordering
@@ -255,6 +265,10 @@ export function useAudioPlayer({
       }
 
       // action === 'play'
+      if (currentTrackRef.current) {
+        queueControls.recordPlayedTrack(currentTrackRef.current, false);
+      }
+      queueControls.recordPlayedTrack(result.nextTrack, true);
       setCurrentTrack(result.nextTrack);
       loadAudioSource(result.nextTrack, autoPlay);
     },
@@ -285,12 +299,10 @@ export function useAudioPlayer({
       clearPlayNextOverride();
       if (tracks.length === 0) return;
 
-      const shouldShuffle =
+      const explicitShuffle =
         typeof optionsOrShuffle === 'boolean'
-          ? optionsOrShuffle || prefs.shuffleRef.current
-          : optionsOrShuffle?.shuffle !== undefined
-          ? optionsOrShuffle.shuffle
-          : prefs.shuffleRef.current;
+          ? optionsOrShuffle
+          : Boolean(optionsOrShuffle?.shuffle);
       const autoPlay =
         typeof optionsOrShuffle === 'object' && typeof optionsOrShuffle.autoPlay === 'boolean'
           ? optionsOrShuffle.autoPlay
@@ -300,7 +312,7 @@ export function useAudioPlayer({
       const playable = tracks.filter(isTrackPlayable);
       if (playable.length === 0) return;
 
-      // Deduplicate using canonical Track Identity
+      // Deduplicate using canonical Track Identity while keeping visible Queue order stable
       const uniqueTracks: TrackItem[] = [];
       for (const track of playable) {
         if (!uniqueTracks.some((existing) => isSameTrack(existing, track))) {
@@ -309,32 +321,20 @@ export function useAudioPlayer({
       }
       if (uniqueTracks.length === 0) return;
 
-      let queueTracks = [...uniqueTracks];
-      let targetIndex = Math.min(Math.max(0, startIndex), queueTracks.length - 1);
+      const targetIndex = explicitShuffle
+        ? Math.floor(Math.random() * uniqueTracks.length)
+        : Math.min(Math.max(0, startIndex), uniqueTracks.length - 1);
 
-      if (shouldShuffle) {
-        unshuffledOrderRef.current = uniqueTracks.map((t) => t.id);
-        const startTrack = queueTracks[targetIndex] || queueTracks[0];
-        const remaining = queueTracks.filter((_, idx) => idx !== targetIndex);
-        for (let i = remaining.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
-        }
-        queueTracks = [startTrack, ...remaining];
-        targetIndex = 0;
-      } else {
-        unshuffledOrderRef.current = [];
-      }
-
-      setQueueImmediate(queueTracks);
-      const target = queueTracks[targetIndex] || queueTracks[0];
+      setQueueImmediate(uniqueTracks);
+      const target = uniqueTracks[targetIndex] || uniqueTracks[0];
+      queueControls.resetShuffleCycle(target);
       setCurrentTrack(target);
       loadAudioSource(target, autoPlay);
     },
-    [clearPlayNextOverride, setQueueImmediate, loadAudioSource]
+    [clearPlayNextOverride, setQueueImmediate, queueControls, loadAudioSource]
   );
 
-  // Advance to next track in queue
+  // Advance to next track in queue (respects Play Next, Shuffle history/cycle, and Repeat)
   const nextTrack = useCallback(() => {
     const targetTrack = queueControls.getNextTrack(
       currentTrackRef.current,
@@ -343,7 +343,7 @@ export function useAudioPlayer({
     );
 
     if (targetTrack) {
-      navigateToTrack(targetTrack);
+      navigateToTrack(targetTrack, true, false);
     } else {
       audioEngine.setIsPlaying(false);
     }
@@ -351,7 +351,7 @@ export function useAudioPlayer({
 
   nextTrackRef.current = nextTrack;
 
-  // Return to previous track in queue
+  // Return to previous track (uses listening history in Shuffle mode, sequential otherwise)
   const prevTrack = useCallback(() => {
     const audio = audioEngine.audioRef.current;
     if (audio && audio.currentTime > 3) {
@@ -361,15 +361,16 @@ export function useAudioPlayer({
 
     const { targetTrack, shouldRestartCurrent } = queueControls.getPrevTrack(
       currentTrackRef.current,
-      prefs.repeatModeRef.current
+      prefs.repeatModeRef.current,
+      prefs.shuffleRef.current
     );
 
     if (targetTrack) {
-      navigateToTrack(targetTrack);
+      navigateToTrack(targetTrack, true, false);
     } else if (shouldRestartCurrent) {
       audioEngine.seekTo(0);
     }
-  }, [audioEngine, queueControls, navigateToTrack, prefs.repeatModeRef]);
+  }, [audioEngine, queueControls, navigateToTrack, prefs.repeatModeRef, prefs.shuffleRef]);
 
   // Toggle play/pause
   const togglePlay = useCallback(() => {
@@ -432,16 +433,10 @@ export function useAudioPlayer({
   const toggleShuffle = useCallback(() => {
     const nextShuffle = !prefs.shuffleRef.current;
     prefs.toggleShuffle();
-    const list = queueControls.queueRef.current;
-    if (list.length <= 1) return;
     if (nextShuffle) {
-      unshuffledOrderRef.current = list.map((t) => t.id);
-      setQueueImmediate(shuffleUpcomingTracks(list, currentTrackRef.current));
-    } else if (unshuffledOrderRef.current.length > 0) {
-      setQueueImmediate(restoreUnshuffledOrder(list, unshuffledOrderRef.current));
-      unshuffledOrderRef.current = [];
+      queueControls.resetShuffleCycle(currentTrackRef.current);
     }
-  }, [prefs, queueControls.queueRef, setQueueImmediate]);
+  }, [prefs, queueControls]);
 
   const removeTracksFromQueue = useCallback(
     (indices: number[]) => queueControls.removeTracksFromQueue(indices, currentTrackRef.current),

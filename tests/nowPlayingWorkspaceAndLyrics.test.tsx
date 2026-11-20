@@ -8,11 +8,8 @@ import { usePlaybackQueue } from '../src/hooks/usePlaybackQueue';
 import { getStoredNavigation, storeNavigation } from '../src/utils/navigationStorage';
 import {
   reconcileQueueWithLibrary,
-  shuffleUpcomingTracks,
-  restoreUnshuffledOrder,
   computeQueueRemovalTransition,
 } from '../src/utils/queueMetadata';
-import { getNextTrackToPlay } from '../src/utils/queueAlgorithms';
 import { TrackItem, LrcLine } from '../src/types/music';
 
 function renderHookSync<T>(useHook: () => T): T {
@@ -195,27 +192,6 @@ describe('Now Playing Workspace & Dedicated Lyrics Panel', () => {
     expect(afterClose?.view).toBe('playlists');
     expect(afterClose?.selectedPlaylistId).toBe('pl-roadtrip');
     expect(afterClose?.isNowPlayingView).toBe(false);
-  });
-
-  it('Shuffle ON shuffles upcoming tracks in-place so displayed Queue matches Next order, and Shuffle OFF restores original order', () => {
-    const t5 = makeTrack('t-5', '稻香', '周杰伦', '魔杰座');
-    const ordered = [t1, t2, t3, t4, t5];
-    const originalIds = ordered.map((t) => t.id);
-
-    // Deterministic RNG for predictable test
-    const shuffled = shuffleUpcomingTracks(ordered, t2, () => 0);
-    // History [t1] and current [t2] remain in place
-    expect(shuffled[0].id).toBe(t1.id);
-    expect(shuffled[1].id).toBe(t2.id);
-    // Upcoming tracks [t3, t4, t5] were shuffled
-    expect(shuffled.slice(2).map((t) => t.id)).not.toEqual([t3.id, t4.id, t5.id]);
-    // Next track strictly matches displayed Queue position index + 1 (no random distant jumps!)
-    const { nextTrack } = getNextTrackToPlay(shuffled, t2, true, 'off', null);
-    expect(nextTrack?.id).toBe(shuffled[2].id);
-
-    // Toggling Shuffle OFF restores original relative order
-    const restored = restoreUnshuffledOrder(shuffled, originalIds);
-    expect(restored.map((t) => t.id)).toEqual(originalIds);
   });
 
   it('reconciles Queue durations and delayed metadata from canonical library tracks and aliases without unnecessary copies', () => {
