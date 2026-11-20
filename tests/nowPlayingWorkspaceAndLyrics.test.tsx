@@ -1,10 +1,18 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NowPlayingView } from '../src/components/NowPlayingView';
+import { NowPlayingQueueRow } from '../src/components/NowPlayingQueueRow';
 import { LyricsPanel } from '../src/components/NowPlayingPanel';
 import { TrackInfoModal } from '../src/components/TrackInfoModal';
 import { usePlaybackQueue } from '../src/hooks/usePlaybackQueue';
 import { getStoredNavigation, storeNavigation } from '../src/utils/navigationStorage';
+import {
+  reconcileQueueWithLibrary,
+  shuffleUpcomingTracks,
+  restoreUnshuffledOrder,
+  computeQueueRemovalTransition,
+} from '../src/utils/queueMetadata';
+import { getNextTrackToPlay } from '../src/utils/queueAlgorithms';
 import { TrackItem, LrcLine } from '../src/types/music';
 
 function renderHookSync<T>(useHook: () => T): T {
@@ -187,5 +195,142 @@ describe('Now Playing Workspace & Dedicated Lyrics Panel', () => {
     expect(afterClose?.view).toBe('playlists');
     expect(afterClose?.selectedPlaylistId).toBe('pl-roadtrip');
     expect(afterClose?.isNowPlayingView).toBe(false);
+  });
+
+  it('Shuffle ON shuffles upcoming tracks in-place so displayed Queue matches Next order, and Shuffle OFF restores original order', () => {
+    const t5 = makeTrack('t-5', '稻香', '周杰伦', '魔杰座');
+    const ordered = [t1, t2, t3, t4, t5];
+    const originalIds = ordered.map((t) => t.id);
+
+    // Deterministic RNG for predictable test
+    const shuffled = shuffleUpcomingTracks(ordered, t2, () => 0);
+    // History [t1] and current [t2] remain in place
+    expect(shuffled[0].id).toBe(t1.id);
+    expect(shuffled[1].id).toBe(t2.id);
+    // Upcoming tracks [t3, t4, t5] were shuffled
+    expect(shuffled.slice(2).map((t) => t.id)).not.toEqual([t3.id, t4.id, t5.id]);
+    // Next track strictly matches displayed Queue position index + 1 (no random distant jumps!)
+    const { nextTrack } = getNextTrackToPlay(shuffled, t2, true, 'off', null);
+    expect(nextTrack?.id).toBe(shuffled[2].id);
+
+    // Toggling Shuffle OFF restores original relative order
+    const restored = restoreUnshuffledOrder(shuffled, originalIds);
+    expect(restored.map((t) => t.id)).toEqual(originalIds);
+  });
+
+  it('reconciles Queue durations and delayed metadata from canonical library tracks and aliases without unnecessary copies', () => {
+    const staleTrack: TrackItem = {
+      ...t1,
+      id: 'alias-t1',
+      metadata: { ...t1.metadata, duration: undefined, isMetadataLoaded: false },
+    };
+    const canonicalTrack: TrackItem = {
+      ...t1,
+      aliases: ['alias-t1'],
+      metadata: { ...t1.metadata, duration: 255, isMetadataLoaded: true },
+    };
+    const missingDurTrack: TrackItem = {
+      ...t2,
+      metadata: { ...t2.metadata, duration: undefined, isMetadataLoaded: true },
+    };
+
+    const queue = [staleTrack, missingDurTrack];
+    const reconciled = reconcileQueueWithLibrary(queue, [canonicalTrack, missingDurTrack]);
+
+    expect(reconciled).not.toBe(queue);
+    expect(reconciled[0].metadata.duration).toBe(255);
+    expect(reconciled[1].metadata.duration).toBeUndefined();
+
+    // Calling again when already reconciled returns the exact same reference (no extra re-renders)
+    const secondPass = reconcileQueueWithLibrary(reconciled, [canonicalTrack, missingDurTrack]);
+    expect(secondPass).toBe(reconciled);
+  });
+
+  it('renders clean context menus: Play Now + Play Next for non-current; Add to Playlist + Track Info + Remove from Queue (no Playing) for current', () => {
+    const htmlNonCurrent = renderToStaticMarkup(
+      <NowPlayingQueueRow
+        track={t3}
+        originalIndex={2}
+        isCurrent={false}
+        isPlaying={true}
+        isSelectMode={false}
+        isSelected={false}
+        isMenuOpen={true}
+        onPlayQueueTrack={() => {}}
+        onToggleSelect={() => {}}
+        onToggleMenu={() => {}}
+        onPlayNext={() => {}}
+        onAddToPlaylist={() => {}}
+        onOpenTrackInfo={() => {}}
+        onRemoveFromQueue={() => {}}
+      />
+    );
+    expect(htmlNonCurrent).toContain('Play Now');
+    expect(htmlNonCurrent).toContain('Play Next');
+    expect(htmlNonCurrent).toContain('Add to Playlist');
+    expect(htmlNonCurrent).toContain('Track Info');
+    expect(htmlNonCurrent).toContain('Remove from Queue');
+    expect(htmlNonCurrent).not.toContain('Jump to Track');
+
+    const htmlCurrent = renderToStaticMarkup(
+      <NowPlayingQueueRow
+        track={t2}
+        originalIndex={1}
+        isCurrent={true}
+        isPlaying={true}
+        isSelectMode={false}
+        isSelected={false}
+        isMenuOpen={true}
+        onPlayQueueTrack={() => {}}
+        onToggleSelect={() => {}}
+        onToggleMenu={() => {}}
+        onPlayNext={() => {}}
+        onAddToPlaylist={() => {}}
+        onOpenTrackInfo={() => {}}
+        onRemoveFromQueue={() => {}}
+      />
+    );
+    expect(htmlCurrent).not.toContain('>Playing<');
+    expect(htmlCurrent).not.toContain('>Play Now<');
+    expect(htmlCurrent).not.toContain('>Play Next<');
+    expect(htmlCurrent).toContain('Add to Playlist');
+    expect(htmlCurrent).toContain('Track Info');
+    expect(htmlCurrent).toContain('Remove from Queue');
+  });
+
+  it('computes accurate Queue removal transitions for non-current, middle current, final current, and only track', () => {
+    // 1. Removing non-current keeps playback uninterrupted
+    const nonCur = computeQueueRemovalTransition(sampleQueue, 0, t2, 'off');
+    expect(nonCur.wasCurrent).toBe(false);
+    expect(nonCur.shouldStop).toBe(false);
+    expect(nonCur.nextTrack?.id).toBe(t2.id);
+    expect(nonCur.nextQueue.map((t) => t.id)).toEqual([t2.id, t3.id, t4.id]);
+
+    // 2. Removing middle current track B in [A, B, C, D] advances to C
+    const midCur = computeQueueRemovalTransition(sampleQueue, 1, t2, 'off');
+    expect(midCur.wasCurrent).toBe(true);
+    expect(midCur.shouldStop).toBe(false);
+    expect(midCur.nextTrack?.id).toBe(t3.id);
+    expect(midCur.nextQueue.map((t) => t.id)).toEqual([t1.id, t3.id, t4.id]);
+
+    // 3. Removing final current track with repeat OFF stops cleanly
+    const finalOff = computeQueueRemovalTransition(sampleQueue, 3, t4, 'off');
+    expect(finalOff.wasCurrent).toBe(true);
+    expect(finalOff.shouldStop).toBe(true);
+    expect(finalOff.nextTrack).toBeNull();
+    expect(finalOff.nextQueue.map((t) => t.id)).toEqual([t1.id, t2.id, t3.id]);
+
+    // 4. Removing final current track with repeat ALL wraps to first track
+    const finalAll = computeQueueRemovalTransition(sampleQueue, 3, t4, 'all');
+    expect(finalAll.wasCurrent).toBe(true);
+    expect(finalAll.shouldStop).toBe(false);
+    expect(finalAll.nextTrack?.id).toBe(t1.id);
+
+    // 5. Removing the only track empties Queue and stops cleanly
+    const onlyTrack = computeQueueRemovalTransition([t1], 0, t1, 'all');
+    expect(onlyTrack.wasCurrent).toBe(true);
+    expect(onlyTrack.shouldStop).toBe(true);
+    expect(onlyTrack.nextTrack).toBeNull();
+    expect(onlyTrack.nextQueue).toEqual([]);
   });
 });

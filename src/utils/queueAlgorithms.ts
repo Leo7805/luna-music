@@ -300,7 +300,7 @@ export function applyAddToQueue(
 export function getNextTrackToPlay(
   queue: TrackItem[],
   currentTrack: TrackItem | null,
-  shuffle: boolean,
+  _shuffle: boolean,
   repeatMode: RepeatMode,
   playNextTrackId: string | null
 ): { nextTrack: TrackItem | null; shouldClearOverride: boolean } {
@@ -309,7 +309,7 @@ export function getNextTrackToPlay(
 
   const currentIndex = queue.findIndex((t) => isSameTrack(t, currentTrack));
 
-  // 1. Play Next override takes precedence over shuffle
+  // 1. Play Next override takes precedence
   if (playNextTrackId) {
     const nextIdx = currentIndex >= 0 ? currentIndex + 1 : 0;
     if (
@@ -330,19 +330,7 @@ export function getNextTrackToPlay(
     }
   }
 
-  // 2. Shuffle mode (when no Play Next override)
-  if (shuffle) {
-    const otherIndices = queue
-      .map((_, i) => i)
-      .filter((i) => !isSameTrack(queue[i], currentTrack));
-    const nextIndex =
-      otherIndices.length > 0
-        ? otherIndices[Math.floor(Math.random() * otherIndices.length)]
-        : 0;
-    return { nextTrack: queue[nextIndex], shouldClearOverride: false };
-  }
-
-  // 3. Normal queue progression
+  // 2. Follow the single authoritative effective Queue order (normal or pre-shuffled)
   if (currentIndex === -1 || currentIndex === queue.length - 1) {
     if (repeatMode === 'all') {
       return { nextTrack: queue[0], shouldClearOverride: false };

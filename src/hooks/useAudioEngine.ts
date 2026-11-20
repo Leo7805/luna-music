@@ -31,6 +31,7 @@ export interface UseAudioEngineReturn {
   playbackError: string | null;
   setPlaybackError: (err: string | null) => void;
   loadAudioSource: (track: TrackItem, autoPlay?: boolean) => Promise<void>;
+  stopPlayback: () => void;
   togglePlay: (onPlayFallback: () => void) => void;
   seekTo: (timeInSeconds: number) => void;
   seekRelative: (deltaSeconds: number) => void;
@@ -421,6 +422,26 @@ export function useAudioEngine({
     };
   }, []);
 
+  // Cleanly stop playback and reset audio element without leaving stale source/state
+  const stopPlayback = useCallback(() => {
+    loadRequestIdRef.current++;
+    pendingSeekRef.current = null;
+    if (activeUrlRef.current) {
+      URL.revokeObjectURL(activeUrlRef.current);
+      activeUrlRef.current = null;
+    }
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    }
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setPlaybackError(null);
+  }, []);
+
   // Clean up on component unmount safely without setting audio.src = ''
   useEffect(() => {
     return () => {
@@ -448,6 +469,7 @@ export function useAudioEngine({
     playbackError,
     setPlaybackError,
     loadAudioSource,
+    stopPlayback,
     togglePlay,
     seekTo,
     seekRelative,

@@ -19,7 +19,7 @@ import { PlaylistModal } from './PlaylistModal';
 import { TrackPlaylistModals } from './TrackPlaylistModals';
 import { TrackInfoModal } from './TrackInfoModal';
 import { NowPlayingQueueRow } from './NowPlayingQueueRow';
-import { calculateQueueScrollOffset } from './NowPlayingQueueTab';
+import { calculateQueueScrollOffset } from '../utils/queueScroll';
 
 export interface NowPlayingViewProps {
   queue: TrackItem[];

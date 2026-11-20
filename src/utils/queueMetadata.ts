@@ -1,0 +1,214 @@
+import { TrackItem, RepeatMode } from '../types/music';
+import { isSameTrack } from './trackIdentity';
+import { isTrackPlayable } from './audioFileTypes';
+
+/**
+ * Reconciles Queue track snapshots with the authoritative canonical libraryTracks
+ * so resolved durations, artwork, titles, and lyrics stay in sync without re-reading files.
+ * Returns the original array reference if nothing changed.
+ */
+export function reconcileQueueWithLibrary(
+  queue: TrackItem[],
+  libraryTracks: TrackItem[]
+): TrackItem[] {
+  if (queue.length === 0 || libraryTracks.length === 0) return queue;
+
+  const canonicalMap = new Map<string, TrackItem>();
+  for (const libTrack of libraryTracks) {
+    canonicalMap.set(libTrack.id, libTrack);
+    if (libTrack.aliases) {
+      for (const alias of libTrack.aliases) {
+        if (!canonicalMap.has(alias)) {
+          canonicalMap.set(alias, libTrack);
+        }
+      }
+    }
+  }
+
+  let changed = false;
+  const updated = queue.map((qTrack) => {
+    let canonical = canonicalMap.get(qTrack.id);
+    if (!canonical && qTrack.aliases) {
+      for (const alias of qTrack.aliases) {
+        canonical = canonicalMap.get(alias);
+        if (canonical) break;
+      }
+    }
+    if (!canonical) return qTrack;
+
+    const qMeta = qTrack.metadata;
+    const cMeta = canonical.metadata;
+
+    const durationChanged =
+      cMeta.duration !== undefined &&
+      cMeta.duration > 0 &&
+      qMeta.duration !== cMeta.duration;
+    const titleChanged =
+      cMeta.isMetadataLoaded && !qMeta.isMetadataLoaded && cMeta.title !== qMeta.title;
+    const artistChanged =
+      cMeta.isMetadataLoaded && cMeta.artist !== qMeta.artist;
+    const albumChanged =
+      cMeta.isMetadataLoaded && cMeta.album !== qMeta.album;
+    const artworkChanged = Boolean(cMeta.artworkUrl && qMeta.artworkUrl !== cMeta.artworkUrl);
+    const statusChanged = canonical.status !== qTrack.status;
+    const lyricsChanged =
+      (canonical.lrcHandle !== qTrack.lrcHandle && Boolean(canonical.lrcHandle)) ||
+      (canonical.lrcFile !== qTrack.lrcFile && Boolean(canonical.lrcFile)) ||
+      (canonical.lrcContent !== qTrack.lrcContent && Boolean(canonical.lrcContent));
+
+    if (
+      !durationChanged &&
+      !titleChanged &&
+      !artistChanged &&
+      !albumChanged &&
+      !artworkChanged &&
+      !statusChanged &&
+      !lyricsChanged
+    ) {
+      return qTrack;
+    }
+
+    changed = true;
+    return {
+      ...qTrack,
+      status: canonical.status ?? qTrack.status,
+      lrcHandle: canonical.lrcHandle ?? qTrack.lrcHandle,
+      lrcFile: canonical.lrcFile ?? qTrack.lrcFile,
+      lrcContent: canonical.lrcContent ?? qTrack.lrcContent,
+      metadata: {
+        ...qMeta,
+        ...(cMeta.isMetadataLoaded ? cMeta : {}),
+        duration:
+          cMeta.duration !== undefined && cMeta.duration > 0
+            ? cMeta.duration
+            : qMeta.duration,
+        artworkUrl: cMeta.artworkUrl || qMeta.artworkUrl,
+      },
+    };
+  });
+
+  return changed ? updated : queue;
+}
+
+/**
+ * Shuffles upcoming tracks in-place (keeping played tracks before currentTrack
+ * and currentTrack itself in place) so the Queue display matches the effective playback order.
+ */
+export function shuffleUpcomingTracks(
+  queue: TrackItem[],
+  currentTrack: TrackItem | null,
+  randomFn: () => number = Math.random
+): TrackItem[] {
+  if (queue.length <= 1) return queue;
+
+  const fisherYates = (items: TrackItem[]): TrackItem[] => {
+    const arr = [...items];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(randomFn() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
+  if (!currentTrack) {
+    return fisherYates(queue);
+  }
+
+  const curIdx = queue.findIndex((t) => isSameTrack(t, currentTrack));
+  if (curIdx === -1) {
+    return fisherYates(queue);
+  }
+
+  // If currently on the final track, keep currentTrack at index 0 and shuffle all others after it
+  if (curIdx === queue.length - 1) {
+    const current = queue[curIdx];
+    const others = queue.slice(0, curIdx);
+    return [current, ...fisherYates(others)];
+  }
+
+  const prefix = queue.slice(0, curIdx + 1);
+  const upcoming = queue.slice(curIdx + 1);
+  return [...prefix, ...fisherYates(upcoming)];
+}
+
+/**
+ * Restores Queue tracks into their pre-shuffle relative order while preserving
+ * any tracks added or removed while Shuffle was enabled.
+ */
+export function restoreUnshuffledOrder(
+  queue: TrackItem[],
+  unshuffledIds: string[]
+): TrackItem[] {
+  if (queue.length <= 1 || unshuffledIds.length === 0) return queue;
+
+  const orderMap = new Map<string, number>();
+  unshuffledIds.forEach((id, idx) => orderMap.set(id, idx));
+
+  const getRank = (track: TrackItem): number => {
+    const direct = orderMap.get(track.id);
+    if (direct !== undefined) return direct;
+    if (track.aliases) {
+      for (const alias of track.aliases) {
+        const rank = orderMap.get(alias);
+        if (rank !== undefined) return rank;
+      }
+    }
+    return Number.MAX_SAFE_INTEGER;
+  };
+
+  return [...queue].sort((a, b) => getRank(a) - getRank(b));
+}
+
+export interface QueueRemovalTransition {
+  nextQueue: TrackItem[];
+  wasCurrent: boolean;
+  nextTrack: TrackItem | null;
+  shouldStop: boolean;
+}
+
+/**
+ * Computes the next Queue and playback transition when removing a track at `index`.
+ * - Non-current removal: keeps current playback uninterrupted.
+ * - Current removal: advances to the next playable track in effective Queue order,
+ *   wrapping if repeatMode === 'all', or stops cleanly if none remain.
+ */
+export function computeQueueRemovalTransition(
+  queue: TrackItem[],
+  index: number,
+  currentTrack: TrackItem | null,
+  repeatMode: RepeatMode
+): QueueRemovalTransition {
+  if (index < 0 || index >= queue.length) {
+    return { nextQueue: queue, wasCurrent: false, nextTrack: currentTrack, shouldStop: false };
+  }
+
+  const removedTrack = queue[index];
+  const nextQueue = queue.filter((_, idx) => idx !== index);
+  const wasCurrent = Boolean(currentTrack && isSameTrack(removedTrack, currentTrack));
+
+  if (!wasCurrent) {
+    return { nextQueue, wasCurrent: false, nextTrack: currentTrack, shouldStop: false };
+  }
+
+  if (nextQueue.length === 0) {
+    return { nextQueue: [], wasCurrent: true, nextTrack: null, shouldStop: true };
+  }
+
+  // Search forward from the removed track's position (next upcoming track in effective order)
+  for (let i = index; i < nextQueue.length; i++) {
+    if (isTrackPlayable(nextQueue[i])) {
+      return { nextQueue, wasCurrent: true, nextTrack: nextQueue[i], shouldStop: false };
+    }
+  }
+
+  // Wrap around only when repeatMode === 'all'
+  if (repeatMode === 'all') {
+    for (let i = 0; i < Math.min(index, nextQueue.length); i++) {
+      if (isTrackPlayable(nextQueue[i])) {
+        return { nextQueue, wasCurrent: true, nextTrack: nextQueue[i], shouldStop: false };
+      }
+    }
+  }
+
+  return { nextQueue, wasCurrent: true, nextTrack: null, shouldStop: true };
+}

@@ -220,17 +220,20 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
             className="absolute right-0 top-full mt-1 w-48 py-1.5 rounded-xl bg-[var(--bg-panel)] dark:bg-[#0c192c] border border-[var(--border-subtle)] dark:border-white/[0.1] shadow-xl z-40 text-xs"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              type="button"
-              onClick={() => {
-                onToggleMenu(null);
-                onPlayQueueTrack(track);
-              }}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text-primary)] dark:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] cursor-pointer"
-            >
-              <Play className="w-3.5 h-3.5 text-[var(--accent-primary)] dark:text-indigo-400" />
-              <span>{isCurrent ? (isPlaying ? 'Playing' : 'Resume') : 'Jump to Track'}</span>
-            </button>
+            {!isCurrent && (
+              <button
+                type="button"
+                onClick={() => {
+                  onToggleMenu(null);
+                  onPlayQueueTrack(track);
+                }}
+                data-testid={`queue-play-now-action-${originalIndex}`}
+                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text-primary)] dark:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] cursor-pointer"
+              >
+                <Play className="w-3.5 h-3.5 text-[var(--accent-primary)] dark:text-indigo-400" />
+                <span>Play Now</span>
+              </button>
+            )}
 
             {!isCurrent && onPlayNext && (
               <button
@@ -239,6 +242,7 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
                   onToggleMenu(null);
                   onPlayNext(track);
                 }}
+                data-testid={`queue-play-next-action-${originalIndex}`}
                 className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text-primary)] dark:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] cursor-pointer"
               >
                 <ListEnd className="w-3.5 h-3.5 text-[var(--text-secondary)] dark:text-slate-400" />
@@ -271,22 +275,19 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
               <span>Track Info</span>
             </button>
 
-            {!isCurrent && (
-              <>
-                <div className="my-1 border-t border-[var(--border-subtle)] dark:border-white/[0.06]" />
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleMenu(null);
-                    onRemoveFromQueue(originalIndex);
-                  }}
-                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove from Queue</span>
-                </button>
-              </>
-            )}
+            <div className="my-1 border-t border-[var(--border-subtle)] dark:border-white/[0.06]" />
+            <button
+              type="button"
+              onClick={() => {
+                onToggleMenu(null);
+                onRemoveFromQueue(originalIndex);
+              }}
+              data-testid={`queue-remove-action-${originalIndex}`}
+              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Remove from Queue</span>
+            </button>
           </div>
         )}
       </div>
