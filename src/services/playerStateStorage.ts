@@ -14,6 +14,8 @@ export const DEFAULT_STATE: StoredPlaybackState = {
   lastTrackId: null,
   lastPosition: 0,
   favourites: [],
+  queueTrackIds: [],
+  queueIndex: 0,
 };
 
 /**
@@ -61,6 +63,7 @@ export function getStoredPlaybackStateSync(): StoredPlaybackState {
           ...DEFAULT_STATE,
           ...parsed,
           favourites: Array.isArray(parsed.favourites) ? parsed.favourites : [],
+          queueTrackIds: Array.isArray(parsed.queueTrackIds) ? parsed.queueTrackIds : [],
         };
       }
     }

@@ -119,7 +119,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
     }
     if (uniqueTracks.length === 0) return;
 
-    audioPlayer.playQueue(uniqueTracks, 0, true);
+    audioPlayer.playQueue(uniqueTracks, 0, false);
   }, [displayedTracks, audioPlayer]);
 
   const commonTrackListProps = {
@@ -184,10 +184,11 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
           onCreatePlaylist={createPlaylist}
           onRenamePlaylist={renamePlaylist}
           onDeletePlaylist={deletePlaylist}
-          onPlayPlaylist={(pl, startIndex, shuffle) => {
+          onPlayPlaylist={(pl, startIndex = 0, shuffle = false) => {
             const resolved = resolvePlaylistTracks(pl.tracks, libraryTracks);
-            if (resolved.length === 0) return;
-            playQueue(resolved, startIndex, shuffle);
+            const playable = resolved.filter(isTrackPlayable);
+            if (playable.length === 0) return;
+            playQueue(playable, startIndex, shuffle);
           }}
           onPlayTrack={playTrack}
           onTogglePlay={togglePlay}

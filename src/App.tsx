@@ -24,7 +24,9 @@ export function App() {
   // Authoritative state hooks
   const playlists = usePlaylists();
   const library = useMusicLibrary();
+  const libraryTracks = library.library?.flatPlaylist || [];
   const audioPlayer = useAudioPlayer({
+    libraryTracks,
     onTrackStatusChanged: library.updateTrackStatus,
   });
 

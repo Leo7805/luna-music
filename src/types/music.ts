@@ -141,6 +141,8 @@ export interface StoredPlaybackState {
   lastTrackId: string | null;
   lastPosition: number;
   favourites: string[];
+  queueTrackIds?: string[];
+  queueIndex?: number;
 }
 
 export interface PlaylistTrackReference {

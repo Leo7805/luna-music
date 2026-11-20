@@ -44,7 +44,7 @@ describe('Theme-Consistent Buttons & Option B Styling', () => {
     it('applies Option B secondary styling and avoids hardcoded saturated indigo button', () => {
       const html = renderToStaticMarkup(
         <PlaylistsView
-          playlists={[]}
+          playlists={[{ id: 'p1', name: 'My List', tracks: [], createdAt: 1, updatedAt: 1 }]}
           selectedPlaylistId={null}
           libraryTracks={[]}
           isPlaying={false}

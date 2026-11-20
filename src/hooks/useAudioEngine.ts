@@ -54,8 +54,8 @@ export function useAudioEngine({
   onEnded,
 }: UseAudioEngineProps): UseAudioEngineReturn {
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [currentTime, setCurrentTime] = useState<number>(0);
-  const [duration, setDuration] = useState<number>(0);
+  const [currentTime, setCurrentTime] = useState<number>(initialPosition > 0 ? initialPosition : 0);
+  const [duration, setDuration] = useState<number>(currentTrack?.metadata.duration || 0);
   const [volume, setVolume] = useState<number>(initialVolume);
   const [isMuted, setIsMuted] = useState<boolean>(initialMuted);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -89,6 +89,11 @@ export function useAudioEngine({
   const loadAudioSource = useCallback(async (track: TrackItem, autoPlay = true) => {
     const audio = audioRef.current;
     if (!audio) return;
+
+    if (autoPlay) {
+      pendingSeekRef.current = null;
+      setCurrentTime(0);
+    }
 
     const requestId = ++loadRequestIdRef.current;
     setPlaybackError(null);
@@ -220,6 +225,7 @@ export function useAudioEngine({
         audio.play().catch((err: Error) => {
           if (err.name !== 'AbortError') {
             console.warn('[Luna Music] Autoplay blocked or interrupted:', err);
+            setPlaybackError(`Playback failed: ${err.message}`);
             setIsPlaying(false);
           }
         });
@@ -250,6 +256,11 @@ export function useAudioEngine({
       }
 
       if (audio.paused) {
+        if (pendingSeekRef.current !== null) {
+          audio.currentTime = pendingSeekRef.current;
+          setCurrentTime(pendingSeekRef.current);
+          pendingSeekRef.current = null;
+        }
         audio.play().catch((err: Error) => {
           if (err.name !== 'AbortError') {
             setPlaybackError(`Playback failed: ${err.message}`);
@@ -348,6 +359,7 @@ export function useAudioEngine({
       setDuration(audio.duration || 0);
       if (pendingSeekRef.current !== null) {
         audio.currentTime = pendingSeekRef.current;
+        setCurrentTime(pendingSeekRef.current);
         pendingSeekRef.current = null;
       }
     };
@@ -388,6 +400,7 @@ export function useAudioEngine({
     };
 
     audio.addEventListener('play', onPlay);
+    audio.addEventListener('playing', onPlay);
     audio.addEventListener('pause', onPause);
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('durationchange', onDurationChange);
@@ -397,6 +410,7 @@ export function useAudioEngine({
 
     return () => {
       audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('playing', onPlay);
       audio.removeEventListener('pause', onPause);
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('durationchange', onDurationChange);
