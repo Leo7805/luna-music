@@ -19,10 +19,10 @@ export function SidebarNavigation({
   onSelectFolder,
 }: SidebarNavigationProps) {
   const baseButtonClass =
-    'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent';
+    'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-[var(--accent-primary)]/50 focus-visible:border-transparent';
 
   const activeClass =
-    'bg-indigo-600/15 bg-[var(--bg-active)] dark:bg-indigo-600/20 text-[var(--accent-primary)] dark:text-indigo-300 border-indigo-500/30 border-[var(--accent-primary)]/30 shadow-sm font-semibold';
+    'bg-indigo-600/15 bg-[var(--bg-active)] dark:bg-white/[0.08] text-[var(--accent-primary)] dark:text-white border-indigo-500/30 border-[var(--accent-primary)]/30 dark:border-white/[0.1] shadow-sm font-semibold';
   const inactiveClass =
     'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]';
 

@@ -36,7 +36,7 @@ export function SidebarPlaylists({
           onClick={onCreatePrompt}
           title="Create Playlist"
           aria-label="Create Playlist"
-          className="p-1 rounded-lg hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] dark:text-slate-400 dark:hover:text-indigo-400 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
+          className="p-1 rounded-lg hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] dark:text-slate-400 dark:hover:text-indigo-400 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-[var(--accent-primary)]/50"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -61,9 +61,9 @@ export function SidebarPlaylists({
                     onSelectPlaylist?.(pl.id);
                   }
                 }}
-                className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
+                className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-[var(--accent-primary)]/50 focus-visible:border-transparent ${
                   selectedPlaylistId === pl.id
-                    ? 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-indigo-600/25 text-[var(--accent-primary)] dark:text-white font-medium border-indigo-500/30 border-[var(--accent-primary)]/30 shadow-sm'
+                    ? 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-white/[0.08] text-[var(--accent-primary)] dark:text-white font-medium border-indigo-500/30 border-[var(--accent-primary)]/30 dark:border-white/[0.1] shadow-sm'
                     : 'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]'
                 }`}
                 onClick={() => {
@@ -141,7 +141,7 @@ export function SidebarPlaylists({
               <button
                 type="button"
                 onClick={onCreatePrompt}
-                className="mt-3 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                className="mt-3 px-3 py-1.5 rounded-lg bg-[var(--accent-primary)]/10 dark:bg-white/[0.08] hover:bg-[var(--accent-primary)]/15 dark:hover:bg-white/[0.12] text-[var(--accent-primary)] dark:text-slate-100 border border-[var(--accent-primary)]/25 dark:border-white/[0.12] text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Create Playlist</span>

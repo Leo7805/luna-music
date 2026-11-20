@@ -79,7 +79,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
-        <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3" />
+        <div className="w-10 h-10 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
           Scanning local library...
         </p>

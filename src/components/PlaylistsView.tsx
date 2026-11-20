@@ -256,7 +256,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
             <button
               type="button"
               onClick={() => setIsCreateModalOpen(true)}
-              className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-3.5 py-2 rounded-xl bg-[var(--accent-primary)]/10 dark:bg-white/[0.08] hover:bg-[var(--accent-primary)]/15 dark:hover:bg-white/[0.12] text-[var(--accent-primary)] dark:text-slate-100 border border-[var(--accent-primary)]/25 dark:border-white/[0.12] text-xs font-semibold shadow-sm flex items-center gap-1.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50"
             >
               <Plus className="w-4 h-4" />
               <span>Create Playlist</span>

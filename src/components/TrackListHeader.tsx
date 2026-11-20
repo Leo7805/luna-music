@@ -45,7 +45,7 @@ export function TrackListHeader({
           <button
             type="button"
             onClick={onToggleSelectMode}
-            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 ${
               isSelectMode
                 ? 'bg-[var(--accent-primary)] text-white border-transparent shadow-sm'
                 : 'border-transparent text-[var(--text-secondary)] dark:text-slate-400 hover:text-[var(--text-primary)] dark:hover:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]'
@@ -65,10 +65,10 @@ export function TrackListHeader({
               type="button"
               onClick={onToggleSelectAll}
               aria-label="Select all"
-              className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer"
+              className="p-1 rounded text-slate-400 hover:text-[var(--accent-primary)] dark:hover:text-indigo-400 cursor-pointer"
             >
               {selectedCount === tracksCount && tracksCount > 0 ? (
-                <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <CheckSquare className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
               ) : (
                 <Square className="w-4 h-4" />
               )}

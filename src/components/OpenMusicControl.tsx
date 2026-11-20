@@ -147,7 +147,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
     <div
       ref={containerRef}
       className={`relative inline-flex items-center min-w-0 ${
-        variant === 'empty-state' ? 'gap-0 shadow-xl shadow-indigo-600/25' : 'w-full'
+        variant === 'empty-state' ? 'gap-0 shadow-xl shadow-[var(--accent-primary)]/25' : 'w-full'
       }`}
     >
       {/* Hidden Folder Fallback Input */}
@@ -195,9 +195,9 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
             className="flex items-center gap-2.5 pl-6 pr-4 py-3.5 rounded-l-2xl hover:bg-white/10 transition-colors cursor-pointer disabled:opacity-50"
           >
             {defaultMode === 'files' ? (
-              <Disc className="w-5 h-5 text-indigo-200" />
+              <Disc className="w-5 h-5 text-white/80" />
             ) : (
-              <FolderOpen className="w-5 h-5 text-indigo-200" />
+              <FolderOpen className="w-5 h-5 text-white/80" />
             )}
             <span>
               {isScanning ? `Scanning (${scanCount} found)...` : 'Open Music'}

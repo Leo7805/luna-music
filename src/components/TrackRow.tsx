@@ -164,11 +164,11 @@ export function TrackRow({
           <button
             type="button"
             onClick={(e) => onCheckboxClick(e, track)}
-            className="p-1 rounded text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="p-1 rounded text-slate-400 hover:text-[var(--accent-primary)] dark:hover:text-indigo-400 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50"
             data-testid={`track-checkbox-${track.id}`}
           >
             {isSelected ? (
-              <CheckSquare className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <CheckSquare className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
             ) : (
               <Square className="w-4 h-4" />
             )}
@@ -316,7 +316,7 @@ export function TrackRow({
               onToggleMenu(track.id);
             }}
             title="Track actions"
-            className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.08] transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 ${
+            className={`p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.08] transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 ${
               isMenuOpen ? 'opacity-100 bg-slate-200/80 dark:bg-white/[0.1]' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
             }`}
           >

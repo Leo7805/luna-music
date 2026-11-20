@@ -389,7 +389,7 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
             currentTrack ? (
               <div className="flex-1 overflow-y-auto p-5 custom-scrollbar space-y-4">
                 <div className="p-4 rounded-xl glass-panel space-y-2.5 text-xs">
-                  <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-semibold mb-1">
+                  <div className="flex items-center gap-2 text-[var(--accent-primary)] dark:text-indigo-400 font-semibold mb-1">
                     <Info className="w-3.5 h-3.5" />
                     <span>Track Properties</span>
                   </div>
@@ -433,14 +433,14 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
                     <FileText className="w-5 h-5 text-slate-400 dark:text-slate-500 mx-auto" />
                     <p className="font-medium text-slate-700 dark:text-slate-300">No Local Lyrics</p>
                     <p className="text-[11px] text-slate-500">
-                      Place a matching <code className="text-indigo-600 dark:text-indigo-300 font-semibold">.lrc</code> file in the same folder to enable live lyrics.
+                      Place a matching <code className="text-[var(--accent-primary)] dark:text-indigo-300 font-semibold">.lrc</code> file in the same folder to enable live lyrics.
                     </p>
                   </div>
                 )}
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400 dark:text-slate-500">
-                <Info className="w-12 h-12 mb-3 opacity-30 text-indigo-500 dark:text-indigo-400" />
+                <Info className="w-12 h-12 mb-3 opacity-30 text-[var(--accent-primary)] dark:text-indigo-400" />
                 <p className="text-xs font-medium text-slate-600 dark:text-slate-400">No song currently playing</p>
                 <p className="text-[11px] text-slate-500 mt-1">Select a track to inspect its properties</p>
               </div>

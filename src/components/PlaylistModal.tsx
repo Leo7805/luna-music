@@ -100,7 +100,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
       >
         <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-indigo-400 flex items-center justify-center">
               <ListMusic className="w-4 h-4" />
             </div>
             <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -185,12 +185,12 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Or create new playlist..."
-                className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.1] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                className="flex-1 px-3 py-1.5 text-xs rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.1] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-[var(--accent-primary)]"
               />
               <button
                 type="submit"
                 disabled={!name.trim()}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white shadow-sm flex items-center gap-1 cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-white shadow-sm flex items-center gap-1 cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Create</span>
@@ -209,7 +209,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="My Awesome Playlist"
-                className="w-full px-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.1] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-300 dark:border-white/[0.1] text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:border-[var(--accent-primary)]"
               />
             </div>
 
@@ -224,7 +224,7 @@ export const PlaylistModal: React.FC<PlaylistModalProps> = ({
               <button
                 type="submit"
                 disabled={!name.trim()}
-                className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white shadow-sm transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-white shadow-sm transition-colors cursor-pointer"
               >
                 {mode === 'create' ? 'Create Playlist' : 'Save Changes'}
               </button>

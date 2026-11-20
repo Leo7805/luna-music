@@ -130,7 +130,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
   if (albums.length === 0) {
     return (
       <div className="py-16 text-center text-slate-500 dark:text-slate-400">
-        <Disc className="w-12 h-12 mx-auto mb-3 opacity-30 text-indigo-500 dark:text-indigo-400" />
+        <Disc className="w-12 h-12 mx-auto mb-3 opacity-30 text-[var(--accent-primary)] dark:text-indigo-400" />
         <p className="text-sm">No albums discovered in library yet.</p>
       </div>
     );

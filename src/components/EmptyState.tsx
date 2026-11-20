@@ -64,7 +64,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       {/* Feature Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mt-12 w-full text-left">
         <div className="p-4 rounded-2xl glass-panel space-y-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 dark:text-indigo-400 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-lg bg-[var(--accent-primary)]/10 text-[var(--accent-primary)] dark:text-indigo-400 flex items-center justify-center">
             <ShieldCheck className="w-4 h-4" />
           </div>
           <h4 className="text-xs font-semibold text-slate-900 dark:text-white">Private & Local</h4>
