@@ -11,7 +11,7 @@ import {
   Volume1,
   VolumeX,
   Heart,
-  List,
+  ScrollText,
 } from 'lucide-react';
 import { TrackItem, RepeatMode } from '../types/music';
 import { formatDuration } from '../utils/formatters';
@@ -28,7 +28,9 @@ interface BottomPlayerProps {
   repeatMode: RepeatMode;
   shuffle: boolean;
   isFavourite: boolean;
-  isNowPlayingOpen: boolean;
+  isLyricsOpen?: boolean;
+  isNowPlayingOpen?: boolean;
+  isNowPlayingViewOpen?: boolean;
   onTogglePlay: () => void;
   onNextTrack: () => void;
   onPrevTrack: () => void;
@@ -38,7 +40,9 @@ interface BottomPlayerProps {
   onCycleRepeat: () => void;
   onToggleShuffle: () => void;
   onToggleFavourite: () => void;
-  onToggleNowPlaying: () => void;
+  onToggleLyrics?: () => void;
+  onToggleNowPlaying?: () => void;
+  onToggleNowPlayingView?: () => void;
 }
 
 export function BottomPlayer({
@@ -51,7 +55,9 @@ export function BottomPlayer({
   repeatMode,
   shuffle,
   isFavourite,
+  isLyricsOpen,
   isNowPlayingOpen,
+  isNowPlayingViewOpen = false,
   onTogglePlay,
   onNextTrack,
   onPrevTrack,
@@ -61,8 +67,13 @@ export function BottomPlayer({
   onCycleRepeat,
   onToggleShuffle,
   onToggleFavourite,
+  onToggleLyrics,
   onToggleNowPlaying,
+  onToggleNowPlayingView,
 }: BottomPlayerProps) {
+  const lyricsOpen = isLyricsOpen !== undefined ? isLyricsOpen : Boolean(isNowPlayingOpen);
+  const handleToggleLyrics = onToggleLyrics || onToggleNowPlaying || (() => {});
+  const handleToggleNowPlayingView = onToggleNowPlayingView || (() => {});
   const currentDuration = duration || currentTrack?.metadata.duration || 0;
   const progressPercent = currentDuration > 0 ? (currentTime / currentDuration) * 100 : 0;
 
@@ -79,53 +90,69 @@ export function BottomPlayer({
   return (
     <footer className="h-24 bg-[var(--bg-player)]/95 dark:bg-[#071427]/95 backdrop-blur-xl border-t border-[var(--border-subtle)] dark:border-white/[0.08] px-4 md:px-6 flex items-center justify-between gap-4 z-40 select-none text-[var(--text-primary)] dark:text-slate-100 transition-colors duration-200">
       {/* Left: Track Details */}
-      <div className="w-1/4 min-w-[180px] max-w-[280px] flex items-center gap-3">
+      <div className="w-1/4 min-w-[180px] max-w-[280px] flex items-center gap-2">
         {currentTrack ? (
           <>
-            {/* Thumbnail */}
-            <div
-              className="w-13 h-13 rounded-xl shrink-0 flex items-center justify-center overflow-hidden shadow-md border border-[var(--border-subtle)] dark:border-white/[0.08]"
-              style={{
-                background:
-                  currentTrack.metadata.placeholderGradient ||
-                  'linear-gradient(135deg, #4338ca, #6d28d9)',
-              }}
-            >
-              {currentTrack.metadata.artworkUrl ? (
-                <img
-                  src={currentTrack.metadata.artworkUrl}
-                  alt={currentTrack.metadata.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-[10px] font-bold text-white/60 uppercase">
-                  {currentTrack.metadata.title.substring(0, 2)}
-                </span>
-              )}
-            </div>
-
-            {/* Title & Artist */}
-            <div className="min-w-0 flex-1">
-              <h4
-                className="text-xs font-semibold text-[var(--text-primary)] dark:text-white truncate hover:underline cursor-pointer"
-                onClick={onToggleNowPlaying}
-                title={currentTrack.metadata.title}
-              >
-                {currentTrack.metadata.title}
-              </h4>
-              <p
-                className="text-[11px] text-[var(--text-secondary)] dark:text-slate-400 truncate mt-0.5 flex items-center gap-1.5"
-                title={currentTrack.metadata.artist || 'Unknown Artist'}
-              >
-                <span>{currentTrack.metadata.artist || 'Unknown Artist'}</span>
-                <TrackStatusBadge status={getTrackStatus(currentTrack)} />
-              </p>
-            </div>
-
-            {/* Heart Button */}
+            {/* Clickable Track Info Area -> Opens/Toggles Central Now Playing */}
             <button
+              type="button"
+              onClick={handleToggleNowPlayingView}
+              data-testid="bottom-track-info-button"
+              aria-label={isNowPlayingViewOpen ? 'Close Now Playing' : 'Open Now Playing'}
+              aria-pressed={isNowPlayingViewOpen}
+              title="Open Now Playing"
+              className={`flex items-center gap-3 min-w-0 flex-1 text-left p-1.5 -ml-1.5 rounded-xl transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 ${
+                isNowPlayingViewOpen
+                  ? 'bg-[var(--bg-active)]/80 dark:bg-white/[0.08]'
+                  : 'hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06]'
+              }`}
+            >
+              {/* Thumbnail */}
+              <div
+                className="w-13 h-13 rounded-xl shrink-0 flex items-center justify-center overflow-hidden shadow-md border border-[var(--border-subtle)] dark:border-white/[0.08]"
+                style={{
+                  background:
+                    currentTrack.metadata.placeholderGradient ||
+                    'linear-gradient(135deg, #4338ca, #6d28d9)',
+                }}
+              >
+                {currentTrack.metadata.artworkUrl ? (
+                  <img
+                    src={currentTrack.metadata.artworkUrl}
+                    alt={currentTrack.metadata.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[10px] font-bold text-white/60 uppercase">
+                    {currentTrack.metadata.title.substring(0, 2)}
+                  </span>
+                )}
+              </div>
+
+              {/* Title & Artist */}
+              <div className="min-w-0 flex-1">
+                <h4
+                  className="text-xs font-semibold text-[var(--text-primary)] dark:text-white truncate"
+                  title={currentTrack.metadata.title}
+                >
+                  {currentTrack.metadata.title}
+                </h4>
+                <p
+                  className="text-[11px] text-[var(--text-secondary)] dark:text-slate-400 truncate mt-0.5 flex items-center gap-1.5"
+                  title={currentTrack.metadata.artist || 'Unknown Artist'}
+                >
+                  <span className="truncate">{currentTrack.metadata.artist || 'Unknown Artist'}</span>
+                  <TrackStatusBadge status={getTrackStatus(currentTrack)} />
+                </p>
+              </div>
+            </button>
+
+            {/* Independent Heart Button */}
+            <button
+              type="button"
               onClick={onToggleFavourite}
-              className={`p-2 rounded-full transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
+              data-testid="bottom-favourite-button"
+              className={`p-2 rounded-full shrink-0 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 ${
                 isFavourite
                   ? 'text-rose-500 dark:text-rose-400 hover:text-rose-600 dark:hover:text-rose-300'
                   : 'text-[var(--text-secondary)] dark:text-slate-500 hover:text-[var(--text-primary)] dark:hover:text-white'
@@ -275,21 +302,22 @@ export function BottomPlayer({
           />
         </div>
 
-        {/* Authoritative Right Sidebar (Now Playing Panel) Toggle */}
+        {/* Dedicated Right-Side Lyrics Panel Toggle */}
         <button
           type="button"
-          onClick={onToggleNowPlaying}
-          aria-expanded={isNowPlayingOpen}
-          aria-label={isNowPlayingOpen ? 'Hide Now Playing panel' : 'Show Now Playing panel'}
-          data-testid="now-playing-toggle-button"
-          className={`p-2 rounded-xl border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
-            isNowPlayingOpen
-              ? 'bg-indigo-600/20 bg-[var(--bg-active)] text-[var(--accent-primary)] dark:text-indigo-400 border-indigo-500/40 border-[var(--accent-primary)]/40 shadow-sm'
+          onClick={handleToggleLyrics}
+          aria-expanded={lyricsOpen}
+          aria-pressed={lyricsOpen}
+          aria-label={lyricsOpen ? 'Hide Lyrics' : 'Show Lyrics'}
+          data-testid="lyrics-toggle-button"
+          className={`p-2 rounded-xl border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 ${
+            lyricsOpen
+              ? 'bg-[var(--bg-active)] dark:bg-white/[0.1] text-[var(--accent-primary)] dark:text-indigo-300 border-[var(--accent-primary)]/25 dark:border-white/[0.12]'
               : 'border-transparent text-[var(--text-secondary)] dark:text-slate-400 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06]'
           }`}
-          title={isNowPlayingOpen ? 'Hide Now Playing panel' : 'Show Now Playing panel'}
+          title={lyricsOpen ? 'Hide Lyrics' : 'Show Lyrics'}
         >
-          <List className="w-4 h-4" />
+          <ScrollText className="w-4 h-4" />
         </button>
       </div>
     </footer>

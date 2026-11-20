@@ -373,6 +373,11 @@ export function useAudioPlayer({
     queueControls.clearQueue(currentTrackRef.current);
   }, [queueControls]);
 
+  const removeTracksFromQueue = useCallback(
+    (indices: number[]) => queueControls.removeTracksFromQueue(indices, currentTrackRef.current),
+    [queueControls]
+  );
+
   // Persist queue updates
   useEffect(() => {
     if (queue.length > 0) {
@@ -437,6 +442,7 @@ export function useAudioPlayer({
     playNextBulk,
     addToQueue,
     removeFromQueue: queueControls.removeFromQueue,
+    removeTracksFromQueue,
     clearQueue,
     reorderQueue: queueControls.reorderQueue,
     togglePlay,

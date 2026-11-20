@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LibraryContent } from './components/LibraryContent';
-import { NowPlayingPanel } from './components/NowPlayingPanel';
+import { NowPlayingView } from './components/NowPlayingView';
+import { LyricsPanel } from './components/NowPlayingPanel';
 import { BottomPlayer } from './components/BottomPlayer';
 import { RecoveryBanner } from './components/RecoveryBanner';
 import { ShortcutsModal } from './components/ShortcutsModal';
@@ -14,12 +15,29 @@ import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { getBreadcrumbs } from './utils/musicTree';
 import { deriveViewHeaderInfo } from './utils/libraryAggregation';
-import { LibraryView } from './types/music';
+import { getStoredNavigation, storeNavigation } from './utils/navigationStorage';
+import { LibraryView, TrackItem } from './types/music';
 
 export function App() {
   const { theme, setTheme, lightStyle, setLightStyle } = useTheme();
-  const [isNowPlayingOpen, setIsNowPlayingOpen] = useState<boolean>(true);
+  const [isLyricsOpen, setIsLyricsOpen] = useState<boolean>(true);
+  const [isNowPlayingViewOpen, setIsNowPlayingViewOpen] = useState<boolean>(
+    () => Boolean(getStoredNavigation()?.isNowPlayingView)
+  );
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
+
+  const toggleNowPlayingView = useCallback(() => {
+    setIsNowPlayingViewOpen((prev) => {
+      const next = !prev;
+      storeNavigation({ isNowPlayingView: next });
+      return next;
+    });
+  }, []);
+
+  const closeNowPlayingView = useCallback(() => {
+    setIsNowPlayingViewOpen(false);
+    storeNavigation({ isNowPlayingView: false });
+  }, []);
 
   // Authoritative state hooks
   const playlists = usePlaylists();
@@ -39,7 +57,7 @@ export function App() {
       prevTrack: audioPlayer.prevTrack,
       adjustVolume: audioPlayer.adjustVolume,
       toggleMute: audioPlayer.toggleMute,
-      toggleLyrics: () => setIsNowPlayingOpen((prev) => !prev),
+      toggleLyrics: () => setIsLyricsOpen((prev) => !prev),
       toggleHelp: () => setIsShortcutsOpen((prev) => !prev),
       closeHelp: () => setIsShortcutsOpen(false),
     }),
@@ -56,15 +74,40 @@ export function App() {
 
   const handleSelectView = useCallback(
     (view: LibraryView) => {
+      const wasInNowPlaying = isNowPlayingViewOpen;
+      closeNowPlayingView();
       library.setCurrentView(view);
-      if (view === 'folder' && library.currentView === 'folder') {
+      if (!wasInNowPlaying && view === 'folder' && library.currentView === 'folder') {
         library.selectFolder('');
       }
-      if (view === 'playlists' && library.currentView === 'playlists') {
+      if (!wasInNowPlaying && view === 'playlists' && library.currentView === 'playlists') {
         playlists.selectPlaylist(null);
       }
     },
-    [library, playlists]
+    [isNowPlayingViewOpen, closeNowPlayingView, library, playlists]
+  );
+
+  const handleSelectFolder = useCallback(
+    (path: string) => {
+      closeNowPlayingView();
+      library.selectFolder(path);
+    },
+    [closeNowPlayingView, library]
+  );
+
+  const handleSelectPlaylist = useCallback(
+    (playlistId: string | null) => {
+      closeNowPlayingView();
+      playlists.selectPlaylist(playlistId);
+    },
+    [closeNowPlayingView, playlists]
+  );
+
+  const handleCreateAndAddToPlaylist = useCallback(
+    (name: string, trackOrTracks: TrackItem | TrackItem[]) => {
+      playlists.createPlaylist(name, Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks]);
+    },
+    [playlists]
   );
 
   // Compute breadcrumbs for folder view
@@ -147,8 +190,8 @@ export function App() {
           isScanning={library.isLoading}
           scanCount={library.scanProgress}
           onSelectView={handleSelectView}
-          onSelectFolder={library.selectFolder}
-          onSelectPlaylist={playlists.selectPlaylist}
+          onSelectFolder={handleSelectFolder}
+          onSelectPlaylist={handleSelectPlaylist}
           onCreatePlaylist={playlists.createPlaylist}
           onRenamePlaylist={playlists.renamePlaylist}
           onDeletePlaylist={playlists.deletePlaylist}
@@ -163,47 +206,68 @@ export function App() {
         />
 
         {/* Central Content Area */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[var(--bg-main)] dark:bg-transparent overflow-hidden">
-          {/* Header */}
-          <Header
-            title={viewTitle}
-            subtitle={viewSubtitle}
-            searchQuery={library.searchQuery}
-            breadcrumbs={hasLibrary && library.currentView === 'folder' ? breadcrumbs : undefined}
-            theme={theme}
-            lightStyle={lightStyle}
-            onSearchChange={library.setSearchQuery}
-            onBreadcrumbClick={library.selectFolder}
-            onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
-            onSelectTheme={setTheme}
-            onSelectLightStyle={setLightStyle}
-          />
-
-          {/* Central View Container */}
-          <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 custom-scrollbar">
-            <LibraryContent
-              library={library}
-              playlists={playlists}
-              audioPlayer={audioPlayer}
+        <main
+          className={`flex-1 flex flex-col min-w-0 overflow-hidden ${
+            theme === 'dark' ? 'bg-transparent' : 'bg-[var(--bg-main)]'
+          }`}
+        >
+          {isNowPlayingViewOpen ? (
+            <NowPlayingView
+              queue={audioPlayer.queue}
+              currentTrack={audioPlayer.currentTrack}
+              isPlaying={audioPlayer.isPlaying}
+              playlists={playlists.playlists}
+              theme={theme}
+              lightStyle={lightStyle}
+              onPlayQueueTrack={audioPlayer.playQueueTrack}
+              onPlayNext={audioPlayer.playNext}
+              onRemoveFromQueue={audioPlayer.removeFromQueue}
+              onRemoveTracksFromQueue={audioPlayer.removeTracksFromQueue}
+              onSaveQueueAsPlaylist={(name) => playlists.saveQueueAsPlaylist(name, audioPlayer.queue)}
+              onAddToPlaylist={playlists.addTrackToPlaylist}
+              onCreateAndAddToPlaylist={handleCreateAndAddToPlaylist}
+              onSelectTheme={setTheme}
+              onSelectLightStyle={setLightStyle}
+              onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
             />
-          </div>
+          ) : (
+            <>
+              {/* Header */}
+              <Header
+                title={viewTitle}
+                subtitle={viewSubtitle}
+                searchQuery={library.searchQuery}
+                breadcrumbs={hasLibrary && library.currentView === 'folder' ? breadcrumbs : undefined}
+                theme={theme}
+                lightStyle={lightStyle}
+                onSearchChange={library.setSearchQuery}
+                onBreadcrumbClick={handleSelectFolder}
+                onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
+                onSelectTheme={setTheme}
+                onSelectLightStyle={setLightStyle}
+              />
+
+              {/* Central View Container */}
+              <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 custom-scrollbar">
+                <LibraryContent
+                  library={library}
+                  playlists={playlists}
+                  audioPlayer={audioPlayer}
+                />
+              </div>
+            </>
+          )}
         </main>
 
-        {/* Right Now Playing Panel */}
-        <NowPlayingPanel
+        {/* Dedicated Right Lyrics Panel */}
+        <LyricsPanel
           currentTrack={audioPlayer.currentTrack}
-          isPlaying={audioPlayer.isPlaying}
           currentTime={audioPlayer.currentTime}
           lyrics={audioPlayer.lyrics}
           ambientColors={audioPlayer.ambientColors}
-          isOpen={isNowPlayingOpen}
-          queue={audioPlayer.queue}
-          onClose={() => setIsNowPlayingOpen(false)}
+          isOpen={isLyricsOpen}
+          onClose={() => setIsLyricsOpen(false)}
           onSeekTo={audioPlayer.seekTo}
-          onPlayTrack={audioPlayer.playQueueTrack}
-          onRemoveFromQueue={audioPlayer.removeFromQueue}
-          onClearQueue={audioPlayer.clearQueue}
-          onSaveQueueAsPlaylist={(name) => playlists.saveQueueAsPlaylist(name, audioPlayer.queue)}
         />
       </div>
 
@@ -223,7 +287,8 @@ export function App() {
               Boolean(audioPlayer.currentTrack.aliases?.some((a) => library.favourites.has(a)))
             : false
         }
-        isNowPlayingOpen={isNowPlayingOpen}
+        isLyricsOpen={isLyricsOpen}
+        isNowPlayingViewOpen={isNowPlayingViewOpen}
         onTogglePlay={audioPlayer.togglePlay}
         onNextTrack={audioPlayer.nextTrack}
         onPrevTrack={audioPlayer.prevTrack}
@@ -235,7 +300,8 @@ export function App() {
         onToggleFavourite={() =>
           audioPlayer.currentTrack && library.toggleFavourite(audioPlayer.currentTrack.id)
         }
-        onToggleNowPlaying={() => setIsNowPlayingOpen((prev) => !prev)}
+        onToggleLyrics={() => setIsLyricsOpen((prev) => !prev)}
+        onToggleNowPlayingView={toggleNowPlayingView}
       />
 
       {/* Keyboard Shortcuts Modal */}

@@ -43,33 +43,29 @@ describe('BottomPlayer Right-Sidebar Toggle Consolidation', () => {
     ...overrides,
   });
 
-  describe('1. Exactly One Authoritative Right-Sidebar Toggle Button', () => {
-    it('renders exactly one toggle button when no track is loaded', () => {
+  describe('1. Exactly One Authoritative Right-Sidebar Lyrics Toggle Button', () => {
+    it('renders exactly one lyrics toggle button when no track is loaded', () => {
       const html = renderToStaticMarkup(<BottomPlayer {...createProps({ currentTrack: null })} />);
 
-      // Exactly one authoritative toggle
-      const matches = html.match(/data-testid="now-playing-toggle-button"/g) || [];
+      const matches = html.match(/data-testid="lyrics-toggle-button"/g) || [];
       expect(matches.length).toBe(1);
-
-      // No redundant lyrics / document button
-      expect(html).not.toContain('Toggle Synchronized Lyrics');
-      expect(html).not.toContain('lucide-file-text');
+      expect(html).toContain('lucide-scroll-text');
+      expect(html).not.toContain('lucide-list');
     });
 
-    it('renders exactly one toggle button when a track with lyrics is active', () => {
+    it('renders exactly one lyrics toggle button when a track with lyrics is active, plus clickable track info separate from heart', () => {
       const html = renderToStaticMarkup(
         <BottomPlayer {...createProps({ currentTrack: mockTrackWithLyrics })} />
       );
 
-      const matches = html.match(/data-testid="now-playing-toggle-button"/g) || [];
+      const matches = html.match(/data-testid="lyrics-toggle-button"/g) || [];
       expect(matches.length).toBe(1);
-
-      // No duplicate button appears regardless of lyrics availability
-      expect(html).not.toContain('Toggle Synchronized Lyrics');
-      expect(html).not.toContain('lucide-file-text');
+      expect(html).toContain('data-testid="bottom-track-info-button"');
+      expect(html).toContain('title="Open Now Playing"');
+      expect(html).toContain('data-testid="bottom-favourite-button"');
     });
 
-    it('renders exactly one toggle button during active playback', () => {
+    it('renders exactly one lyrics toggle button during active playback', () => {
       const html = renderToStaticMarkup(
         <BottomPlayer
           {...createProps({
@@ -80,37 +76,36 @@ describe('BottomPlayer Right-Sidebar Toggle Consolidation', () => {
         />
       );
 
-      const matches = html.match(/data-testid="now-playing-toggle-button"/g) || [];
+      const matches = html.match(/data-testid="lyrics-toggle-button"/g) || [];
       expect(matches.length).toBe(1);
     });
   });
 
   describe('2. State Reflection & Accessibility Attributes', () => {
-    it('reflects collapsed state with aria-expanded="false" and appropriate label when closed', () => {
+    it('reflects collapsed state with aria-expanded="false", aria-pressed="false", and Show Lyrics label when closed', () => {
       const html = renderToStaticMarkup(
-        <BottomPlayer {...createProps({ isNowPlayingOpen: false })} />
+        <BottomPlayer {...createProps({ isLyricsOpen: false, isNowPlayingOpen: false })} />
       );
 
-      expect(html).toContain('data-testid="now-playing-toggle-button"');
+      expect(html).toContain('data-testid="lyrics-toggle-button"');
       expect(html).toContain('aria-expanded="false"');
-      expect(html).toContain('aria-label="Show Now Playing panel"');
-      expect(html).toContain('title="Show Now Playing panel"');
-      // Inactive styling
+      expect(html).toContain('aria-pressed="false"');
+      expect(html).toContain('aria-label="Show Lyrics"');
+      expect(html).toContain('title="Show Lyrics"');
       expect(html).toContain('border-transparent');
     });
 
-    it('reflects expanded state with aria-expanded="true" and active purple styling when open', () => {
+    it('reflects expanded state with aria-expanded="true", aria-pressed="true", and Hide Lyrics label when open', () => {
       const html = renderToStaticMarkup(
-        <BottomPlayer {...createProps({ isNowPlayingOpen: true })} />
+        <BottomPlayer {...createProps({ isLyricsOpen: true, isNowPlayingOpen: true })} />
       );
 
-      expect(html).toContain('data-testid="now-playing-toggle-button"');
+      expect(html).toContain('data-testid="lyrics-toggle-button"');
       expect(html).toContain('aria-expanded="true"');
-      expect(html).toContain('aria-label="Hide Now Playing panel"');
-      expect(html).toContain('title="Hide Now Playing panel"');
-      // Active styling
-      expect(html).toContain('bg-indigo-600/20');
-      expect(html).toContain('border-indigo-500/40');
+      expect(html).toContain('aria-pressed="true"');
+      expect(html).toContain('aria-label="Hide Lyrics"');
+      expect(html).toContain('title="Hide Lyrics"');
+      expect(html).toContain('bg-[var(--bg-active)]');
     });
 
     it('provides keyboard focus-visible ring styles for accessible navigation', () => {

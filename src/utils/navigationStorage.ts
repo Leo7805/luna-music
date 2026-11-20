@@ -6,6 +6,7 @@ export interface StoredNavigationState {
   selectedArtistName?: string | null;
   selectedAlbumId?: string | null;
   selectedPlaylistId?: string | null;
+  isNowPlayingView?: boolean;
 }
 
 export const SESSION_STORAGE_NAV_KEY = 'luna_music_nav_state';
@@ -37,6 +38,7 @@ export function getStoredNavigation(): StoredNavigationState | null {
         selectedArtistName: typeof parsed.selectedArtistName === 'string' ? parsed.selectedArtistName : null,
         selectedAlbumId: typeof parsed.selectedAlbumId === 'string' ? parsed.selectedAlbumId : null,
         selectedPlaylistId: typeof parsed.selectedPlaylistId === 'string' ? parsed.selectedPlaylistId : null,
+        isNowPlayingView: Boolean(parsed.isNowPlayingView),
       };
     }
   } catch {

@@ -44,6 +44,7 @@ export interface UsePlaybackQueueReturn {
     onFallbackPlayTrack: (track: TrackItem, queue: TrackItem[]) => void
   ) => boolean;
   removeFromQueue: (index: number) => void;
+  removeTracksFromQueue: (indices: number[], currentTrack: TrackItem | null) => number;
   clearQueue: (currentTrack: TrackItem | null) => void;
   reorderQueue: (fromIndex: number, toIndex: number) => void;
   getNextTrack: (
@@ -224,6 +225,30 @@ export function usePlaybackQueue({
     });
   }, []);
 
+  // Bulk remove tracks by original Queue indices while strictly protecting the currently playing track
+  const removeTracksFromQueue = useCallback(
+    (indices: number[], currentTrack: TrackItem | null): number => {
+      if (indices.length === 0) return 0;
+      const indexSet = new Set(indices);
+      const prevQueue = queueRef.current;
+      let removedCount = 0;
+      const nextQueue = prevQueue.filter((track, idx) => {
+        if (!indexSet.has(idx)) return true;
+        if (currentTrack && isSameTrack(track, currentTrack)) {
+          return true;
+        }
+        removedCount++;
+        return false;
+      });
+      if (removedCount > 0) {
+        queueRef.current = nextQueue;
+        setQueue(nextQueue);
+      }
+      return removedCount;
+    },
+    []
+  );
+
   // Clear upcoming items in queue (preserving current track)
   const clearQueue = useCallback((currentTrack: TrackItem | null) => {
     if (currentTrack) {
@@ -305,6 +330,7 @@ export function usePlaybackQueue({
     playNextBulk,
     addToQueue,
     removeFromQueue,
+    removeTracksFromQueue,
     clearQueue,
     reorderQueue,
     getNextTrack,
