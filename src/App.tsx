@@ -199,7 +199,7 @@ export function App() {
           queue={audioPlayer.queue}
           onClose={() => setIsNowPlayingOpen(false)}
           onSeekTo={audioPlayer.seekTo}
-          onPlayTrack={audioPlayer.playTrack}
+          onPlayTrack={audioPlayer.playQueueTrack}
           onRemoveFromQueue={audioPlayer.removeFromQueue}
           onClearQueue={audioPlayer.clearQueue}
           onSaveQueueAsPlaylist={(name) => playlists.saveQueueAsPlaylist(name, audioPlayer.queue)}

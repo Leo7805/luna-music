@@ -54,6 +54,8 @@ export function SidebarPlaylists({
               <div
                 tabIndex={0}
                 role="button"
+                data-active={selectedPlaylistId === pl.id ? 'true' : 'false'}
+                aria-current={selectedPlaylistId === pl.id ? 'page' : undefined}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
@@ -61,9 +63,9 @@ export function SidebarPlaylists({
                     onSelectPlaylist?.(pl.id);
                   }
                 }}
-                className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-[var(--accent-primary)]/50 focus-visible:border-transparent ${
+                className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 focus-visible:border-transparent ${
                   selectedPlaylistId === pl.id
-                    ? 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-white/[0.08] text-[var(--accent-primary)] dark:text-white font-medium border-indigo-500/30 border-[var(--accent-primary)]/30 dark:border-white/[0.1] shadow-sm'
+                    ? 'bg-[var(--bg-active)] dark:bg-white/[0.1] text-[var(--text-primary)] dark:text-white font-semibold border-[var(--accent-primary)]/20 dark:border-white/[0.12]'
                     : 'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]'
                 }`}
                 onClick={() => {

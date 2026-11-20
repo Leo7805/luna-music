@@ -198,32 +198,46 @@ export const NowPlayingQueueTab: React.FC<NowPlayingQueueTabProps> = ({
                   }
                 }}
                 onClick={() => onPlayTrack?.(track)}
-                className={`group flex items-center justify-between p-2 rounded-xl text-xs border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
-                  isCurrent
-                    ? 'bg-[var(--bg-active)] dark:bg-indigo-600/25 border-[var(--accent-primary)]/30 text-[var(--accent-primary)] dark:text-indigo-300 font-medium shadow-sm'
-                    : 'border-transparent hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04] text-[var(--text-primary)] dark:text-slate-300'
-                }`}
+                className="group flex items-center justify-between p-2 rounded-xl text-xs border border-transparent transition-colors duration-150 cursor-pointer hover:bg-[var(--bg-hover)]/70 dark:hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 focus-visible:border-transparent"
               >
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="w-4 text-center text-[10px] text-[var(--text-secondary)]">
                     {isCurrent ? (
-                      <Play className="w-3 h-3 text-[var(--accent-primary)] fill-[var(--accent-primary)]" />
+                      <Play className="w-3 h-3 mx-auto text-[var(--accent-primary)] fill-[var(--accent-primary)] dark:text-slate-100 dark:fill-slate-100" />
                     ) : (
                       idx + 1
                     )}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs text-[var(--text-primary)] dark:text-white">
+                    <p
+                      className={`truncate text-xs ${
+                        isCurrent
+                          ? 'font-semibold text-[var(--accent-primary)] dark:text-white'
+                          : 'text-[var(--text-primary)]/85 dark:text-slate-300'
+                      }`}
+                    >
                       {track.metadata.title || track.name}
                     </p>
-                    <p className="truncate text-[10px] text-[var(--text-secondary)] dark:text-slate-400">
+                    <p
+                      className={`truncate text-[10px] ${
+                        isCurrent
+                          ? 'text-[var(--text-primary)]/75 dark:text-slate-300'
+                          : 'text-[var(--text-secondary)] dark:text-slate-500'
+                      }`}
+                    >
                       {track.metadata.artist || 'Unknown Artist'}
                     </p>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                  <span className="text-[10px] text-[var(--text-secondary)] font-mono">
+                  <span
+                    className={`text-[10px] font-mono ${
+                      isCurrent
+                        ? 'text-[var(--accent-primary)] dark:text-slate-200 font-medium'
+                        : 'text-[var(--text-secondary)]'
+                    }`}
+                  >
                     {formatDuration(track.metadata.duration)}
                   </span>
                   {onRemoveFromQueue && !isCurrent && (

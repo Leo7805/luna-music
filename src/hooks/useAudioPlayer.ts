@@ -163,6 +163,35 @@ export function useAudioPlayer({
     [clearPlayNextOverride, loadAudioSource]
   );
 
+  // Direct click on a Queue row: jump to its existing position without reordering
+  const playQueueTrack = useCallback(
+    (track: TrackItem) => {
+      const now = Date.now();
+      if (
+        lastPlayRequestRef.current.id === `queue-row:${track.id}` &&
+        now - lastPlayRequestRef.current.time < 350
+      ) {
+        return;
+      }
+      lastPlayRequestRef.current = { id: `queue-row:${track.id}`, time: now };
+
+      if (!isTrackPlayable(track)) {
+        audioEngine.setPlaybackError(`Cannot play unplayable track: ${track.name}`);
+        return;
+      }
+
+      if (currentTrackRef.current && isSameTrack(currentTrackRef.current, track)) {
+        if (!audioEngine.isPlaying) {
+          audioEngine.togglePlay(() => navigateToTrack(track, true));
+        }
+        return;
+      }
+
+      navigateToTrack(track, true);
+    },
+    [audioEngine, navigateToTrack]
+  );
+
   // Play a specific track (Play Now) across all library views
   const playTrack = useCallback(
     (track: TrackItem, newQueue?: TrackItem[], autoPlay = true) => {
@@ -402,6 +431,7 @@ export function useAudioPlayer({
     ambientColors,
     queue,
     playTrack,
+    playQueueTrack,
     playQueue,
     playNext,
     playNextBulk,

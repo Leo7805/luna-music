@@ -4,13 +4,27 @@ import {
   NowPlayingQueueTab,
   calculateQueueScrollOffset,
 } from '../src/components/NowPlayingQueueTab';
+import { useAudioPlayer } from '../src/hooks/useAudioPlayer';
+import { getNextTrackToPlay, getPrevTrackToPlay } from '../src/utils/queueAlgorithms';
+import { resolveInitialQueue, resolveInitialTrack } from '../src/utils/playbackSession';
 import { TrackItem } from '../src/types/music';
+
+function renderHookSync<T>(useHook: () => T): T {
+  let result!: T;
+  function Harness() {
+    result = useHook();
+    return null;
+  }
+  renderToStaticMarkup(<Harness />);
+  return result;
+}
 
 function makeTrack(id: string, name: string): TrackItem {
   return {
     id,
     name: `${name}.mp3`,
     relativePath: `${name}.mp3`,
+    file: new File(['audio'], `${name}.mp3`, { type: 'audio/mpeg' }),
     size: 1024,
     lastModified: 1000,
     metadata: {
@@ -24,8 +38,8 @@ function makeTrack(id: string, name: string): TrackItem {
   };
 }
 
-describe('Queue Auto-Scroll & Visibility Management', () => {
-  it('renders queue tracks and marks the playing track with active highlight', () => {
+describe('Queue Auto-Scroll, Text-Emphasis Styling & Direct Queue Navigation', () => {
+  it('renders queue active row with text emphasis and playing icon only (no active fill, border, or shadow)', () => {
     const tracks = [
       makeTrack('t1', 'Track 1'),
       makeTrack('t2', 'Track 2'),
@@ -44,9 +58,58 @@ describe('Queue Auto-Scroll & Visibility Management', () => {
     expect(html).toContain('Track 1');
     expect(html).toContain('Track 2');
     expect(html).toContain('Track 3');
-    // Active track has theme accent/active background and play icon
-    expect(html).toContain('bg-[var(--bg-active)]');
+    // Active track uses data-current, playing icon, and semibold title text
+    expect(html).toContain('data-current="true"');
     expect(html).toContain('lucide-play');
+    expect(html).toContain('font-semibold text-[var(--accent-primary)] dark:text-white');
+    // No persistent filled background, colored border, or drop shadow on active row
+    expect(html).not.toContain('bg-[var(--bg-active)]');
+    expect(html).not.toContain('dark:bg-indigo-600/25');
+    expect(html).not.toContain('border-[var(--accent-primary)]/30');
+    expect(html).not.toContain('shadow-sm');
+    // Accessible focus-visible indicator preserved
+    expect(html).toContain('focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50');
+  });
+
+  it('direct Queue click (playQueueTrack) navigates without reordering and preserves Prev/Next and session restoration', () => {
+    const [tA, tB, tC, tD, tE] = ['A', 'B', 'C', 'D', 'E'].map((k) =>
+      makeTrack(`track-${k}`, `Track ${k}`)
+    );
+    const initialQueue = [tA, tB, tC, tD, tE];
+
+    const player = renderHookSync(() =>
+      useAudioPlayer({
+        initialQueue,
+        initialTrackId: tB.id,
+        libraryTracks: initialQueue,
+      })
+    );
+
+    expect(typeof player.playQueueTrack).toBe('function');
+    expect(player.queue.map((t) => t.id)).toEqual([tA.id, tB.id, tC.id, tD.id, tE.id]);
+    expect(player.currentTrack?.id).toBe(tB.id);
+
+    // Clicking D directly in Queue does not reorder the queue
+    player.playQueueTrack(tD);
+    expect(player.queue.map((t) => t.id)).toEqual([tA.id, tB.id, tC.id, tD.id, tE.id]);
+
+    // Prev/Next from D operate on its original index (3 -> C and E)
+    expect(getNextTrackToPlay(initialQueue, tD, false, 'off', null).nextTrack?.id).toBe(tE.id);
+    expect(getPrevTrackToPlay(initialQueue, tD, 'off').targetTrack?.id).toBe(tC.id);
+
+    // Persisted queue order and current track restore cleanly after refresh
+    const restoredQ = resolveInitialQueue({
+      storedQueueIds: initialQueue.map((t) => t.id),
+      effectiveInitialTrackId: tD.id,
+      libraryTracks: initialQueue,
+    });
+    const restoredTrack = resolveInitialTrack({
+      effectiveInitialTrackId: tD.id,
+      libraryTracks: initialQueue,
+      queue: restoredQ,
+    });
+    expect(restoredQ.map((t) => t.id)).toEqual([tA.id, tB.id, tC.id, tD.id, tE.id]);
+    expect(restoredTrack?.id).toBe(tD.id);
   });
 
   it('renders empty queue state message when queue is empty', () => {

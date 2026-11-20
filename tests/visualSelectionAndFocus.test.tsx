@@ -142,7 +142,7 @@ describe('Visual Selection and Focus States Consistency', () => {
   });
 
   describe('2. Sidebar Playlists & Folders Consistent Selection Borders', () => {
-    it('renders playlist item with constant border and transition-colors', () => {
+    it('renders playlist item with unified soft active styling matching folder sources and no shadow', () => {
       const htmlSelected = renderToStaticMarkup(
         <SidebarPlaylists
           playlists={[mockPlaylist]}
@@ -155,7 +155,11 @@ describe('Visual Selection and Focus States Consistency', () => {
           onDeletePrompt={() => {}}
         />
       );
-      expect(htmlSelected).toContain('border-indigo-500/30');
+      expect(htmlSelected).toContain('data-active="true" aria-current="page"');
+      expect(htmlSelected).toContain('bg-[var(--bg-active)] dark:bg-white/[0.1] text-[var(--text-primary)] dark:text-white font-semibold border-[var(--accent-primary)]/20 dark:border-white/[0.12]');
+      expect(htmlSelected).not.toContain('bg-indigo-600/20');
+      expect(htmlSelected).not.toContain('border-indigo-500/30');
+      expect(htmlSelected).not.toContain('shadow-sm');
       expect(htmlSelected).toContain('transition-colors');
 
       const htmlUnselected = renderToStaticMarkup(
