@@ -14,7 +14,7 @@ import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { getBreadcrumbs } from './utils/musicTree';
 import { deriveViewHeaderInfo } from './utils/libraryAggregation';
-import { LibraryView, TrackItem } from './types/music';
+import { LibraryView } from './types/music';
 
 export function App() {
   const { theme, setTheme, lightStyle, setLightStyle } = useTheme();
@@ -197,7 +197,7 @@ export function App() {
           queue={audioPlayer.queue}
           onClose={() => setIsNowPlayingOpen(false)}
           onSeekTo={audioPlayer.seekTo}
-          onPlayTrack={(track: TrackItem) => audioPlayer.playTrack(track, audioPlayer.queue)}
+          onPlayTrack={audioPlayer.playTrack}
           onRemoveFromQueue={audioPlayer.removeFromQueue}
           onClearQueue={audioPlayer.clearQueue}
           onSaveQueueAsPlaylist={(name) => playlists.saveQueueAsPlaylist(name, audioPlayer.queue)}

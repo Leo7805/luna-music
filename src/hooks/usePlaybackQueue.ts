@@ -1,11 +1,15 @@
 import { useState, useRef, useCallback } from 'react';
 import { TrackItem, RepeatMode } from '../types/music';
+import { isTrackPlayable } from '../utils/audioFileTypes';
 import {
   isSameTrack,
+  applyPlayNow,
   applyPlayNext,
   applyBulkPlayNext,
   applyAddToQueue,
   getNextTrackToPlay,
+  getPrevTrackToPlay,
+  PlayNowResult,
 } from '../utils/musicTree';
 
 export interface UsePlaybackQueueProps {
@@ -19,11 +23,16 @@ export interface UsePlaybackQueueReturn {
   setQueue: React.Dispatch<React.SetStateAction<TrackItem[]>>;
   setQueueImmediate: (newQueue: TrackItem[]) => void;
   appendTrackIfMissing: (track: TrackItem) => void;
+  playNow: (
+    selectedTrack: TrackItem,
+    currentTrack: TrackItem | null,
+    isPlaying: boolean
+  ) => PlayNowResult;
   playNext: (
     track: TrackItem,
     currentTrack: TrackItem | null,
     onFallbackPlayTrack: (track: TrackItem, queue: TrackItem[]) => void
-  ) => 'added' | 'moved';
+  ) => 'added' | 'moved' | void;
   playNextBulk: (
     tracks: TrackItem[],
     currentTrack: TrackItem | null,
@@ -79,13 +88,39 @@ export function usePlaybackQueue({
     }
   }, []);
 
+  // Compute Play Now queue mutation and action
+  const playNow = useCallback(
+    (
+      selectedTrack: TrackItem,
+      currentTrack: TrackItem | null,
+      isPlaying: boolean
+    ): PlayNowResult => {
+      const result = applyPlayNow(
+        queueRef.current,
+        currentTrack,
+        selectedTrack,
+        isPlaying
+      );
+      if (result.action === 'play') {
+        queueRef.current = result.nextQueue;
+        setQueue(result.nextQueue);
+      }
+      return result;
+    },
+    []
+  );
+
   // Insert track immediately after currentTrack in queue (Play Next)
   const playNext = useCallback(
     (
       track: TrackItem,
       currentTrack: TrackItem | null,
       onFallbackPlayTrack: (track: TrackItem, queue: TrackItem[]) => void
-    ): 'added' | 'moved' => {
+    ): 'added' | 'moved' | void => {
+      if (!isTrackPlayable(track)) {
+        return undefined;
+      }
+
       if (!currentTrack && queueRef.current.length === 0) {
         onFallbackPlayTrack(track, [track]);
         playNextTrackIdRef.current = null;
@@ -97,6 +132,10 @@ export function usePlaybackQueue({
         currentTrack,
         track
       );
+
+      if (outcome === 'noop') {
+        return undefined;
+      }
 
       queueRef.current = nextQueue;
       setQueue(nextQueue);
@@ -115,25 +154,26 @@ export function usePlaybackQueue({
       currentTrack: TrackItem | null,
       onFallbackPlayTrack: (track: TrackItem, queue: TrackItem[]) => void
     ): { movedCount: number; addedCount: number } => {
-      if (tracks.length === 0) return { movedCount: 0, addedCount: 0 };
+      const playable = tracks.filter(isTrackPlayable);
+      if (playable.length === 0) return { movedCount: 0, addedCount: 0 };
 
       if (!currentTrack && queueRef.current.length === 0) {
-        onFallbackPlayTrack(tracks[0], tracks);
+        onFallbackPlayTrack(playable[0], playable);
         playNextTrackIdRef.current = null;
-        return { movedCount: 0, addedCount: tracks.length };
+        return { movedCount: 0, addedCount: playable.length };
       }
 
       const { nextQueue, movedCount, addedCount } = applyBulkPlayNext(
         queueRef.current,
         currentTrack,
-        tracks
+        playable
       );
 
       queueRef.current = nextQueue;
       setQueue(nextQueue);
 
-      if (tracks.length > 0) {
-        playNextTrackIdRef.current = tracks[0].id;
+      if (playable.length > 0) {
+        playNextTrackIdRef.current = playable[0].id;
       }
 
       return { movedCount, addedCount };
@@ -148,7 +188,8 @@ export function usePlaybackQueue({
       currentTrack: TrackItem | null,
       onFallbackPlayTrack: (track: TrackItem, queue: TrackItem[]) => void
     ): boolean => {
-      const incoming = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
+      const raw = Array.isArray(trackOrTracks) ? trackOrTracks : [trackOrTracks];
+      const incoming = raw.filter(isTrackPlayable);
       if (incoming.length === 0) return false;
 
       if (!currentTrack && queueRef.current.length === 0) {
@@ -248,23 +289,7 @@ export function usePlaybackQueue({
       currentTrack: TrackItem | null,
       repeatMode: RepeatMode
     ): { targetTrack: TrackItem | null; shouldRestartCurrent: boolean } => {
-      const currentList = queueRef.current;
-      if (currentList.length === 0) {
-        return { targetTrack: null, shouldRestartCurrent: false };
-      }
-
-      if (!currentTrack) {
-        return { targetTrack: currentList[0], shouldRestartCurrent: false };
-      }
-
-      const currentIndex = currentList.findIndex((t) => isSameTrack(t, currentTrack));
-      if (currentIndex > 0) {
-        return { targetTrack: currentList[currentIndex - 1], shouldRestartCurrent: false };
-      } else if (repeatMode === 'all') {
-        return { targetTrack: currentList[currentList.length - 1], shouldRestartCurrent: false };
-      } else {
-        return { targetTrack: null, shouldRestartCurrent: true };
-      }
+      return getPrevTrackToPlay(queueRef.current, currentTrack, repeatMode);
     },
     []
   );
@@ -275,6 +300,7 @@ export function usePlaybackQueue({
     setQueue,
     setQueueImmediate,
     appendTrackIfMissing,
+    playNow,
     playNext,
     playNextBulk,
     addToQueue,

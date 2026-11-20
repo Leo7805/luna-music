@@ -29,6 +29,7 @@ export interface UseAudioEngineReturn {
   volume: number;
   isMuted: boolean;
   playbackError: string | null;
+  setPlaybackError: (err: string | null) => void;
   loadAudioSource: (track: TrackItem, autoPlay?: boolean) => Promise<void>;
   togglePlay: (onPlayFallback: () => void) => void;
   seekTo: (timeInSeconds: number) => void;
@@ -445,6 +446,7 @@ export function useAudioEngine({
     volume,
     isMuted,
     playbackError,
+    setPlaybackError,
     loadAudioSource,
     togglePlay,
     seekTo,

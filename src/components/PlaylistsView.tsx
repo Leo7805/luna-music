@@ -30,7 +30,7 @@ interface PlaylistsViewProps {
   onRenamePlaylist: (id: string, newName: string) => void;
   onDeletePlaylist: (id: string) => void;
   onPlayPlaylist: (playlist: Playlist, startIndex?: number, shuffle?: boolean) => void;
-  onPlayTrack: (track: TrackItem, queue?: TrackItem[]) => void;
+  onPlayTrack: (track: TrackItem) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
@@ -202,7 +202,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 isPlaying={isPlaying}
                 favourites={favourites}
                 playlists={playlists}
-                onPlayTrack={(track) => onPlayTrack(track, resolvedTracks)}
+                onPlayTrack={onPlayTrack}
                 onTogglePlay={onTogglePlay}
                 onToggleFavourite={onToggleFavourite}
                 onPlayNext={onPlayNext}

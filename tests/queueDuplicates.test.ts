@@ -101,34 +101,19 @@ describe('Playback Queue Duplicate Prevention & Play Next Handling', () => {
   });
 
   // 4. Play Next on the currently playing track
-  it('4. Play Next on the currently playing track allows one additional occurrence immediately after it', () => {
+  it('4. Play Next on the currently playing track leaves queue unchanged and prevents duplicates', () => {
     const queue = [trackA, trackB, trackC];
     const currentTrack = trackB;
 
     const { nextQueue, outcome } = applyPlayNext(queue, currentTrack, trackB);
 
-    expect(outcome).toBe('added');
-    // Should result in [A, B, B, C]
+    expect(outcome).toBe('noop');
+    // Should preserve queue without duplicating B
     expect(nextQueue.map((t) => t.id)).toEqual([
       'track-A',
       'track-B',
-      'track-B',
       'track-C',
     ]);
-
-    // If B is playing AND already also in upcoming queue: [A, B, C, B, D]
-    const queueWithUpcomingB = [trackA, trackB, trackC, trackB, trackD];
-    const result2 = applyPlayNext(queueWithUpcomingB, trackB, trackB);
-    expect(result2.outcome).toBe('moved');
-    // Consolidated upcoming B to immediately after current track: [A, B, B, C, D]
-    expect(result2.nextQueue.map((t) => t.id)).toEqual([
-      'track-A',
-      'track-B',
-      'track-B',
-      'track-C',
-      'track-D',
-    ]);
-    expect(result2.nextQueue.filter((t) => isSameTrack(t, trackB))).toHaveLength(2);
   });
 
   // 5. Add to Queue on an existing upcoming track
@@ -154,18 +139,11 @@ describe('Playback Queue Duplicate Prevention & Play Next Handling', () => {
       'track-E',
     ]);
 
-    // Adding currently playing track B when B is not yet in upcoming queue appends to end
+    // Adding currently playing track B skips appending duplicate
     const resultB = applyAddToQueue(queue, currentTrack, trackB);
-    expect(resultB.addedCount).toBe(1);
-    expect(resultB.nextQueue.map((t) => t.id)).toEqual([
-      'track-A',
-      'track-B',
-      'track-C',
-      'track-D',
-      'track-B',
-    ]);
-    // The currently playing track B at index 1 is not modified
-    expect(resultB.nextQueue[1].id).toBe('track-B');
+    expect(resultB.addedCount).toBe(0);
+    expect(resultB.nextQueue).toEqual(queue);
+    expect(resultB.nextQueue.filter((t) => isSameTrack(t, trackB))).toHaveLength(1);
   });
 
   // 6. Alias-equivalent tracks

@@ -6,12 +6,12 @@ import { resolveInitialQueue, resolveInitialTrack } from '../utils/playbackSessi
 import {
   storePlaybackState,
   getStoredPlaybackStateSync,
-  getStoredPlaybackState,
 } from '../services/idbStorage';
 import { useArtworkColors } from './useArtworkColors';
 import { useTrackLyrics } from './useTrackLyrics';
 import { usePlaybackQueue } from './usePlaybackQueue';
 import { useAudioEngine } from './useAudioEngine';
+import { usePlaybackPreferences } from './usePlaybackPreferences';
 
 export interface UseAudioPlayerProps {
   playlist?: TrackItem[];
@@ -33,8 +33,8 @@ export interface UseAudioPlayerProps {
 
 /**
  * Luna Music Audio Player Hook
- * Coordinates the audio engine, playback queue, lyrics, ambient colors,
- * and playback state persistence.
+ * Coordinates the audio engine, playback queue, preferences, lyrics,
+ * ambient colors, and playback state persistence.
  */
 export function useAudioPlayer({
   playlist,
@@ -79,56 +79,16 @@ export function useAudioPlayer({
   });
 
   const [currentTrack, setCurrentTrack] = useState<TrackItem | null>(() => resolvedInitialTrack);
-  const [repeatMode, setRepeatMode] = useState<RepeatMode>(effectiveInitialRepeat);
-  const [shuffle, setShuffle] = useState<boolean>(effectiveInitialShuffle);
-
-  // Track user manual changes in current session to prevent async storage hydration overwriting them
-  const userInteractedRef = useRef<{
-    volume: boolean;
-    repeatMode: boolean;
-    shuffle: boolean;
-    isMuted: boolean;
-  }>({
-    volume: false,
-    repeatMode: false,
-    shuffle: false,
-    isMuted: false,
-  });
-
   const lastPlayRequestRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
-
   const currentTrackRef = useRef<TrackItem | null>(currentTrack);
   currentTrackRef.current = currentTrack;
 
-  const repeatModeRef = useRef<RepeatMode>(repeatMode);
-  repeatModeRef.current = repeatMode;
-
-  const shuffleRef = useRef<boolean>(shuffle);
-  shuffleRef.current = shuffle;
-
   // Queue state and algorithms
   const queueControls = usePlaybackQueue({ initialQueue: resolvedInitialQueue, playlist });
-  const {
-    queue,
-    clearPlayNextOverride,
-    setQueueImmediate,
-    appendTrackIfMissing,
-  } = queueControls;
+  const { queue, clearPlayNextOverride, setQueueImmediate } = queueControls;
 
   // Forward declarations for circular references in ended handler
   const nextTrackRef = useRef<() => void>(() => {});
-
-  const handleEnded = useCallback(() => {
-    if (repeatModeRef.current === 'one') {
-      audioEngine.seekTo(0);
-      const audio = audioEngine.audioRef.current;
-      if (audio) {
-        audio.play().catch(() => {});
-      }
-    } else {
-      nextTrackRef.current();
-    }
-  }, []);
 
   // Audio element and engine controls
   const audioEngine = useAudioEngine({
@@ -138,10 +98,24 @@ export function useAudioPlayer({
     currentTrack,
     onTrackStatusChanged,
     onTrackUpdated: setCurrentTrack,
-    onEnded: handleEnded,
+    onEnded: () => {
+      if (prefs.repeatModeRef.current === 'one') {
+        audioEngine.seekTo(0);
+        audioEngine.audioRef.current?.play().catch(() => {});
+      } else {
+        nextTrackRef.current();
+      }
+    },
   });
 
   const { loadAudioSource } = audioEngine;
+
+  // Playback preferences hook (volume, mute, repeat, shuffle)
+  const prefs = usePlaybackPreferences({
+    initialRepeatMode: effectiveInitialRepeat,
+    initialShuffle: effectiveInitialShuffle,
+    audioEngine,
+  });
 
   // Lyrics and ambient artwork colors
   const lyrics = useTrackLyrics(currentTrack);
@@ -179,7 +153,17 @@ export function useAudioPlayer({
     }
   }, [libraryTracks, queue, effectiveInitialTrackId, setQueueImmediate, loadAudioSource, syncState.queueTrackIds]);
 
-  // Play a specific track, optionally providing a new playback queue
+  // Navigate to track without reordering or mutating the queue
+  const navigateToTrack = useCallback(
+    (track: TrackItem, autoPlay = true) => {
+      clearPlayNextOverride();
+      setCurrentTrack(track);
+      loadAudioSource(track, autoPlay);
+    },
+    [clearPlayNextOverride, loadAudioSource]
+  );
+
+  // Play a specific track (Play Now) across all library views
   const playTrack = useCallback(
     (track: TrackItem, newQueue?: TrackItem[], autoPlay = true) => {
       // Rapid duplicate play protection (e.g. from rapid double-clicks)
@@ -193,19 +177,38 @@ export function useAudioPlayer({
       }
       lastPlayRequestRef.current = { id: track.id, time: now };
 
+      if (!isTrackPlayable(track)) {
+        audioEngine.setPlaybackError(`Cannot play unplayable track: ${track.name}`);
+        return;
+      }
+
       clearPlayNextOverride();
+
       if (newQueue && newQueue.length > 0) {
         setQueueImmediate(newQueue);
-      } else {
-        appendTrackIfMissing(track);
+        setCurrentTrack(track);
+        loadAudioSource(track, autoPlay);
+        return;
       }
-      setCurrentTrack(track);
-      loadAudioSource(track, autoPlay);
+
+      // Play Now contract: insert/move to current position without destroying queue
+      const result = queueControls.playNow(track, currentTrackRef.current, audioEngine.isPlaying);
+      if (result.action === 'noop') {
+        return;
+      }
+      if (result.action === 'resume') {
+        audioEngine.togglePlay(() => {});
+        return;
+      }
+
+      // action === 'play'
+      setCurrentTrack(result.nextTrack);
+      loadAudioSource(result.nextTrack, autoPlay);
     },
-    [clearPlayNextOverride, setQueueImmediate, appendTrackIfMissing, loadAudioSource]
+    [clearPlayNextOverride, queueControls, audioEngine, loadAudioSource, setQueueImmediate]
   );
 
-  // Play an entire queue starting from startIndex or 0
+  // Play an entire queue starting from startIndex or 0 (Play All)
   const playQueue = useCallback(
     (
       tracks: TrackItem[],
@@ -277,16 +280,16 @@ export function useAudioPlayer({
   const nextTrack = useCallback(() => {
     const targetTrack = queueControls.getNextTrack(
       currentTrackRef.current,
-      shuffleRef.current,
-      repeatModeRef.current
+      prefs.shuffleRef.current,
+      prefs.repeatModeRef.current
     );
 
     if (targetTrack) {
-      playTrack(targetTrack, undefined, true);
+      navigateToTrack(targetTrack);
     } else {
       audioEngine.setIsPlaying(false);
     }
-  }, [queueControls, playTrack, audioEngine]);
+  }, [queueControls, navigateToTrack, audioEngine, prefs.shuffleRef, prefs.repeatModeRef]);
 
   nextTrackRef.current = nextTrack;
 
@@ -300,26 +303,26 @@ export function useAudioPlayer({
 
     const { targetTrack, shouldRestartCurrent } = queueControls.getPrevTrack(
       currentTrackRef.current,
-      repeatModeRef.current
+      prefs.repeatModeRef.current
     );
 
     if (targetTrack) {
-      playTrack(targetTrack, undefined, true);
+      navigateToTrack(targetTrack);
     } else if (shouldRestartCurrent) {
       audioEngine.seekTo(0);
     }
-  }, [audioEngine, queueControls, playTrack]);
+  }, [audioEngine, queueControls, navigateToTrack, prefs.repeatModeRef]);
 
   // Toggle play/pause
   const togglePlay = useCallback(() => {
     audioEngine.togglePlay(() => {
       if (currentTrackRef.current) {
-        playTrack(currentTrackRef.current, undefined, true);
+        navigateToTrack(currentTrackRef.current);
       } else if (queueControls.queueRef.current.length > 0) {
-        playTrack(queueControls.queueRef.current[0], undefined, true);
+        navigateToTrack(queueControls.queueRef.current[0]);
       }
     });
-  }, [audioEngine, playTrack, queueControls.queueRef]);
+  }, [audioEngine, navigateToTrack, queueControls.queueRef]);
 
   // Queue manipulation actions bound with fallback playback
   const playNext = useCallback(
@@ -340,78 +343,6 @@ export function useAudioPlayer({
   const clearQueue = useCallback(() => {
     queueControls.clearQueue(currentTrackRef.current);
   }, [queueControls]);
-
-  // Asynchronously hydrate persistent settings from IndexedDB (fallback / verification)
-  useEffect(() => {
-    let isCancelled = false;
-    getStoredPlaybackState()
-      .then((stored) => {
-        if (isCancelled || !stored) return;
-
-        // Apply volume & mute if user hasn't modified them in this session
-        if (!userInteractedRef.current.volume && typeof stored.volume === 'number') {
-          audioEngine.applyHydratedSettings({
-            volume: stored.volume,
-            isMuted:
-              !userInteractedRef.current.isMuted && typeof stored.isMuted === 'boolean'
-                ? stored.isMuted
-                : undefined,
-          });
-        } else if (!userInteractedRef.current.isMuted && typeof stored.isMuted === 'boolean') {
-          audioEngine.applyHydratedSettings({ isMuted: stored.isMuted });
-        }
-
-        // Apply repeat mode & shuffle if user hasn't modified them in this session
-        if (!userInteractedRef.current.repeatMode && stored.repeatMode) {
-          setRepeatMode(stored.repeatMode);
-        }
-        if (!userInteractedRef.current.shuffle && typeof stored.shuffle === 'boolean') {
-          setShuffle(stored.shuffle);
-        }
-      })
-      .catch(() => {
-        // Safe fallback: keep existing settings
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, []);
-
-  const changeVolume = useCallback((newVol: number) => {
-    userInteractedRef.current.volume = true;
-    userInteractedRef.current.isMuted = true;
-    audioEngine.changeVolume(newVol);
-  }, [audioEngine]);
-
-  const adjustVolume = useCallback((delta: number) => {
-    userInteractedRef.current.volume = true;
-    userInteractedRef.current.isMuted = true;
-    audioEngine.adjustVolume(delta);
-  }, [audioEngine]);
-
-  const toggleMute = useCallback(() => {
-    userInteractedRef.current.isMuted = true;
-    audioEngine.toggleMute();
-  }, [audioEngine]);
-
-  const cycleRepeatMode = useCallback(() => {
-    userInteractedRef.current.repeatMode = true;
-    setRepeatMode((prev) => {
-      const next: RepeatMode = prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off';
-      storePlaybackState({ repeatMode: next });
-      return next;
-    });
-  }, []);
-
-  const toggleShuffle = useCallback(() => {
-    userInteractedRef.current.shuffle = true;
-    setShuffle((prev) => {
-      const next = !prev;
-      storePlaybackState({ shuffle: next });
-      return next;
-    });
-  }, []);
 
   // Persist queue updates
   useEffect(() => {
@@ -463,8 +394,8 @@ export function useAudioPlayer({
     duration: audioEngine.duration,
     volume: audioEngine.volume,
     isMuted: audioEngine.isMuted,
-    repeatMode,
-    shuffle,
+    repeatMode: prefs.repeatMode,
+    shuffle: prefs.shuffle,
     playbackError: audioEngine.playbackError,
     clearPlaybackError: audioEngine.clearPlaybackError,
     lyrics,
@@ -483,10 +414,10 @@ export function useAudioPlayer({
     prevTrack,
     seekTo: audioEngine.seekTo,
     seekRelative: audioEngine.seekRelative,
-    changeVolume,
-    adjustVolume,
-    toggleMute,
-    cycleRepeatMode,
-    toggleShuffle,
+    changeVolume: prefs.changeVolume,
+    adjustVolume: prefs.adjustVolume,
+    toggleMute: prefs.toggleMute,
+    cycleRepeatMode: prefs.cycleRepeatMode,
+    toggleShuffle: prefs.toggleShuffle,
   };
 }
