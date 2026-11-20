@@ -5,6 +5,7 @@ import {
   MusicLibrary,
   AlbumGroup,
   ArtistGroup,
+  IMPORTED_FILES_ROOT_ID,
 } from '../types/music';
 import { findFolderNodeByPath } from '../utils/musicTree';
 import { getStoredNavigation, storeNavigation } from '../utils/navigationStorage';
@@ -45,7 +46,7 @@ export function useLibraryNavigation(
     () => initialNav?.view || 'all'
   );
   const [selectedFolderPath, setSelectedFolderPathState] = useState<string>(
-    () => initialNav?.selectedFolderPath || ''
+    () => (initialNav?.view === 'folder' ? initialNav.selectedFolderPath || '' : '')
   );
   const [selectedArtistName, setSelectedArtistNameState] = useState<string | null>(
     () => initialNav?.selectedArtistName ?? null
@@ -62,7 +63,12 @@ export function useLibraryNavigation(
 
   const setCurrentView = useCallback((view: LibraryView) => {
     setCurrentViewState(view);
-    storeNavigation({ view });
+    if (view !== 'folder') {
+      setSelectedFolderPathState('');
+      storeNavigation({ view, selectedFolderPath: '' });
+    } else {
+      storeNavigation({ view });
+    }
   }, []);
 
   const selectFolder = useCallback((path: string) => {
@@ -73,25 +79,30 @@ export function useLibraryNavigation(
 
   const selectArtist = useCallback((artistName: string | null) => {
     setSelectedArtistNameState(artistName);
+    setSelectedFolderPathState('');
     setCurrentViewState('artists');
-    storeNavigation({ view: 'artists', selectedArtistName: artistName });
+    storeNavigation({ view: 'artists', selectedArtistName: artistName, selectedFolderPath: '' });
   }, []);
 
   const selectAlbum = useCallback((albumId: string | null) => {
     setSelectedAlbumIdState(albumId);
+    setSelectedFolderPathState('');
     setCurrentViewState('albums');
-    storeNavigation({ view: 'albums', selectedAlbumId: albumId });
+    storeNavigation({ view: 'albums', selectedAlbumId: albumId, selectedFolderPath: '' });
   }, []);
 
-  const resetFolderSelectionIfMatching = useCallback((folderId: string) => {
-    setSelectedFolderPathState((prev) => {
-      if (prev === folderId || prev.startsWith(`${folderId}/`)) {
+  const resetFolderSelectionIfMatching = useCallback(
+    (folderId: string) => {
+      if (
+        selectedFolderPath === folderId ||
+        selectedFolderPath.startsWith(`${folderId}/`)
+      ) {
+        setSelectedFolderPathState('');
         storeNavigation({ selectedFolderPath: '' });
-        return '';
       }
-      return prev;
-    });
-  }, []);
+    },
+    [selectedFolderPath]
+  );
 
   const clearFolderSelection = useCallback(() => {
     setSelectedFolderPathState('');
@@ -141,6 +152,22 @@ export function useLibraryNavigation(
           setSelectedFolderPathState(fallbackPath);
           storeNavigation({ selectedFolderPath: fallbackPath });
         }
+      }
+    }
+
+    // 1b. Imported Files destination check
+    if (currentView === 'imported-files') {
+      const hasImported = Boolean(
+        library.folders?.some((f) => f.id === IMPORTED_FILES_ROOT_ID && f.tracks.length > 0)
+      );
+      if (!hasImported) {
+        const hasPhysical = Boolean(
+          library.folders?.some((f) => f.id !== IMPORTED_FILES_ROOT_ID)
+        );
+        const nextView: LibraryView = hasPhysical ? 'folder' : 'all';
+        setCurrentViewState(nextView);
+        setSelectedFolderPathState('');
+        storeNavigation({ view: nextView, selectedFolderPath: '' });
       }
     }
 

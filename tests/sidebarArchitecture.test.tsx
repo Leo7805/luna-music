@@ -159,7 +159,7 @@ describe('Sidebar Architecture & Component Decomposition (Stage 3)', () => {
         onSelectFolder={() => {}}
       />
     );
-    expect(htmlFolder).toContain('bg-indigo-600/15');
+    expect(htmlFolder).toContain('data-testid="nav-item-folders" data-active="true" aria-current="page"');
 
     const htmlImported = renderToStaticMarkup(
       <SidebarNavigation
@@ -171,7 +171,7 @@ describe('Sidebar Architecture & Component Decomposition (Stage 3)', () => {
         onSelectFolder={() => {}}
       />
     );
-    expect(htmlImported).toContain('bg-indigo-600/15');
+    expect(htmlImported).toContain('data-testid="nav-item-folders" data-active="true" aria-current="page"');
   });
 
   it('3. renders contextual Music Folders section and Imported Files', () => {

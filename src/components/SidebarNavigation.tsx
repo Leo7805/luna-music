@@ -25,10 +25,10 @@ export function SidebarNavigation({
   onSelectFolder,
 }: SidebarNavigationProps) {
   const baseButtonClass =
-    'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:ring-[var(--accent-primary)]/50 focus-visible:border-transparent';
+    'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 focus-visible:border-transparent';
 
   const activeClass =
-    'bg-indigo-600/15 bg-[var(--bg-active)] dark:bg-white/[0.08] text-[var(--accent-primary)] dark:text-white border-indigo-500/30 border-[var(--accent-primary)]/30 dark:border-white/[0.1] shadow-sm font-semibold';
+    'bg-[var(--bg-active)]/75 dark:bg-white/[0.06] text-[var(--text-primary)] dark:text-white border-transparent font-semibold';
   const inactiveClass =
     'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]';
 
@@ -102,6 +102,8 @@ export function SidebarNavigation({
           key={item.id}
           type="button"
           data-testid={`nav-item-${item.id}`}
+          data-active={item.isActive ? 'true' : 'false'}
+          aria-current={item.isActive ? 'page' : undefined}
           onClick={item.onClick}
           className={`${baseButtonClass} ${item.isActive ? activeClass : inactiveClass}`}
         >

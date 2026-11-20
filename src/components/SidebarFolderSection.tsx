@@ -42,6 +42,7 @@ export function SidebarFolderSection({
 }: SidebarFolderSectionProps) {
   const physicalFolders = folders.filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
   const importedFilesFolder = folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+  const activePhysicalFolderPath = currentView === 'folder' ? selectedFolderPath : '';
 
   return (
     <div className="flex-1 flex flex-col min-h-0 border-t border-[var(--border-subtle)] dark:border-white/[0.08] mt-2">
@@ -55,7 +56,7 @@ export function SidebarFolderSection({
           onClick={onOpenFolder}
           title="Add Music Folder"
           aria-label="Add Music Folder"
-          className="p-1 rounded-lg hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] dark:text-slate-400 dark:hover:text-indigo-400 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
+          className="p-1 rounded-lg hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] dark:text-slate-400 dark:hover:text-indigo-400 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30"
         >
           <FolderPlus className="w-4 h-4" />
         </button>
@@ -69,7 +70,7 @@ export function SidebarFolderSection({
               <RootFolderItem
                 key={folder.id}
                 folder={folder}
-                selectedPath={selectedFolderPath}
+                selectedPath={activePhysicalFolderPath}
                 isMenuOpen={activeMenuFolderId === folder.id}
                 onToggleMenu={() => onToggleMenu(folder.id)}
                 onSelectFolder={onSelectFolder}
@@ -94,7 +95,7 @@ export function SidebarFolderSection({
         ) : folderTree ? (
           <LegacyFolderTreeNode
             node={folderTree}
-            selectedPath={selectedFolderPath}
+            selectedPath={activePhysicalFolderPath}
             onSelect={onSelectFolder}
             depth={0}
             isRoot={true}

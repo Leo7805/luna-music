@@ -33,15 +33,17 @@ export function SubfolderTreeNode({
       <div
         tabIndex={0}
         role="button"
+        data-active={isSelected ? 'true' : 'false'}
+        aria-current={isSelected ? 'page' : undefined}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             onSelect(node.relativePath);
           }
         }}
-        className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
+        className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 focus-visible:border-transparent ${
           isSelected
-            ? 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-indigo-600/25 text-[var(--accent-primary)] dark:text-white font-medium border-indigo-500/30 border-[var(--accent-primary)]/30 shadow-sm'
+            ? 'bg-[var(--bg-active)] dark:bg-white/[0.1] text-[var(--text-primary)] dark:text-white font-semibold border-[var(--accent-primary)]/20 dark:border-white/[0.12]'
             : 'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]'
         }`}
         style={{ paddingLeft: `${depth * 14 + 10}px` }}
@@ -140,15 +142,17 @@ export function LegacyFolderTreeNode({
       <div
         tabIndex={0}
         role="button"
+        data-active={isSelected ? 'true' : 'false'}
+        aria-current={isSelected ? 'page' : undefined}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
             onSelect(node.relativePath);
           }
         }}
-        className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
+        className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 focus-visible:border-transparent ${
           isSelected
-            ? 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-indigo-600/25 text-[var(--accent-primary)] dark:text-white font-medium border-indigo-500/30 border-[var(--accent-primary)]/30 shadow-sm'
+            ? 'bg-[var(--bg-active)] dark:bg-white/[0.1] text-[var(--text-primary)] dark:text-white font-semibold border-[var(--accent-primary)]/20 dark:border-white/[0.12]'
             : 'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]'
         }`}
         style={{ paddingLeft: `${depth * 14 + 8}px` }}

@@ -88,9 +88,12 @@ describe('Visual Selection and Focus States Consistency', () => {
         />
       );
 
-      // Active item ('All Tracks') has purple border & background
-      expect(html).toContain('border-indigo-500/30');
-      expect(html).toContain('bg-indigo-600/15');
+      // Active item ('All Tracks') has soft theme-aware active background without heavy shadow or hardcoded indigo
+      expect(html).toContain('data-testid="nav-item-all" data-active="true" aria-current="page"');
+      expect(html).toContain('bg-[var(--bg-active)]/75');
+      expect(html).not.toContain('bg-indigo-600/15');
+      expect(html).not.toContain('border-indigo-500/30');
+      expect(html).not.toContain('shadow-sm');
 
       // Inactive items have border-transparent (prevents border flash & 1px jitter)
       expect(html).toContain('border-transparent');
@@ -110,8 +113,7 @@ describe('Visual Selection and Focus States Consistency', () => {
           onSelectFolder={() => {}}
         />
       );
-      expect(htmlFolders).toContain('Folders</span>');
-      expect(htmlFolders).toContain('bg-indigo-600/15');
+      expect(htmlFolders).toContain('data-testid="nav-item-folders" data-active="true" aria-current="page"');
 
       const htmlPlaylists = renderToStaticMarkup(
         <SidebarNavigation
@@ -123,8 +125,7 @@ describe('Visual Selection and Focus States Consistency', () => {
           onSelectFolder={() => {}}
         />
       );
-      expect(htmlPlaylists).toContain('Playlists</span>');
-      expect(htmlPlaylists).toContain('bg-indigo-600/15');
+      expect(htmlPlaylists).toContain('data-testid="nav-item-playlists" data-active="true" aria-current="page"');
 
       const htmlAlbums = renderToStaticMarkup(
         <SidebarNavigation
@@ -136,8 +137,7 @@ describe('Visual Selection and Focus States Consistency', () => {
           onSelectFolder={() => {}}
         />
       );
-      expect(htmlAlbums).toContain('Albums</span>');
-      expect(htmlAlbums).toContain('bg-indigo-600/15');
+      expect(htmlAlbums).toContain('data-testid="nav-item-albums" data-active="true" aria-current="page"');
     });
   });
 
@@ -183,8 +183,10 @@ describe('Visual Selection and Focus States Consistency', () => {
           depth={1}
         />
       );
-      expect(html).toContain('border-indigo-500/30');
+      expect(html).toContain('data-active="true"');
+      expect(html).toContain('border-[var(--accent-primary)]/20');
       expect(html).toContain('transition-colors');
+      expect(html).not.toContain('shadow-sm');
 
       const htmlUnselected = renderToStaticMarkup(
         <SubfolderTreeNode
@@ -210,8 +212,10 @@ describe('Visual Selection and Focus States Consistency', () => {
           onRequestPermission={() => {}}
         />
       );
-      expect(htmlRoot).toContain('border-indigo-500/30');
+      expect(htmlRoot).toContain('data-active="true"');
+      expect(htmlRoot).toContain('border-[var(--accent-primary)]/20');
       expect(htmlRoot).toContain('transition-colors');
+      expect(htmlRoot).not.toContain('shadow-sm');
 
       const htmlImp = renderToStaticMarkup(
         <SidebarImportedFiles
@@ -330,7 +334,7 @@ describe('Visual Selection and Focus States Consistency', () => {
       );
 
       expect(html).toContain('focus-visible:ring-2');
-      expect(html).toContain('focus-visible:ring-indigo-500');
+      expect(html).toContain('focus-visible:ring-[var(--accent-primary)]/50');
       expect(html).toContain('focus:outline-none');
     });
 
