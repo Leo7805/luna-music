@@ -21,7 +21,7 @@ export function TrackListHeader({
     <>
       {/* Select Mode Toolbar Controls */}
       <div className="flex items-center justify-between pb-2 px-1">
-        <div className="text-[11px] text-slate-400 dark:text-slate-500">
+        <div className="text-[11px] text-[#687995] dark:text-slate-500 font-medium">
           {selectedCount > 0
             ? `${selectedCount} of ${tracksCount} selected`
             : `${tracksCount} tracks`}
@@ -31,8 +31,8 @@ export function TrackListHeader({
           onClick={onToggleSelectMode}
           className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
             isSelectMode
-              ? 'bg-indigo-600 text-white border-transparent shadow-sm'
-              : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+              ? 'bg-[#565ECF] text-white border-transparent shadow-sm'
+              : 'border-transparent text-[#687995] dark:text-slate-400 hover:text-[#182238] dark:hover:text-slate-200 hover:bg-[#E9EDF7] dark:hover:bg-white/[0.04]'
           }`}
           data-testid="toggle-select-mode"
         >
@@ -41,7 +41,7 @@ export function TrackListHeader({
       </div>
 
       {/* Table Header */}
-      <div className="grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-300/80 dark:border-white/[0.06] select-none">
+      <div className="grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[#687995] dark:text-slate-400 border-b border-[#DDE4EF] dark:border-white/[0.06] select-none">
         <div className="text-center flex items-center justify-center">
           {showCheckboxes ? (
             <button

@@ -123,9 +123,9 @@ export function Sidebar({
   };
 
   return (
-    <aside className="w-64 md:w-72 shrink-0 flex flex-col h-full bg-slate-100/95 dark:bg-[#071427]/95 backdrop-blur-xl border-r border-slate-300/80 dark:border-white/[0.08] select-none text-slate-800 dark:text-slate-100 transition-colors duration-200">
+    <aside className="w-64 md:w-72 shrink-0 flex flex-col h-full bg-[#EEF2F8] dark:bg-[#071427]/95 backdrop-blur-xl border-r border-[#DDE4EF] dark:border-white/[0.08] select-none text-[#182238] dark:text-slate-100 transition-colors duration-200">
       {/* Brand Header */}
-      <div className="p-5 border-b border-slate-300/80 dark:border-white/[0.08]">
+      <div className="p-5 border-b border-[#DDE4EF] dark:border-white/[0.08]">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center shrink-0">
             <img
@@ -135,10 +135,10 @@ export function Sidebar({
             />
           </div>
           <div>
-            <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">
+            <span className="font-bold text-lg tracking-tight text-[#182238] dark:text-white">
               Luna Music
             </span>
-            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Local Music Player</p>
+            <p className="text-xs text-[#687995] dark:text-slate-400 font-medium">Local Music Player</p>
           </div>
         </div>
       </div>
@@ -196,7 +196,7 @@ export function Sidebar({
       {hasLibrary && (
         <div
           data-testid="sidebar-open-music-container"
-          className="p-3 border-t border-slate-300/80 dark:border-white/[0.08] bg-slate-200/50 dark:bg-[#071427]/80"
+          className="p-3 border-t border-[#DDE4EF] dark:border-white/[0.08] bg-[#E9EDF7]/60 dark:bg-[#071427]/80"
         >
           <OpenMusicControl
             variant="sidebar"

@@ -52,7 +52,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
         {/* Album Header Banner */}
         <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 p-6 rounded-2xl glass-panel relative overflow-hidden">
           <div
-            className="w-44 h-44 rounded-xl shadow-2xl shrink-0 flex items-center justify-center overflow-hidden border border-slate-300/80 dark:border-white/[0.1]"
+            className="w-44 h-44 rounded-xl shadow-2xl shrink-0 flex items-center justify-center overflow-hidden border border-[#DDE4EF] dark:border-white/[0.1]"
             style={{
               background: selectedAlbum.placeholderGradient || 'linear-gradient(135deg, #4f46e5, #7c3aed)',
             }}
@@ -69,14 +69,14 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
           </div>
 
           <div className="flex-1 text-center sm:text-left min-w-0">
-            <span className="text-[11px] uppercase tracking-widest font-bold text-indigo-600 dark:text-indigo-400">
+            <span className="text-[11px] uppercase tracking-widest font-bold text-[#565ECF] dark:text-indigo-400">
               Album
             </span>
-            <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight truncate mt-1">
+            <h2 className="text-3xl font-extrabold text-[#182238] dark:text-white tracking-tight truncate mt-1">
               {selectedAlbum.name}
             </h2>
-            <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-xs text-slate-600 dark:text-slate-300">
-              <span className="font-semibold text-slate-900 dark:text-white">{selectedAlbum.artist}</span>
+            <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-xs text-[#687995] dark:text-slate-300">
+              <span className="font-semibold text-[#182238] dark:text-white">{selectedAlbum.artist}</span>
               {selectedAlbum.year && <span>• {selectedAlbum.year}</span>}
               <span>• {selectedAlbum.tracks.length} tracks</span>
               <span>• {formatDuration(selectedAlbum.totalDuration)}</span>
@@ -89,7 +89,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
                     onPlayTrack(selectedAlbum.tracks[0]);
                   }
                 }}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#565ECF] hover:bg-[#4B52BA] text-white text-xs font-bold shadow-lg shadow-[#565ECF]/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-white" />
                 <span>Play Album</span>
@@ -131,7 +131,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
         <div
           key={album.id}
           onClick={() => onSelectAlbum(album.id)}
-          className="group p-3.5 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-colors duration-150 cursor-pointer select-none flex flex-col"
+          className="group p-3.5 rounded-2xl glass-panel hover:bg-[#E9EDF7] dark:hover:bg-white/[0.08] hover:border-[#565ECF]/40 transition-colors duration-150 cursor-pointer select-none flex flex-col"
         >
           {/* Cover Art */}
           <div
@@ -159,7 +159,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
                   onPlayTrack(album.tracks[0]);
                 }
               }}
-              className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+              className="absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full bg-[#565ECF] hover:bg-[#4B52BA] text-white shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all hover:scale-110 active:scale-95 cursor-pointer"
               title="Play album"
             >
               <Play className="w-4 h-4 fill-white ml-0.5" />
@@ -168,13 +168,13 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
 
           {/* Info */}
           <div className="min-w-0">
-            <h3 className="font-semibold text-xs text-slate-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">
+            <h3 className="font-semibold text-xs text-[#182238] dark:text-white truncate group-hover:text-[#565ECF] dark:group-hover:text-indigo-300 transition-colors">
               {album.name}
             </h3>
-            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+            <p className="text-[11px] text-[#687995] dark:text-slate-400 truncate mt-0.5">
               {album.artist}
             </p>
-            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
+            <p className="text-[10px] text-[#687995] dark:text-slate-500 mt-1">
               {album.year ? `${album.year} • ` : ''}
               {album.tracks.length} {album.tracks.length === 1 ? 'track' : 'tracks'}
             </p>

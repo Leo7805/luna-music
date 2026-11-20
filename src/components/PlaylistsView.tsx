@@ -117,14 +117,14 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
 
             {/* Playlist Meta Details */}
             <div className="flex-1 min-w-0 text-center sm:text-left space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#565ECF] dark:text-indigo-400">
                 User Playlist
               </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight truncate">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#182238] dark:text-white tracking-tight truncate">
                 {selectedPlaylist.name}
               </h1>
 
-              <div className="flex items-center justify-center sm:justify-start gap-3 text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <div className="flex items-center justify-center sm:justify-start gap-3 text-xs text-[#687995] dark:text-slate-400 font-medium">
                 <span>{resolvedTracks.length} {resolvedTracks.length === 1 ? 'track' : 'tracks'}</span>
                 {totalDuration > 0 && (
                   <>
@@ -143,7 +143,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                   type="button"
                   disabled={resolvedTracks.length === 0}
                   onClick={() => onPlayPlaylist(selectedPlaylist, 0, false)}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white font-semibold text-xs shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                  className="px-4 py-2 rounded-xl bg-[#565ECF] hover:bg-[#4B52BA] disabled:opacity-40 text-white font-semibold text-xs shadow-md shadow-[#565ECF]/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 >
                   <Play className="w-3.5 h-3.5 fill-current" />
                   <span>Play All</span>
@@ -153,7 +153,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                   type="button"
                   disabled={resolvedTracks.length < 2}
                   onClick={() => onPlayPlaylist(selectedPlaylist, 0, true)}
-                  className="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/[0.1] text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-white/[0.06] disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-3.5 py-2 rounded-xl border border-[#DDE4EF] dark:border-white/[0.1] text-[#182238] dark:text-slate-300 hover:bg-[#E9EDF7] dark:hover:bg-white/[0.06] disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Shuffle className="w-3.5 h-3.5" />
                   <span>Shuffle</span>
@@ -164,7 +164,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                     type="button"
                     disabled={resolvedTracks.length === 0}
                     onClick={() => onAddToQueue(resolvedTracks)}
-                    className="px-3.5 py-2 rounded-xl border border-slate-300 dark:border-white/[0.1] text-slate-700 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-white/[0.06] disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
+                    className="px-3.5 py-2 rounded-xl border border-[#DDE4EF] dark:border-white/[0.1] text-[#182238] dark:text-slate-300 hover:bg-[#E9EDF7] dark:hover:bg-white/[0.06] disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <ListPlus className="w-3.5 h-3.5" />
                     <span>Add to Queue</span>
@@ -174,7 +174,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setPlaylistToRename(selectedPlaylist)}
-                  className="p-2 rounded-xl border border-slate-300 dark:border-white/[0.1] text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+                  className="p-2 rounded-xl border border-[#DDE4EF] dark:border-white/[0.1] text-[#687995] hover:text-[#182238] dark:hover:text-white hover:bg-[#E9EDF7] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
                   title="Rename Playlist"
                 >
                   <Edit2 className="w-3.5 h-3.5" />
@@ -183,7 +183,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setPlaylistToDelete(selectedPlaylist)}
-                  className="p-2 rounded-xl border border-slate-300 dark:border-white/[0.1] text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
+                  className="p-2 rounded-xl border border-[#DDE4EF] dark:border-white/[0.1] text-[#687995] hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-colors cursor-pointer"
                   title="Delete Playlist"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -268,15 +268,15 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
               {/* Create Playlist Action Card */}
               <div
                 onClick={() => setIsCreateModalOpen(true)}
-                className="group p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-white/[0.1] hover:border-indigo-500/50 hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20 transition-colors duration-150 cursor-pointer flex flex-col items-center justify-center text-center min-h-[180px] select-none"
+                className="group p-4 rounded-2xl border-2 border-dashed border-[#DDE4EF] dark:border-white/[0.1] hover:border-[#565ECF]/50 hover:bg-[#E1E6FA]/40 dark:hover:bg-indigo-950/20 transition-colors duration-150 cursor-pointer flex flex-col items-center justify-center text-center min-h-[180px] select-none"
               >
-                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <div className="w-12 h-12 rounded-xl bg-[#565ECF]/10 dark:bg-indigo-500/20 text-[#565ECF] dark:text-indigo-400 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
                   <Plus className="w-6 h-6" />
                 </div>
-                <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
+                <p className="text-xs font-semibold text-[#182238] dark:text-slate-200 group-hover:text-[#565ECF] dark:group-hover:text-indigo-400">
                   New Playlist
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Click to create</p>
+                <p className="text-[10px] text-[#687995] mt-0.5">Click to create</p>
               </div>
 
               {/* Playlist Cards */}
@@ -284,7 +284,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 <div
                   key={pl.id}
                   onClick={() => onSelectPlaylist(pl.id)}
-                  className="group p-4 rounded-2xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-colors duration-150 cursor-pointer flex flex-col justify-between select-none relative min-h-[180px]"
+                  className="group p-4 rounded-2xl glass-panel hover:bg-[#E9EDF7] dark:hover:bg-white/[0.08] hover:border-[#565ECF]/40 transition-colors duration-150 cursor-pointer flex flex-col justify-between select-none relative min-h-[180px]"
                 >
                   <div className="w-full aspect-square rounded-xl bg-gradient-to-br from-indigo-500/80 to-purple-600/80 flex items-center justify-center shadow-md mb-3 group-hover:scale-[1.02] transition-transform relative overflow-hidden">
                     <ListMusic className="w-10 h-10 text-white/90" />
@@ -295,7 +295,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                         e.stopPropagation();
                         onPlayPlaylist(pl, 0, false);
                       }}
-                      className="absolute right-2.5 bottom-2.5 w-9 h-9 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:scale-105 active:scale-95 disabled:hidden cursor-pointer"
+                      className="absolute right-2.5 bottom-2.5 w-9 h-9 rounded-full bg-[#565ECF] hover:bg-[#4B52BA] text-white shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:scale-105 active:scale-95 disabled:hidden cursor-pointer"
                       title="Play playlist"
                     >
                       <Play className="w-4 h-4 fill-current ml-0.5" />
@@ -303,10 +303,10 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                   </div>
 
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-xs text-slate-900 dark:text-white truncate">
+                    <h3 className="font-semibold text-xs text-[#182238] dark:text-white truncate">
                       {pl.name}
                     </h3>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    <p className="text-[11px] text-[#687995] dark:text-slate-400 mt-0.5">
                       {pl.tracks.length} {pl.tracks.length === 1 ? 'track' : 'tracks'}
                     </p>
                   </div>
@@ -318,16 +318,16 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
               <div className="w-16 h-16 rounded-2xl bg-amber-500/10 dark:bg-amber-500/15 border border-amber-500/20 flex items-center justify-center mb-4 mx-auto text-amber-600 dark:text-amber-400">
                 <ListMusic className="w-8 h-8" />
               </div>
-              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1.5">
+              <h3 className="text-base font-semibold text-[#182238] dark:text-slate-100 mb-1.5">
                 No playlists yet
               </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto leading-relaxed mb-5">
+              <p className="text-xs text-[#687995] dark:text-slate-400 max-w-sm mx-auto leading-relaxed mb-5">
                 Create custom playlists to organize your favorite music into curated collections.
               </p>
               <button
                 type="button"
                 onClick={() => setIsCreateModalOpen(true)}
-                className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[#565ECF] hover:bg-[#4B52BA] text-white text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
                 <span>Create Playlist</span>

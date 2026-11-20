@@ -61,8 +61,8 @@ export function RootFolderItem({
         }}
         className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
           isSelected
-            ? 'bg-indigo-600/20 dark:bg-indigo-600/25 text-indigo-700 dark:text-white font-medium border-indigo-500/30 shadow-sm'
-            : 'border-transparent text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+            ? 'bg-indigo-600/20 dark:bg-indigo-600/25 text-[#565ECF] dark:text-white font-medium border-indigo-500/30 shadow-sm'
+            : 'border-transparent text-[#687995] dark:text-slate-300 hover:text-[#182238] dark:hover:text-white hover:bg-[#E9EDF7] dark:hover:bg-white/[0.04]'
         }`}
         onClick={() => onSelectFolder(folder.tree.relativePath)}
       >
@@ -116,7 +116,7 @@ export function RootFolderItem({
           )}
 
           {folder.trackCount !== undefined && folder.trackCount > 0 && (
-            <span className="text-[10px] text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/[0.04] shrink-0">
+            <span className="text-[10px] text-[#687995] dark:text-slate-400 px-1.5 py-0.2 rounded bg-[#DDE4EF]/70 dark:bg-white/[0.04] shrink-0 font-medium">
               {folder.trackCount}
             </span>
           )}

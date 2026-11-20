@@ -101,15 +101,15 @@ export function App() {
   return (
     <div
       className={`relative h-screen w-screen flex flex-col overflow-hidden font-sans transition-colors duration-200 select-none ${
-        theme === 'dark' ? 'bg-[#071427] text-slate-100' : 'bg-[#CFDBE7] text-slate-900'
+        theme === 'dark' ? 'bg-[#071427] text-slate-100' : 'bg-[#F1F4F9] text-[#182238]'
       }`}
     >
       {/* Background layer matching Luna Player */}
       <div
-        className={`fixed inset-0 pointer-events-none z-0 transition-colors duration-500 ${
+        className={`fixed inset-0 pointer-events-none z-0 transition-colors duration-200 ${
           theme === 'dark'
             ? 'bg-gradient-to-b from-[#102443] to-[#071427] ambient-glow-bg'
-            : 'bg-[#CFDBE7]'
+            : 'bg-[#F1F4F9]'
         }`}
         data-testid="app-background"
       />
@@ -159,7 +159,7 @@ export function App() {
         />
 
         {/* Central Content Area */}
-        <main className="flex-1 flex flex-col min-w-0 bg-transparent overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 bg-[#F5F7FB] dark:bg-transparent overflow-hidden">
           {/* Header */}
           <Header
             title={viewTitle}

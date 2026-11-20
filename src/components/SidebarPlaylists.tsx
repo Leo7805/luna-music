@@ -25,10 +25,10 @@ export function SidebarPlaylists({
   onDeletePrompt,
 }: SidebarPlaylistsProps) {
   return (
-    <div className="flex-1 flex flex-col min-h-0 border-t border-slate-300/80 dark:border-white/[0.08] mt-2">
+    <div className="flex-1 flex flex-col min-h-0 border-t border-[#DDE4EF] dark:border-white/[0.08] mt-2">
       {/* Section Header */}
       <div className="px-4 py-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[#687995] dark:text-slate-400">
           My Playlists
         </span>
         <button
@@ -36,7 +36,7 @@ export function SidebarPlaylists({
           onClick={onCreatePrompt}
           title="Create Playlist"
           aria-label="Create Playlist"
-          className="p-1 rounded-lg hover:bg-slate-200/80 dark:hover:bg-white/[0.08] text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
+          className="p-1 rounded-lg hover:bg-[#E9EDF7] dark:hover:bg-white/[0.08] text-[#687995] hover:text-[#565ECF] dark:text-slate-400 dark:hover:text-indigo-400 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70"
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -63,8 +63,8 @@ export function SidebarPlaylists({
                 }}
                 className={`group flex items-center justify-between py-1.5 px-2 rounded-lg cursor-pointer border transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
                   selectedPlaylistId === pl.id
-                    ? 'bg-indigo-600/20 dark:bg-indigo-600/25 text-indigo-700 dark:text-white font-medium border-indigo-500/30 shadow-sm'
-                    : 'border-transparent text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.04]'
+                    ? 'bg-indigo-600/20 dark:bg-indigo-600/25 text-[#565ECF] dark:text-white font-medium border-indigo-500/30 shadow-sm'
+                    : 'border-transparent text-[#687995] dark:text-slate-300 hover:text-[#182238] dark:hover:text-white hover:bg-[#E9EDF7] dark:hover:bg-white/[0.04]'
                 }`}
                 onClick={() => {
                   onSelectView('playlists');
@@ -79,7 +79,7 @@ export function SidebarPlaylists({
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                  <span className="text-[10px] text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded bg-slate-200/80 dark:bg-white/[0.04] shrink-0">
+                  <span className="text-[10px] text-[#687995] dark:text-slate-400 px-1.5 py-0.2 rounded bg-[#DDE4EF]/70 dark:bg-white/[0.04] shrink-0 font-medium">
                     {pl.tracks.length}
                   </span>
 

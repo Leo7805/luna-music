@@ -44,17 +44,17 @@ export function SidebarFolderSection({
   const importedFilesFolder = folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 border-t border-slate-300/80 dark:border-white/[0.08] mt-2">
+    <div className="flex-1 flex flex-col min-h-0 border-t border-[#DDE4EF] dark:border-white/[0.08] mt-2">
       {/* Section Header */}
       <div className="px-4 py-3 flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[#687995] dark:text-slate-400">
           Music Folders
         </span>
         <button
           type="button"
           onClick={onOpenFolder}
           title="Add Music Folder"
-          className="p-1 rounded-lg hover:bg-slate-200/80 dark:hover:bg-white/[0.08] text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-colors cursor-pointer"
+          className="p-1 rounded-lg hover:bg-[#E9EDF7] dark:hover:bg-white/[0.08] text-[#687995] hover:text-[#565ECF] dark:text-slate-400 dark:hover:text-indigo-400 transition-colors cursor-pointer"
         >
           <FolderPlus className="w-4 h-4" />
         </button>

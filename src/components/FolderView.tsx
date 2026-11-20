@@ -63,12 +63,12 @@ export const FolderView: React.FC<FolderViewProps> = ({
       {/* Subfolder Cards Grid */}
       {currentNode.subfolders.length > 0 || currentPath ? (
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-[#687995] dark:text-slate-400 px-1">
             <span>Subfolders ({currentNode.subfolders.length})</span>
             {currentPath && (
               <button
                 onClick={() => onSelectFolder(parentPath)}
-                className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium normal-case cursor-pointer"
+                className="flex items-center gap-1 text-[#565ECF] dark:text-indigo-400 hover:text-[#4B52BA] dark:hover:text-indigo-300 font-medium normal-case cursor-pointer"
               >
                 <ArrowUpLeft className="w-3.5 h-3.5" />
                 <span>Go Up</span>
@@ -81,16 +81,16 @@ export const FolderView: React.FC<FolderViewProps> = ({
               <div
                 key={sub.id}
                 onClick={() => onSelectFolder(sub.relativePath)}
-                className="group p-3 rounded-xl glass-panel hover:bg-slate-200/60 dark:hover:bg-white/[0.08] hover:border-indigo-500/40 transition-colors duration-150 cursor-pointer flex items-center gap-3 select-none"
+                className="group p-3 rounded-xl glass-panel hover:bg-[#E9EDF7] dark:hover:bg-white/[0.08] hover:border-[#565ECF]/40 transition-colors duration-150 cursor-pointer flex items-center gap-3 select-none"
               >
-                <div className="w-9 h-9 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                  <Folder className="w-4 h-4 text-indigo-500 dark:text-indigo-400 group-hover:text-indigo-600 dark:group-hover:text-indigo-300" />
+                <div className="w-9 h-9 rounded-lg bg-[#565ECF]/10 border border-[#565ECF]/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                  <Folder className="w-4 h-4 text-[#565ECF] dark:text-indigo-400 group-hover:text-[#4B52BA] dark:group-hover:text-indigo-300" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-slate-800 dark:text-slate-200 group-hover:text-slate-950 dark:group-hover:text-white truncate">
+                  <p className="text-xs font-medium text-[#182238] dark:text-slate-200 group-hover:text-black dark:group-hover:text-white truncate">
                     {sub.name}
                   </p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">
+                  <p className="text-[10px] text-[#687995] mt-0.5">
                     {sub.totalTrackCount} {sub.totalTrackCount === 1 ? 'track' : 'tracks'}
                   </p>
                 </div>
@@ -102,12 +102,12 @@ export const FolderView: React.FC<FolderViewProps> = ({
 
       {/* Direct Tracks in this Folder */}
       <div className="space-y-2">
-        <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 px-1 flex items-center justify-between">
+        <div className="text-xs font-semibold uppercase tracking-wider text-[#687995] dark:text-slate-400 px-1 flex items-center justify-between">
           <span>Folder Tracks ({currentNode.tracks.length})</span>
           {currentNode.tracks.length > 0 && (
             <button
               onClick={() => onPlayTrack(currentNode.tracks[0])}
-              className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-semibold normal-case cursor-pointer"
+              className="text-xs text-[#565ECF] dark:text-indigo-400 hover:text-[#4B52BA] dark:hover:text-indigo-300 font-semibold normal-case cursor-pointer"
             >
               Play All
             </button>
