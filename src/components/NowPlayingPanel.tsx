@@ -6,16 +6,13 @@ import {
   Disc,
   Info,
   Sparkles,
-  ListMusic,
-  Trash2,
-  Play,
-  Save,
 } from 'lucide-react';
 import { TrackItem, LrcLine } from '../types/music';
 import { findCurrentLyricIndex } from '../utils/lrcParser';
 import { formatDuration, formatFileSize } from '../utils/formatters';
-import { getTrackStatus, isSameTrack } from '../utils/musicTree';
+import { getTrackStatus } from '../utils/musicTree';
 import { TrackStatusBadge } from './TrackStatusBadge';
+import { NowPlayingQueueTab } from './NowPlayingQueueTab';
 
 interface NowPlayingPanelProps {
   currentTrack: TrackItem | null;
@@ -47,8 +44,6 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
   onSaveQueueAsPlaylist,
 }) => {
   const [activeTab, setActiveTab] = useState<'lyrics' | 'queue' | 'artwork'>('queue');
-  const [isSavingQueue, setIsSavingQueue] = useState<boolean>(false);
-  const [queuePlaylistName, setQueuePlaylistName] = useState<string>('');
   const lyricsContainerRef = useRef<HTMLDivElement | null>(null);
   const activeLyricRef = useRef<HTMLDivElement | null>(null);
 
@@ -64,16 +59,6 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
       });
     }
   }, [currentLyricIndex]);
-
-  const handleSaveQueue = (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = queuePlaylistName.trim() || `Queue - ${new Date().toLocaleDateString()}`;
-    if (onSaveQueueAsPlaylist) {
-      onSaveQueueAsPlaylist(name);
-    }
-    setIsSavingQueue(false);
-    setQueuePlaylistName('');
-  };
 
   if (!isOpen) return null;
 
@@ -97,8 +82,8 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
         </div>
 
         <div className="flex items-center gap-1">
-          {/* Tab Switcher */}
-          <div className="flex items-center bg-[var(--border-subtle)]/70 dark:bg-white/[0.06] rounded-lg p-0.5 border border-[var(--border-subtle)] dark:border-white/[0.06]">
+          {/* Tab Selector Buttons */}
+          <div className="flex items-center bg-[var(--bg-active)]/80 dark:bg-white/[0.06] rounded-lg p-0.5 border border-[var(--border-subtle)] dark:border-white/[0.06] mr-2">
             <button
               type="button"
               onClick={() => setActiveTab('lyrics')}
@@ -137,72 +122,68 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-[var(--text-secondary)] dark:text-slate-400 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] transition-colors ml-1 cursor-pointer"
-            title="Close Panel"
+            className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 transition-colors"
+            title="Close panel"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 relative z-10 overflow-hidden">
-        {/* Top Artwork + Track Meta Banner: shown when currentTrack is present */}
+      {/* Main Panel Content */}
+      <div className="flex-1 flex flex-col min-h-0 relative z-10">
+        {/* Upper Track Summary Card */}
         {currentTrack && (
-          <div className="p-4 flex flex-col items-center text-center border-b border-[var(--border-subtle)] dark:border-white/[0.04] shrink-0">
-            {/* Artwork Card with Ambient Glow */}
-            <div className="relative mb-3 group">
+          <div className="p-4 border-b border-[var(--border-subtle)] dark:border-white/[0.04] bg-[var(--bg-main)]/40 dark:bg-white/[0.01] shrink-0">
+            <div className="flex items-center gap-3">
               <div
-                className="w-40 h-40 lg:w-44 lg:h-44 rounded-2xl shadow-xl overflow-hidden flex items-center justify-center border border-[var(--border-subtle)] dark:border-white/[0.1] relative z-10 transition-transform duration-300 group-hover:scale-[1.02]"
+                className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-md relative overflow-hidden group border border-[var(--border-subtle)] dark:border-white/[0.08]"
                 style={{
-                  background:
-                    currentTrack.metadata.placeholderGradient ||
-                    'linear-gradient(135deg, #4338ca, #6d28d9)',
+                  background: currentTrack.metadata.artworkUrl
+                    ? 'transparent'
+                    : currentTrack.metadata.placeholderGradient || 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
                 }}
               >
                 {currentTrack.metadata.artworkUrl ? (
                   <img
                     src={currentTrack.metadata.artworkUrl}
-                    alt={currentTrack.metadata.title}
-                    className="w-full h-full object-cover"
+                    alt={currentTrack.metadata.album || currentTrack.name}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   />
                 ) : (
-                  <Disc className="w-16 h-16 text-white/40" />
+                  <Disc className="w-6 h-6 text-white/90 drop-shadow animate-spin-slow" />
                 )}
               </div>
 
-              {/* Ambient Glow halo */}
-              <div
-                className="absolute inset-0 rounded-2xl blur-xl opacity-60 -z-0 scale-95 transition-colors duration-700 hidden dark:block"
-                style={{
-                  background: ambientColors.glow || 'rgba(99, 102, 241, 0.4)',
-                }}
-              />
-            </div>
-
-            {/* Song Details */}
-            <h3 className="font-bold text-sm text-[var(--text-primary)] dark:text-white truncate max-w-full px-2">
-              {currentTrack.metadata.title}
-            </h3>
-            <p className="text-xs text-[var(--accent-primary)] dark:text-indigo-300 font-medium truncate max-w-full mt-0.5">
-              {currentTrack.metadata.artist || 'Unknown Artist'}
-            </p>
-            <p className="text-[11px] text-[var(--text-secondary)] dark:text-slate-400 truncate max-w-full mt-0.5">
-              {currentTrack.metadata.album || 'Unknown Album'}
-            </p>
-
-            {/* Technical Badges */}
-            <div className="flex items-center gap-1.5 mt-2 flex-wrap justify-center">
-              <TrackStatusBadge status={getTrackStatus(currentTrack)} variant="pill" />
-              {currentTrack.metadata.codec && (
-                <span className="text-[9px] font-mono uppercase px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-white/[0.06] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/[0.08]">
-                  {currentTrack.metadata.codec}
-                </span>
-              )}
-              {currentTrack.metadata.bitrate && (
-                <span className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-slate-200/80 dark:bg-white/[0.06] text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-white/[0.08]">
-                  {Math.round(currentTrack.metadata.bitrate / 1000)} kbps
-                </span>
-              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3
+                    className="font-bold text-sm text-[var(--text-primary)] dark:text-white truncate"
+                    title={currentTrack.metadata.title || currentTrack.name}
+                  >
+                    {currentTrack.metadata.title || currentTrack.name}
+                  </h3>
+                  {getTrackStatus(currentTrack) !== 'normal' && (
+                    <TrackStatusBadge status={getTrackStatus(currentTrack)} />
+                  )}
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] dark:text-slate-400 truncate mt-0.5">
+                  {currentTrack.metadata.artist || 'Unknown Artist'}
+                </p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-[10px] text-[var(--text-secondary)] dark:text-slate-500 truncate max-w-[140px]">
+                    {currentTrack.metadata.album || 'Unknown Album'}
+                  </span>
+                  {currentTrack.metadata.year && (
+                    <>
+                      <span className="text-[10px] text-[var(--text-secondary)] dark:text-slate-600">•</span>
+                      <span className="text-[10px] text-[var(--text-secondary)] dark:text-slate-500 font-mono">
+                        {currentTrack.metadata.year}
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -210,140 +191,16 @@ export const NowPlayingPanel: React.FC<NowPlayingPanelProps> = ({
         {/* Lower Content: Queue, Lyrics, or Info */}
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {activeTab === 'queue' ? (
-            <div className="flex-1 flex flex-col min-h-0">
-              {/* Queue Header Actions */}
-              <div className="px-4 py-2.5 border-b border-[var(--border-subtle)] dark:border-white/[0.04] flex items-center justify-between text-xs shrink-0">
-                <span className="font-semibold text-[var(--text-primary)] dark:text-slate-300 uppercase tracking-wider text-[11px]">
-                  Playback Queue ({queue.length})
-                </span>
-                <div className="flex items-center gap-1.5">
-                  {queue.length > 0 && onSaveQueueAsPlaylist && (
-                    <button
-                      type="button"
-                      onClick={() => setIsSavingQueue(true)}
-                      title="Save current queue as a playlist"
-                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] text-[var(--accent-primary)] dark:text-indigo-400 hover:bg-[var(--bg-active)] dark:hover:bg-indigo-950/40 transition-colors font-medium cursor-pointer"
-                    >
-                      <Save className="w-3 h-3" />
-                      <span>Save as Playlist</span>
-                    </button>
-                  )}
-                  {queue.length > 0 && onClearQueue && (
-                    <button
-                      type="button"
-                      onClick={onClearQueue}
-                      title={currentTrack ? 'Clear upcoming songs' : 'Clear queue'}
-                      className="p-1 rounded-lg text-[var(--text-secondary)] hover:text-rose-500 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Save Queue Modal Prompt */}
-              {isSavingQueue && (
-                <form
-                  onSubmit={handleSaveQueue}
-                  className="p-3 bg-[var(--bg-active)]/50 dark:bg-indigo-950/40 border-b border-[var(--accent-primary)]/20 dark:border-indigo-900/50 flex items-center gap-2"
-                >
-                  <input
-                    type="text"
-                    autoFocus
-                    value={queuePlaylistName}
-                    onChange={(e) => setQueuePlaylistName(e.target.value)}
-                    placeholder="Playlist name..."
-                    className="flex-1 px-2.5 py-1 text-xs rounded-lg bg-[var(--bg-main)] dark:bg-slate-900 border border-[var(--border-subtle)] dark:border-slate-700 text-[var(--text-primary)] dark:text-white focus:outline-none focus:border-[var(--accent-primary)]"
-                  />
-                  <button
-                    type="submit"
-                    className="px-2.5 py-1 text-xs rounded-lg bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white font-medium cursor-pointer"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsSavingQueue(false)}
-                    className="p-1 text-[var(--text-secondary)] hover:text-[var(--text-primary)] dark:hover:text-slate-200 cursor-pointer"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </form>
-              )}
-
-              {/* Queue List */}
-              <div className="flex-1 overflow-y-auto p-2 custom-scrollbar space-y-1">
-                {queue.length === 0 ? (
-                  <div className="py-12 flex flex-col items-center justify-center text-center text-xs text-[var(--text-secondary)] dark:text-slate-500">
-                    <ListMusic className="w-10 h-10 mb-2 opacity-40 text-[var(--accent-primary)] dark:text-indigo-400" />
-                    <p className="font-medium text-[var(--text-primary)] dark:text-slate-400">Queue is empty</p>
-                    <p className="text-[11px] text-[var(--text-secondary)] mt-1">
-                      Add tracks to the queue using &quot;Play Next&quot; or &quot;Add to Queue&quot;
-                    </p>
-                  </div>
-                ) : (
-                  queue.map((track, idx) => {
-                    const isCurrent = currentTrack ? isSameTrack(track, currentTrack) : false;
-                    return (
-                      <div
-                        key={`${track.id}-${idx}`}
-                        tabIndex={0}
-                        role="button"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            onPlayTrack?.(track);
-                          }
-                        }}
-                        onClick={() => onPlayTrack?.(track)}
-                        className={`group flex items-center justify-between p-2 rounded-xl text-xs border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent ${
-                          isCurrent
-                            ? 'bg-[var(--bg-active)] dark:bg-indigo-600/25 border-[var(--accent-primary)]/30 text-[var(--accent-primary)] dark:text-indigo-300 font-medium shadow-sm'
-                            : 'border-transparent hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04] text-[var(--text-primary)] dark:text-slate-300'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="w-4 text-center text-[10px] text-[var(--text-secondary)]">
-                            {isCurrent ? (
-                              <Play className="w-3 h-3 text-[var(--accent-primary)] fill-[var(--accent-primary)]" />
-                            ) : (
-                              idx + 1
-                            )}
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs text-[var(--text-primary)] dark:text-white">
-                              {track.metadata.title || track.name}
-                            </p>
-                            <p className="truncate text-[10px] text-[var(--text-secondary)] dark:text-slate-400">
-                              {track.metadata.artist || 'Unknown Artist'}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                          <span className="text-[10px] text-[var(--text-secondary)] font-mono">
-                            {formatDuration(track.metadata.duration)}
-                          </span>
-                          {onRemoveFromQueue && !isCurrent && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onRemoveFromQueue(idx);
-                              }}
-                              title="Remove from queue"
-                              className="p-1 rounded text-[var(--text-secondary)] hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
+            <NowPlayingQueueTab
+              queue={queue}
+              currentTrack={currentTrack}
+              isOpen={isOpen}
+              isActiveTab={activeTab === 'queue'}
+              onPlayTrack={onPlayTrack}
+              onRemoveFromQueue={onRemoveFromQueue}
+              onClearQueue={onClearQueue}
+              onSaveQueueAsPlaylist={onSaveQueueAsPlaylist}
+            />
           ) : activeTab === 'lyrics' ? (
             currentTrack && hasLyrics ? (
               <div

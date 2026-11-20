@@ -190,6 +190,19 @@ export function applyBulkPlayNext(
     return { nextQueue: toInsert, movedCount: 0, addedCount: toInsert.length };
   }
 
+  const initialCurIdx = currentTrack
+    ? queue.findIndex((t) => isSameTrack(t, currentTrack))
+    : -1;
+
+  if (
+    initialCurIdx >= 0 &&
+    toInsert.length > 0 &&
+    initialCurIdx + toInsert.length < queue.length &&
+    toInsert.every((t, i) => isSameTrack(queue[initialCurIdx + 1 + i], t))
+  ) {
+    return { nextQueue: queue, movedCount: 0, addedCount: 0 };
+  }
+
   let movedCount = 0;
   let addedCount = 0;
   for (const inc of toInsert) {

@@ -1,6 +1,7 @@
 import { parseBlob, selectCover } from 'music-metadata';
 import { TrackMetadata } from '../types/music';
 import { cleanTrackTitle } from './formatters';
+import { sanitizeMetadataTitle, sanitizeMetadataField } from './encodingRecovery';
 
 const GRADIENT_PALETTES = [
   'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', // Indigo to Violet
@@ -86,9 +87,10 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
       }
     }
 
-    const title = common.title?.trim() || fallbackTitle;
-    const artist = common.artist?.trim() || (common.artists && common.artists.length > 0 ? common.artists.join(', ') : undefined);
-    const album = common.album?.trim();
+    const title = sanitizeMetadataTitle(common.title, fallbackTitle);
+    const rawArtist = common.artist?.trim() || (common.artists && common.artists.length > 0 ? common.artists.join(', ') : undefined);
+    const artist = sanitizeMetadataField(rawArtist);
+    const album = sanitizeMetadataField(common.album?.trim());
     const duration = format.duration;
     const trackNo = common.track?.no ?? undefined;
     const diskNo = common.disk?.no ?? undefined;

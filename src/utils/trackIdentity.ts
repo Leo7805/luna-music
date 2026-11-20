@@ -1,5 +1,10 @@
 import { TrackItem, ImportedFolder } from '../types/music';
 import { naturalSort } from './naturalSort';
+import {
+  isLikelyMojibake,
+  sanitizeMetadataTitle,
+  sanitizeMetadataField,
+} from './encodingRecovery';
 
 /**
  * Authoritative check for logical track identity based on canonical ID and aliases.
@@ -67,9 +72,43 @@ export function mergeTrackMetadataAndSources(target: TrackItem, source: TrackIte
 
   // 5. Reconcile metadata without overwriting populated fields with fallback/empty values
   if (source.metadata.isMetadataLoaded && !target.metadata.isMetadataLoaded) {
-    target.metadata = { ...source.metadata };
+    const cleanTitle = sanitizeMetadataTitle(
+      source.metadata.title,
+      target.metadata.title || target.name
+    );
+    const cleanArtist = sanitizeMetadataField(
+      source.metadata.artist,
+      target.metadata.artist
+    );
+    const cleanAlbum = sanitizeMetadataField(
+      source.metadata.album,
+      target.metadata.album
+    );
+    target.metadata = {
+      ...source.metadata,
+      title: cleanTitle,
+      artist: cleanArtist || 'Unknown Artist',
+      album: cleanAlbum || 'Unknown Album',
+    };
   } else if (target.metadata.isMetadataLoaded && !source.metadata.isMetadataLoaded) {
-    source.metadata = { ...target.metadata };
+    const cleanTitle = sanitizeMetadataTitle(
+      target.metadata.title,
+      source.metadata.title || source.name
+    );
+    const cleanArtist = sanitizeMetadataField(
+      target.metadata.artist,
+      source.metadata.artist
+    );
+    const cleanAlbum = sanitizeMetadataField(
+      target.metadata.album,
+      source.metadata.album
+    );
+    source.metadata = {
+      ...target.metadata,
+      title: cleanTitle,
+      artist: cleanArtist || 'Unknown Artist',
+      album: cleanAlbum || 'Unknown Album',
+    };
   } else {
     // Both loaded or both fallback: preserve best non-empty attributes
     if (!target.metadata.artworkUrl && source.metadata.artworkUrl) {
@@ -80,29 +119,64 @@ export function mergeTrackMetadataAndSources(target: TrackItem, source: TrackIte
       target.metadata.duration = source.metadata.duration;
       source.metadata.duration = source.metadata.duration;
     }
+    // Reconcile title: never overwrite a clean title with mojibake
+    const targetTitleMojibake = isLikelyMojibake(target.metadata.title);
+    const sourceTitleMojibake = isLikelyMojibake(source.metadata.title);
     if (
-      (!target.metadata.title || target.metadata.title === target.name) &&
+      (!target.metadata.title || target.metadata.title === target.name || targetTitleMojibake) &&
       source.metadata.title &&
-      source.metadata.title !== source.name
+      source.metadata.title !== source.name &&
+      !sourceTitleMojibake
     ) {
       target.metadata.title = source.metadata.title;
       source.metadata.title = source.metadata.title;
+    } else if (
+      (!source.metadata.title || source.metadata.title === source.name || sourceTitleMojibake) &&
+      target.metadata.title &&
+      target.metadata.title !== target.name &&
+      !targetTitleMojibake
+    ) {
+      source.metadata.title = target.metadata.title;
     }
+
+    // Reconcile artist: never overwrite clean artist with mojibake
+    const targetArtistMojibake = isLikelyMojibake(target.metadata.artist);
+    const sourceArtistMojibake = isLikelyMojibake(source.metadata.artist);
     if (
-      (!target.metadata.artist || target.metadata.artist === 'Unknown Artist') &&
+      (!target.metadata.artist || target.metadata.artist === 'Unknown Artist' || targetArtistMojibake) &&
       source.metadata.artist &&
-      source.metadata.artist !== 'Unknown Artist'
+      source.metadata.artist !== 'Unknown Artist' &&
+      !sourceArtistMojibake
     ) {
       target.metadata.artist = source.metadata.artist;
       source.metadata.artist = source.metadata.artist;
+    } else if (
+      (!source.metadata.artist || source.metadata.artist === 'Unknown Artist' || sourceArtistMojibake) &&
+      target.metadata.artist &&
+      target.metadata.artist !== 'Unknown Artist' &&
+      !targetArtistMojibake
+    ) {
+      source.metadata.artist = target.metadata.artist;
     }
+
+    // Reconcile album: never overwrite clean album with mojibake
+    const targetAlbumMojibake = isLikelyMojibake(target.metadata.album);
+    const sourceAlbumMojibake = isLikelyMojibake(source.metadata.album);
     if (
-      (!target.metadata.album || target.metadata.album === 'Unknown Album') &&
+      (!target.metadata.album || target.metadata.album === 'Unknown Album' || targetAlbumMojibake) &&
       source.metadata.album &&
-      source.metadata.album !== 'Unknown Album'
+      source.metadata.album !== 'Unknown Album' &&
+      !sourceAlbumMojibake
     ) {
       target.metadata.album = source.metadata.album;
       source.metadata.album = source.metadata.album;
+    } else if (
+      (!source.metadata.album || source.metadata.album === 'Unknown Album' || sourceAlbumMojibake) &&
+      target.metadata.album &&
+      target.metadata.album !== 'Unknown Album' &&
+      !targetAlbumMojibake
+    ) {
+      source.metadata.album = target.metadata.album;
     }
   }
 
