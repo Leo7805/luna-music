@@ -8,13 +8,15 @@ import {
   IMPORTED_FILES_COLLECTION_NAME,
 } from '../types/music';
 import { promptOpenFiles } from '../services/directoryAccess';
-import { storeImportedFiles } from '../services/idbStorage';
+import { storeImportedFiles, getStoredPlaylists, storePlaylists } from '../services/idbStorage';
 import {
   buildUnifiedMultiFolderTree,
   combineFlatPlaylists,
   isSupportedAudioFile,
   isLrcFile,
 } from '../utils/musicTree';
+import { isSameTrack, findExistingTrackByHandle } from '../utils/trackIdentity';
+import { stripExtension } from '../utils/audioFileTypes';
 import { createFallbackMetadata } from '../utils/metadata';
 
 export interface UseImportedFilesManagerProps {
@@ -30,6 +32,42 @@ export interface UseImportedFilesManagerReturn {
   handleOpenFilesSelect: (files: FileList | File[] | null) => Promise<void>;
   removeImportedFiles: (trackIds: string[]) => Promise<void>;
   removeAllImportedFiles: () => Promise<void>;
+}
+
+function createImportedFolderRecord(tracks: TrackItem[], addedAt?: number): ImportedFolder {
+  return {
+    id: IMPORTED_FILES_ROOT_ID,
+    name: IMPORTED_FILES_COLLECTION_NAME,
+    sourceType: 'files',
+    tree: {
+      id: IMPORTED_FILES_ROOT_ID,
+      name: IMPORTED_FILES_COLLECTION_NAME,
+      relativePath: IMPORTED_FILES_ROOT_ID,
+      tracks,
+      subfolders: [],
+      totalTrackCount: tracks.length,
+    },
+    tracks,
+    trackCount: tracks.length,
+    addedAt: addedAt || Date.now(),
+    lastScannedAt: Date.now(),
+    permissionStatus: 'granted',
+  };
+}
+
+function persistImportedFileRecords(tracks: TrackItem[]): Promise<boolean> {
+  const recordsToStore: StoredImportedFileRecord[] = tracks.map((t) => ({
+    id: t.id,
+    name: t.name,
+    relativePath: t.relativePath,
+    size: t.size,
+    lastModified: t.lastModified,
+    handle: t.handle,
+    status: t.status,
+    metadata: t.metadata,
+    addedAt: Date.now(),
+  }));
+  return storeImportedFiles(recordsToStore);
 }
 
 /**
@@ -50,90 +88,109 @@ export function useImportedFilesManager({
       if (!handles || handles.length === 0) return;
 
       setIsLoading(true);
-      const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
-      const existingTracks = existingImportedFolder ? [...existingImportedFolder.tracks] : [];
-      const newTracks: TrackItem[] = [];
 
-      for (const handle of handles) {
-        let alreadyExists = false;
-        for (const existing of existingTracks) {
-          if (existing.handle) {
-            try {
-              if (await existing.handle.isSameEntry(handle)) {
-                alreadyExists = true;
-                break;
-              }
-            } catch {
-              // Ignore handle comparison error
-            }
-          }
-        }
-        if (alreadyExists) continue;
+      const lrcHandles = new Map<string, FileSystemFileHandle>();
+      const audioHandles: FileSystemFileHandle[] = [];
 
-        try {
-          const file = await handle.getFile();
-          const stableId = `${IMPORTED_FILES_ROOT_ID}:${file.name}`;
-          const finalId =
-            existingTracks.some((t) => t.id === stableId) ||
-            newTracks.some((t) => t.id === stableId)
-              ? `${IMPORTED_FILES_ROOT_ID}:${file.name}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
-              : stableId;
-
-          const trackItem: TrackItem = {
-            id: finalId,
-            name: file.name,
-            relativePath: file.name,
-            size: file.size,
-            lastModified: file.lastModified,
-            handle,
-            file,
-            metadata: createFallbackMetadata(file.name, file.name),
-            status: file.size === 0 ? 'empty' : 'normal',
-            folderIds: [IMPORTED_FILES_ROOT_ID],
-          };
-          newTracks.push(trackItem);
-        } catch (err) {
-          console.error('Error reading file handle:', err);
+      for (const h of handles) {
+        if (isLrcFile(h.name)) {
+          lrcHandles.set(stripExtension(h.name).toLowerCase(), h);
+        } else if (isSupportedAudioFile(h.name)) {
+          audioHandles.push(h);
         }
       }
 
-      if (newTracks.length === 0) {
+      if (audioHandles.length === 0) {
         setIsLoading(false);
         return;
       }
 
-      const allImportedTracks = [...existingTracks, ...newTracks];
-      const updatedImportedFolder: ImportedFolder = {
-        id: IMPORTED_FILES_ROOT_ID,
-        name: IMPORTED_FILES_COLLECTION_NAME,
-        sourceType: 'files',
-        tree: {
-          id: IMPORTED_FILES_ROOT_ID,
-          name: IMPORTED_FILES_COLLECTION_NAME,
-          relativePath: IMPORTED_FILES_ROOT_ID,
-          tracks: allImportedTracks,
-          subfolders: [],
-          totalTrackCount: allImportedTracks.length,
-        },
-        tracks: allImportedTracks,
-        trackCount: allImportedTracks.length,
-        addedAt: existingImportedFolder?.addedAt || Date.now(),
-        lastScannedAt: Date.now(),
-        permissionStatus: 'granted',
-      };
+      const allLibraryTracks = (library?.folders || []).flatMap((f) => f.tracks);
+      const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+      const allImportedTracks = existingImportedFolder ? [...existingImportedFolder.tracks] : [];
+      const newTracksForMetadata: TrackItem[] = [];
 
-      const recordsToStore: StoredImportedFileRecord[] = allImportedTracks.map((t) => ({
-        id: t.id,
-        name: t.name,
-        relativePath: t.relativePath,
-        size: t.size,
-        lastModified: t.lastModified,
-        handle: t.handle,
-        status: t.status,
-        metadata: t.metadata,
-        addedAt: Date.now(),
-      }));
-      await storeImportedFiles(recordsToStore);
+      for (const handle of audioHandles) {
+        const baseName = stripExtension(handle.name).toLowerCase();
+        const batchLrc = lrcHandles.get(baseName);
+
+        // Check if handle matches an existing track anywhere in the library
+        const matched = await findExistingTrackByHandle(handle, allLibraryTracks);
+
+        if (matched) {
+          // Reconcile source membership
+          const folderIds = matched.folderIds || [];
+          if (!folderIds.includes(IMPORTED_FILES_ROOT_ID)) {
+            matched.folderIds = [...folderIds, IMPORTED_FILES_ROOT_ID];
+          }
+
+          // Generate stable alias if not present
+          const stableId = `${IMPORTED_FILES_ROOT_ID}:${matched.name}`;
+          const aliases = matched.aliases || [matched.id];
+          if (!aliases.includes(stableId)) {
+            matched.aliases = [...aliases, stableId];
+          }
+
+          // Pair with batch .lrc if provided
+          if (batchLrc) {
+            matched.lrcHandle = batchLrc;
+          }
+
+          // Keep fresh handle and update status
+          matched.handle = handle;
+          if (matched.status === 'unreadable') {
+            matched.status = 'normal';
+          }
+
+          // Ensure it is in allImportedTracks
+          const alreadyInImported = allImportedTracks.some((t) => isSameTrack(t, matched));
+          if (!alreadyInImported) {
+            allImportedTracks.push(matched);
+          }
+        } else {
+          // Check if already in allImportedTracks
+          const inImported = await findExistingTrackByHandle(handle, allImportedTracks);
+          if (inImported) {
+            if (batchLrc) inImported.lrcHandle = batchLrc;
+            inImported.handle = handle;
+            continue;
+          }
+
+          try {
+            const file = await handle.getFile();
+            const stableId = `${IMPORTED_FILES_ROOT_ID}:${file.name}`;
+            const finalId =
+              allImportedTracks.some((t) => t.id === stableId)
+                ? `${IMPORTED_FILES_ROOT_ID}:${file.name}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+                : stableId;
+
+            const trackItem: TrackItem = {
+              id: finalId,
+              name: file.name,
+              relativePath: file.name,
+              size: file.size,
+              lastModified: file.lastModified,
+              handle,
+              file,
+              lrcHandle: batchLrc,
+              metadata: createFallbackMetadata(file.name, file.name),
+              status: file.size === 0 ? 'empty' : 'normal',
+              folderIds: [IMPORTED_FILES_ROOT_ID],
+              aliases: [finalId],
+            };
+            allImportedTracks.push(trackItem);
+            newTracksForMetadata.push(trackItem);
+          } catch (err) {
+            console.error('Error reading file handle:', err);
+          }
+        }
+      }
+
+      const updatedImportedFolder = createImportedFolderRecord(
+        allImportedTracks,
+        existingImportedFolder?.addedAt
+      );
+      await persistImportedFileRecords(allImportedTracks);
 
       const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
       const nextFolders = [...otherFolders, updatedImportedFolder];
@@ -150,7 +207,9 @@ export function useImportedFilesManager({
         handle: nextFolders[0]?.handle,
       }));
 
-      startMetadataExtraction(newTracks);
+      if (newTracksForMetadata.length > 0) {
+        startMetadataExtraction(newTracksForMetadata);
+      }
     } catch (err) {
       console.error('Failed to open files:', err);
     } finally {
@@ -166,6 +225,17 @@ export function useImportedFilesManager({
       setIsLoading(true);
       const fileArray = Array.from(files);
 
+      const lrcFiles = new Map<string, File>();
+      const audioFiles: File[] = [];
+
+      for (const file of fileArray) {
+        if (isLrcFile(file.name)) {
+          lrcFiles.set(stripExtension(file.name).toLowerCase(), file);
+        } else if (isSupportedAudioFile(file.name)) {
+          audioFiles.push(file);
+        }
+      }
+
       const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
       const existingTracks = existingImportedFolder ? [...existingImportedFolder.tracks] : [];
 
@@ -174,9 +244,9 @@ export function useImportedFilesManager({
       const updatedExistingTracks = [...existingTracks];
       const newTracksToAdd: TrackItem[] = [];
 
-      for (const file of fileArray) {
-        if (!isSupportedAudioFile(file.name) && !isLrcFile(file.name)) continue;
-        if (isLrcFile(file.name)) continue;
+      for (const file of audioFiles) {
+        const baseName = stripExtension(file.name).toLowerCase();
+        const batchLrc = lrcFiles.get(baseName);
 
         // Candidate matching for safe reconnect on iPad/Safari:
         // Match only if (name === file.name && size === file.size && lastModified === file.lastModified)
@@ -197,6 +267,7 @@ export function useImportedFilesManager({
             updatedExistingTracks[idx] = {
               ...updatedExistingTracks[idx],
               file,
+              lrcFile: batchLrc || updatedExistingTracks[idx].lrcFile,
               status: file.size === 0 ? 'empty' : 'normal',
             };
           }
@@ -228,9 +299,11 @@ export function useImportedFilesManager({
             size: file.size,
             lastModified: file.lastModified,
             file,
+            lrcFile: batchLrc,
             metadata: createFallbackMetadata(file.name, file.name),
             status: file.size === 0 ? 'empty' : 'normal',
             folderIds: [IMPORTED_FILES_ROOT_ID],
+            aliases: [finalId],
           });
         }
       }
@@ -241,37 +314,11 @@ export function useImportedFilesManager({
         return;
       }
 
-      const updatedImportedFolder: ImportedFolder = {
-        id: IMPORTED_FILES_ROOT_ID,
-        name: IMPORTED_FILES_COLLECTION_NAME,
-        sourceType: 'files',
-        tree: {
-          id: IMPORTED_FILES_ROOT_ID,
-          name: IMPORTED_FILES_COLLECTION_NAME,
-          relativePath: IMPORTED_FILES_ROOT_ID,
-          tracks: allTracks,
-          subfolders: [],
-          totalTrackCount: allTracks.length,
-        },
-        tracks: allTracks,
-        trackCount: allTracks.length,
-        addedAt: existingImportedFolder?.addedAt || Date.now(),
-        lastScannedAt: Date.now(),
-        permissionStatus: 'granted',
-      };
-
-      const recordsToStore: StoredImportedFileRecord[] = allTracks.map((t) => ({
-        id: t.id,
-        name: t.name,
-        relativePath: t.relativePath,
-        size: t.size,
-        lastModified: t.lastModified,
-        handle: t.handle,
-        status: t.status,
-        metadata: t.metadata,
-        addedAt: Date.now(),
-      }));
-      await storeImportedFiles(recordsToStore);
+      const updatedImportedFolder = createImportedFolderRecord(
+        allTracks,
+        existingImportedFolder?.addedAt
+      );
+      await persistImportedFileRecords(allTracks);
 
       const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
       const nextFolders = [...otherFolders, updatedImportedFolder];
@@ -301,34 +348,79 @@ export function useImportedFilesManager({
       const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
       if (!existingImportedFolder) return;
 
-      const remainingTracks = existingImportedFolder.tracks.filter((t) => !idSet.has(t.id));
+      const remainingTracks: TrackItem[] = [];
+      const actuallyRemovedIds: string[] = [];
+      const idMigrations = new Map<string, string>();
 
-      const updatedFolder: ImportedFolder = {
-        ...existingImportedFolder,
-        tracks: remainingTracks,
-        trackCount: remainingTracks.length,
-        tree: {
-          ...existingImportedFolder.tree,
-          tracks: remainingTracks,
-          totalTrackCount: remainingTracks.length,
-        },
-      };
+      for (const track of existingImportedFolder.tracks) {
+        const isTargeted =
+          idSet.has(track.id) || (track.aliases && track.aliases.some((a) => idSet.has(a)));
 
-      const recordsToStore: StoredImportedFileRecord[] = remainingTracks.map((t) => ({
-        id: t.id,
-        name: t.name,
-        relativePath: t.relativePath,
-        size: t.size,
-        lastModified: t.lastModified,
-        handle: t.handle,
-        status: t.status,
-        metadata: t.metadata,
-        addedAt: Date.now(),
-      }));
-      await storeImportedFiles(recordsToStore);
+        if (isTargeted) {
+          // Remove IMPORTED_FILES_ROOT_ID from folderIds
+          const remainingFolderIds = (track.folderIds || []).filter(
+            (id) => id !== IMPORTED_FILES_ROOT_ID
+          );
+          track.folderIds = remainingFolderIds;
 
-      // Clean up favourites for removed tracks
-      onRemoveFavourites(trackIds);
+          if (remainingFolderIds.length > 0) {
+            // Track still has other folder sources: preserve it in the library!
+            if (track.id.startsWith(`${IMPORTED_FILES_ROOT_ID}:`)) {
+              const folderAlias = track.aliases?.find(
+                (a) => !a.startsWith(`${IMPORTED_FILES_ROOT_ID}:`)
+              );
+              if (folderAlias) {
+                idMigrations.set(track.id, folderAlias);
+                track.id = folderAlias;
+              }
+            }
+          } else {
+            // Track has no other sources left: truly removed from library
+            actuallyRemovedIds.push(track.id);
+            if (track.aliases) {
+              track.aliases.forEach((a) => actuallyRemovedIds.push(a));
+            }
+          }
+        } else {
+          remainingTracks.push(track);
+        }
+      }
+
+      const updatedFolder = createImportedFolderRecord(
+        remainingTracks,
+        existingImportedFolder.addedAt
+      );
+      await persistImportedFileRecords(remainingTracks);
+
+      // Clean up favourites ONLY for tracks truly removed from library
+      if (actuallyRemovedIds.length > 0) {
+        onRemoveFavourites(actuallyRemovedIds);
+      }
+
+      // If canonical ID migrated, update stored playlists
+      if (idMigrations.size > 0) {
+        getStoredPlaylists().then((storedPlaylists) => {
+          let playlistsChanged = false;
+          const updated = storedPlaylists.map((pl) => {
+            let changed = false;
+            const newTracks = pl.tracks.map((ref) => {
+              if (idMigrations.has(ref.trackId)) {
+                changed = true;
+                return { ...ref, trackId: idMigrations.get(ref.trackId)! };
+              }
+              return ref;
+            });
+            if (changed) {
+              playlistsChanged = true;
+              return { ...pl, tracks: newTracks, updatedAt: Date.now() };
+            }
+            return pl;
+          });
+          if (playlistsChanged) {
+            storePlaylists(updated);
+          }
+        });
+      }
 
       const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
       const nextFolders = remainingTracks.length > 0 ? [...otherFolders, updatedFolder] : otherFolders;

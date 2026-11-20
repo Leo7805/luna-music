@@ -167,7 +167,7 @@ export function updateTrackInLibrary(
   metadata?: Partial<TrackItem['metadata']>
 ): MusicLibrary {
   const updateItem = (t: TrackItem): TrackItem => {
-    if (t.id !== trackId) return t;
+    if (t.id !== trackId && (!t.aliases || !t.aliases.includes(trackId))) return t;
     return {
       ...t,
       status,
@@ -215,12 +215,13 @@ export function updateTrackMetadataInLibrary(
   meta: Partial<TrackItem['metadata']>
 ): MusicLibrary {
   const updateItem = (t: TrackItem): TrackItem => {
-    if (t.id !== trackId) return t;
+    if (t.id !== trackId && (!t.aliases || !t.aliases.includes(trackId))) return t;
     return {
       ...t,
       metadata: {
         ...t.metadata,
         ...meta,
+        artworkUrl: meta.artworkUrl || t.metadata.artworkUrl,
         isMetadataLoaded: true,
       },
     };

@@ -127,15 +127,18 @@ export async function storeRegisteredFolders(folders: StoredFolderRecord[]): Pro
     if (!db) return false;
 
     // Sanitize records to ensure only lightweight serializable data is stored
-    const records: StoredFolderRecord[] = folders.map((f) => ({
-      id: f.id,
-      name: f.name,
-      sourceType: f.sourceType,
-      handle: f.handle,
-      addedAt: f.addedAt,
-      lastScannedAt: f.lastScannedAt,
-      trackCount: f.trackCount,
-    }));
+    // Exclude virtual collections such as imported-files-root from registered folder handles store
+    const records: StoredFolderRecord[] = folders
+      .filter((f) => f.id !== 'imported-files-root')
+      .map((f) => ({
+        id: f.id,
+        name: f.name,
+        sourceType: f.sourceType,
+        handle: f.handle,
+        addedAt: f.addedAt,
+        lastScannedAt: f.lastScannedAt,
+        trackCount: f.trackCount,
+      }));
 
     return new Promise((resolve) => {
       try {

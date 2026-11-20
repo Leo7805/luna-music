@@ -24,6 +24,7 @@ import {
   buildUnifiedMultiFolderTree,
   combineFlatPlaylists,
   reconcileOverlappingTracks,
+  mergeTrackMetadataAndSources,
 } from '../utils/musicTree';
 import { createFallbackMetadata } from '../utils/metadata';
 
@@ -188,6 +189,27 @@ export function useLibraryInitialization({
             metadata: rec.metadata || createFallbackMetadata(rec.name, rec.relativePath),
             folderIds: [IMPORTED_FILES_ROOT_ID],
           });
+        }
+
+        // Reconcile imported tracks with loaded folder tracks to unify identity and share lyrics
+        const allLoadedTracks = loadedFolders.flatMap((f) => f.tracks);
+        for (let i = 0; i < importedTracks.length; i++) {
+          const imp = importedTracks[i];
+          if (imp.handle) {
+            for (const loaded of allLoadedTracks) {
+              if (loaded.handle && loaded.name === imp.name) {
+                try {
+                  if (await loaded.handle.isSameEntry(imp.handle)) {
+                    mergeTrackMetadataAndSources(loaded, imp);
+                    importedTracks[i] = loaded;
+                    break;
+                  }
+                } catch {
+                  // Ignore handle comparison error
+                }
+              }
+            }
+          }
         }
 
         importedFilesFolder = {

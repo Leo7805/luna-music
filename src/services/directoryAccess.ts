@@ -35,9 +35,10 @@ export async function promptOpenFiles(): Promise<FileSystemFileHandle[] | null> 
       multiple: true,
       types: [
         {
-          description: 'Audio Files',
+          description: 'Audio & Lyrics Files',
           accept: {
             'audio/*': ['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg', '.opus', '.weba'],
+            'text/plain': ['.lrc'],
           },
         },
       ],
