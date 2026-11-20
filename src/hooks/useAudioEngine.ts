@@ -100,6 +100,16 @@ export function useAudioEngine({
     }
 
     try {
+      if (track.status === 'unreadable') {
+        audio.pause();
+        audio.removeAttribute('src');
+        audio.load();
+        setIsPlaying(false);
+        throw new Error(
+          'Cannot access this audio file. Please check file permissions or reopen the music folder.'
+        );
+      }
+
       let file: File | Blob | null = null;
       if (track.handle) {
         try {

@@ -14,8 +14,12 @@ export async function storeImportedFiles(records: StoredImportedFileRecord[]): P
   // 1. Sync to localStorage cache
   try {
     if (typeof localStorage !== 'undefined') {
-      const cached = records.map((r) => ({ ...r, handle: undefined }));
-      localStorage.setItem(LOCAL_STORAGE_IMPORTED_FILES_KEY, JSON.stringify(cached));
+      if (records.length === 0) {
+        localStorage.removeItem(LOCAL_STORAGE_IMPORTED_FILES_KEY);
+      } else {
+        const cached = records.map((r) => ({ ...r, handle: undefined }));
+        localStorage.setItem(LOCAL_STORAGE_IMPORTED_FILES_KEY, JSON.stringify(cached));
+      }
     }
   } catch {
     // Ignore localStorage error
@@ -36,6 +40,7 @@ export async function storeImportedFiles(records: StoredImportedFileRecord[]): P
       status: r.status,
       metadata: r.metadata ? { ...r.metadata, artworkUrl: undefined } : undefined,
       addedAt: r.addedAt,
+      aliases: r.aliases,
     }));
 
     return new Promise((resolve) => {
@@ -100,7 +105,7 @@ export async function getStoredImportedFiles(): Promise<StoredImportedFileRecord
         req.onsuccess = () => {
           const result = req.result;
           db.close();
-          if (Array.isArray(result) && result.length > 0) {
+          if (Array.isArray(result)) {
             resolve(result as StoredImportedFileRecord[]);
           } else {
             resolve(localCache);

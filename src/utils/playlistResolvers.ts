@@ -1,4 +1,36 @@
 import { TrackItem, PlaylistTrackReference } from '../types/music';
+import { getStoredPlaylists, storePlaylists } from '../services/idbStorage';
+
+/**
+ * Updates stored playlists when tracks migrate to canonical IDs upon source removal.
+ */
+export async function migratePlaylistsTrackIds(idMigrations: Map<string, string>): Promise<void> {
+  if (idMigrations.size === 0) return;
+  try {
+    const storedPlaylists = await getStoredPlaylists();
+    let playlistsChanged = false;
+    const updated = storedPlaylists.map((pl) => {
+      let changed = false;
+      const newTracks = pl.tracks.map((ref) => {
+        if (idMigrations.has(ref.trackId)) {
+          changed = true;
+          return { ...ref, trackId: idMigrations.get(ref.trackId)! };
+        }
+        return ref;
+      });
+      if (changed) {
+        playlistsChanged = true;
+        return { ...pl, tracks: newTracks, updatedAt: Date.now() };
+      }
+      return pl;
+    });
+    if (playlistsChanged) {
+      await storePlaylists(updated);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
 
 /**
  * Resolves an ordered list of PlaylistTrackReferences against library tracks,

@@ -3,6 +3,7 @@ import {
   TrackItem,
   MusicLibrary,
   StoredFolderRecord,
+  IMPORTED_FILES_ROOT_ID,
 } from '../types/music';
 import {
   scanRootFolderHandle,
@@ -12,14 +13,15 @@ import {
 import { parseFileList } from '../services/fallbackAccess';
 import {
   storeRegisteredFolders,
-  getStoredPlaylists,
-  storePlaylists,
+  clearStoredDirectoryHandle,
+  storeImportedFiles,
 } from '../services/idbStorage';
 import {
   buildFolderTree,
   buildUnifiedMultiFolderTree,
   combineFlatPlaylists,
   reconcileOverlappingTracks,
+  migratePlaylistsTrackIds,
 } from '../utils/musicTree';
 import { extractAudioMetadata } from '../utils/metadata';
 import { updateTrackMetadataInLibrary } from '../utils/libraryAggregation';
@@ -288,7 +290,7 @@ export function useFolderScanning({
   // Remove a root folder from the library
   const removeFolder = useCallback(
     async (folderId: string) => {
-      if (folderId === 'imported-files-root') {
+      if (folderId === IMPORTED_FILES_ROOT_ID || folderId === 'imported-files-root') {
         await onRemoveAllImportedFiles();
         return;
       }
@@ -312,6 +314,7 @@ export function useFolderScanning({
       if (remainingFolders.length === 0) {
         onLibraryUpdated(() => null);
         await storeRegisteredFolders([]);
+        await clearStoredDirectoryHandle();
         return;
       }
 
@@ -355,28 +358,40 @@ export function useFolderScanning({
 
       if (idMigrations.size > 0) {
         onMigrateFavourites(idMigrations);
+        migratePlaylistsTrackIds(idMigrations);
+      }
 
-        getStoredPlaylists().then((storedPlaylists) => {
-          let playlistsChanged = false;
-          const updated = storedPlaylists.map((pl) => {
-            let changed = false;
-            const newTracks = pl.tracks.map((ref) => {
-              if (idMigrations.has(ref.trackId)) {
-                changed = true;
-                return { ...ref, trackId: idMigrations.get(ref.trackId)! };
-              }
-              return ref;
-            });
-            if (changed) {
-              playlistsChanged = true;
-              return { ...pl, tracks: newTracks, updatedAt: Date.now() };
-            }
-            return pl;
-          });
-          if (playlistsChanged) {
-            storePlaylists(updated);
-          }
-        });
+      // Separate physical folders from virtual imported files
+      const physicalFolders = refreshedFolders.filter(
+        (f) =>
+          f.id !== IMPORTED_FILES_ROOT_ID &&
+          f.id !== 'imported-files-root' &&
+          f.sourceType !== 'files'
+      );
+      const remainingImported = refreshedFolders.find(
+        (f) => f.id === IMPORTED_FILES_ROOT_ID || f.id === 'imported-files-root'
+      );
+
+      if (remainingImported) {
+        const recordsToStore = remainingImported.tracks.map((t) => ({
+          id: t.id,
+          name: t.name,
+          relativePath: t.relativePath,
+          size: t.size,
+          lastModified: t.lastModified,
+          handle: t.handle,
+          status: t.status,
+          metadata: t.metadata,
+          addedAt: Date.now(),
+          aliases: t.aliases,
+        }));
+        await storeImportedFiles(recordsToStore);
+      }
+
+      await storeRegisteredFolders(physicalFolders);
+
+      if (physicalFolders.length === 0) {
+        await clearStoredDirectoryHandle();
       }
 
       const unifiedTree = buildUnifiedMultiFolderTree(refreshedFolders);
@@ -392,8 +407,6 @@ export function useFolderScanning({
             }
           : null
       );
-
-      await storeRegisteredFolders(refreshedFolders);
     },
     [
       library,

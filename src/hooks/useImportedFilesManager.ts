@@ -8,12 +8,17 @@ import {
   IMPORTED_FILES_COLLECTION_NAME,
 } from '../types/music';
 import { promptOpenFiles } from '../services/directoryAccess';
-import { storeImportedFiles, getStoredPlaylists, storePlaylists } from '../services/idbStorage';
+import {
+  storeImportedFiles,
+  storeRegisteredFolders,
+  clearStoredDirectoryHandle,
+} from '../services/idbStorage';
 import {
   buildUnifiedMultiFolderTree,
   combineFlatPlaylists,
   isSupportedAudioFile,
   isLrcFile,
+  migratePlaylistsTrackIds,
 } from '../utils/musicTree';
 import { isSameTrack, findExistingTrackByHandle } from '../utils/trackIdentity';
 import { stripExtension } from '../utils/audioFileTypes';
@@ -66,6 +71,7 @@ function persistImportedFileRecords(tracks: TrackItem[]): Promise<boolean> {
     status: t.status,
     metadata: t.metadata,
     addedAt: Date.now(),
+    aliases: t.aliases,
   }));
   return storeImportedFiles(recordsToStore);
 }
@@ -77,7 +83,7 @@ function persistImportedFileRecords(tracks: TrackItem[]): Promise<boolean> {
 export function useImportedFilesManager({
   library,
   onLibraryUpdated,
-  onRemoveFavourites,
+  onRemoveFavourites: _onRemoveFavourites,
   startMetadataExtraction,
   setIsLoading,
 }: UseImportedFilesManagerProps): UseImportedFilesManagerReturn {
@@ -345,7 +351,9 @@ export function useImportedFilesManager({
   const removeImportedFiles = useCallback(
     async (trackIds: string[]) => {
       const idSet = new Set(trackIds);
-      const existingImportedFolder = library?.folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+      const existingImportedFolder = library?.folders.find(
+        (f) => f.id === IMPORTED_FILES_ROOT_ID || f.id === 'imported-files-root'
+      );
       if (!existingImportedFolder) return;
 
       const remainingTracks: TrackItem[] = [];
@@ -359,15 +367,20 @@ export function useImportedFilesManager({
         if (isTargeted) {
           // Remove IMPORTED_FILES_ROOT_ID from folderIds
           const remainingFolderIds = (track.folderIds || []).filter(
-            (id) => id !== IMPORTED_FILES_ROOT_ID
+            (id) => id !== IMPORTED_FILES_ROOT_ID && id !== 'imported-files-root'
           );
           track.folderIds = remainingFolderIds;
 
           if (remainingFolderIds.length > 0) {
             // Track still has other folder sources: preserve it in the library!
-            if (track.id.startsWith(`${IMPORTED_FILES_ROOT_ID}:`)) {
+            if (
+              track.id.startsWith(`${IMPORTED_FILES_ROOT_ID}:`) ||
+              track.id.startsWith('imported-files-root:')
+            ) {
               const folderAlias = track.aliases?.find(
-                (a) => !a.startsWith(`${IMPORTED_FILES_ROOT_ID}:`)
+                (a) =>
+                  !a.startsWith(`${IMPORTED_FILES_ROOT_ID}:`) &&
+                  !a.startsWith('imported-files-root:')
               );
               if (folderAlias) {
                 idMigrations.set(track.id, folderAlias);
@@ -392,43 +405,47 @@ export function useImportedFilesManager({
       );
       await persistImportedFileRecords(remainingTracks);
 
-      // Clean up favourites ONLY for tracks truly removed from library
-      if (actuallyRemovedIds.length > 0) {
-        onRemoveFavourites(actuallyRemovedIds);
-      }
-
       // If canonical ID migrated, update stored playlists
       if (idMigrations.size > 0) {
-        getStoredPlaylists().then((storedPlaylists) => {
-          let playlistsChanged = false;
-          const updated = storedPlaylists.map((pl) => {
-            let changed = false;
-            const newTracks = pl.tracks.map((ref) => {
-              if (idMigrations.has(ref.trackId)) {
-                changed = true;
-                return { ...ref, trackId: idMigrations.get(ref.trackId)! };
-              }
-              return ref;
-            });
-            if (changed) {
-              playlistsChanged = true;
-              return { ...pl, tracks: newTracks, updatedAt: Date.now() };
-            }
-            return pl;
-          });
-          if (playlistsChanged) {
-            storePlaylists(updated);
-          }
-        });
+        migratePlaylistsTrackIds(idMigrations);
       }
 
-      const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
-      const nextFolders = remainingTracks.length > 0 ? [...otherFolders, updatedFolder] : otherFolders;
+      const otherFolders = (library?.folders || []).filter(
+        (f) =>
+          f.id !== IMPORTED_FILES_ROOT_ID &&
+          f.id !== 'imported-files-root' &&
+          f.sourceType !== 'files'
+      );
+
+      // Clean up folderIds in otherFolders for tracks that were removed from Imported Files
+      const cleanedOtherFolders = otherFolders.map((f) => ({
+        ...f,
+        tracks: f.tracks.map((t) => {
+          const isTargeted =
+            idSet.has(t.id) || (t.aliases && t.aliases.some((a) => idSet.has(a)));
+          if (isTargeted) {
+            return {
+              ...t,
+              folderIds: (t.folderIds || []).filter(
+                (id) => id !== IMPORTED_FILES_ROOT_ID && id !== 'imported-files-root'
+              ),
+            };
+          }
+          return t;
+        }),
+      }));
+
+      const nextFolders =
+        remainingTracks.length > 0 ? [...cleanedOtherFolders, updatedFolder] : cleanedOtherFolders;
 
       if (nextFolders.length === 0) {
         onLibraryUpdated(() => null);
+        await storeRegisteredFolders([]);
+        await clearStoredDirectoryHandle();
         return;
       }
+
+      await storeRegisteredFolders(cleanedOtherFolders);
 
       const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
       const flatPlaylist = combineFlatPlaylists(nextFolders);
@@ -444,7 +461,7 @@ export function useImportedFilesManager({
           : null
       );
     },
-    [library, onLibraryUpdated, onRemoveFavourites]
+    [library, onLibraryUpdated]
   );
 
   // Remove all imported files from library

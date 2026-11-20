@@ -60,6 +60,7 @@ export interface StoredImportedFileRecord {
   status?: FileStatus;
   metadata?: TrackMetadata;
   addedAt: number;
+  aliases?: string[];
 }
 
 /**

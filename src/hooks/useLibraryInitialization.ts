@@ -77,6 +77,8 @@ export function useLibraryInitialization({
         // are strictly preserved, even if named 'Selected Audio' without a persistent directory handle.
         const isLegacyFolder = (f: StoredFolderRecord) =>
           f.sourceType === 'files' ||
+          f.id === IMPORTED_FILES_ROOT_ID ||
+          f.id === 'imported-files-root' ||
           f.id.startsWith('files:') ||
           (!f.sourceType && f.name === 'Selected Audio');
         const legacyFolders = storedFolders.filter(isLegacyFolder);
@@ -188,6 +190,7 @@ export function useLibraryInitialization({
             status,
             metadata: rec.metadata || createFallbackMetadata(rec.name, rec.relativePath),
             folderIds: [IMPORTED_FILES_ROOT_ID],
+            aliases: rec.aliases || [rec.id],
           });
         }
 
@@ -199,7 +202,14 @@ export function useLibraryInitialization({
             for (const loaded of allLoadedTracks) {
               if (loaded.handle && loaded.name === imp.name) {
                 try {
-                  if (await loaded.handle.isSameEntry(imp.handle)) {
+                  let isSame = false;
+                  if (typeof imp.handle.isSameEntry === 'function') {
+                    isSame = await imp.handle.isSameEntry(loaded.handle);
+                  }
+                  if (!isSame && typeof loaded.handle.isSameEntry === 'function') {
+                    isSame = await loaded.handle.isSameEntry(imp.handle);
+                  }
+                  if (isSame) {
                     mergeTrackMetadataAndSources(loaded, imp);
                     importedTracks[i] = loaded;
                     break;
