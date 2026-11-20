@@ -22,9 +22,9 @@ export function SidebarNavigation({
     'w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 focus-visible:border-transparent';
 
   const activeClass =
-    'bg-indigo-600/15 dark:bg-indigo-600/20 text-[#565ECF] dark:text-indigo-300 border-indigo-500/30 shadow-sm font-semibold';
+    'bg-indigo-600/15 bg-[var(--bg-active)] dark:bg-indigo-600/20 text-[var(--accent-primary)] dark:text-indigo-300 border-indigo-500/30 border-[var(--accent-primary)]/30 shadow-sm font-semibold';
   const inactiveClass =
-    'border-transparent text-[#687995] dark:text-slate-300 hover:text-[#182238] dark:hover:text-white hover:bg-[#E9EDF7] dark:hover:bg-white/[0.04]';
+    'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.04]';
 
   return (
     <div className="p-3 space-y-1">
@@ -35,10 +35,10 @@ export function SidebarNavigation({
         className={`${baseButtonClass} ${currentView === 'all' ? activeClass : inactiveClass}`}
       >
         <div className="flex items-center gap-3">
-          <Music className="w-4 h-4 text-[#565ECF] dark:text-indigo-400" />
+          <Music className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
           <span>All Tracks</span>
         </div>
-        <span className="text-xs px-2 py-0.5 rounded-full bg-[#DDE4EF]/70 dark:bg-white/[0.06] text-[#687995] dark:text-slate-400 font-medium">
+        <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--border-subtle)]/70 dark:bg-white/[0.06] text-[var(--text-secondary)] dark:text-slate-400 font-medium">
           {totalTracksCount}
         </span>
       </button>
@@ -71,7 +71,7 @@ export function SidebarNavigation({
           <span>Playlists</span>
         </div>
         {playlistsCount > 0 && (
-          <span className="text-xs px-2 py-0.5 rounded-full bg-[#DDE4EF]/70 dark:bg-white/[0.06] text-[#687995] dark:text-slate-400 font-medium">
+          <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--border-subtle)]/70 dark:bg-white/[0.06] text-[var(--text-secondary)] dark:text-slate-400 font-medium">
             {playlistsCount}
           </span>
         )}

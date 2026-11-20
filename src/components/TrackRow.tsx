@@ -97,10 +97,10 @@ export function TrackRow({
         isMenuOpen ? 'z-30' : 'z-0'
       } ${
         isSelected
-          ? 'bg-indigo-600/20 dark:bg-indigo-600/25 border-indigo-500/40 shadow-sm'
+          ? 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-indigo-600/25 border-indigo-500/40 border-[var(--accent-primary)]/40 shadow-sm'
           : isCurrent
-          ? 'bg-indigo-600/15 dark:bg-indigo-600/20 border-indigo-500/25 shadow-sm'
-          : 'border-transparent hover:bg-[#E9EDF7]/70 dark:hover:bg-white/[0.04]'
+          ? 'bg-indigo-600/15 bg-[var(--bg-active)]/70 dark:bg-indigo-600/20 border-indigo-500/25 border-[var(--accent-primary)]/25 shadow-sm'
+          : 'border-transparent hover:bg-[var(--bg-hover)]/70 dark:hover:bg-white/[0.04]'
       } ${isAbnormal ? 'opacity-85' : ''}`}
     >
       {/* Col 1: Number, Checkbox, Equalizer, or Play Button */}
@@ -120,17 +120,17 @@ export function TrackRow({
           </button>
         ) : isCurrent && isPlaying ? (
           <div className="w-4 h-4 flex items-end justify-center gap-[2px]">
-            <span className="w-[3px] bg-[#565ECF] dark:bg-indigo-400 rounded-full animate-bar-1" />
-            <span className="w-[3px] bg-[#565ECF] dark:bg-indigo-400 rounded-full animate-bar-2" />
-            <span className="w-[3px] bg-[#565ECF] dark:bg-indigo-400 rounded-full animate-bar-3" />
+            <span className="w-[3px] bg-[var(--accent-primary)] dark:bg-indigo-400 rounded-full animate-bar-1" />
+            <span className="w-[3px] bg-[var(--accent-primary)] dark:bg-indigo-400 rounded-full animate-bar-2" />
+            <span className="w-[3px] bg-[var(--accent-primary)] dark:bg-indigo-400 rounded-full animate-bar-3" />
           </div>
         ) : (
           <>
             <span
               className={`group-hover:hidden ${
                 isCurrent
-                  ? 'text-[#565ECF] dark:text-indigo-400 font-bold'
-                  : 'text-[#687995] dark:text-slate-500'
+                  ? 'text-[var(--accent-primary)] dark:text-indigo-400 font-bold'
+                  : 'text-[var(--text-secondary)] dark:text-slate-500'
               }`}
             >
               {index + 1}
@@ -145,7 +145,7 @@ export function TrackRow({
                   onPlayTrack(track);
                 }
               }}
-              className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded-full bg-[#565ECF] hover:bg-[#4B52BA] text-white dark:bg-white dark:text-black hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
+              className="hidden group-hover:flex items-center justify-center w-6 h-6 rounded-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white dark:bg-white dark:text-black hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
             >
               {isCurrent && isPlaying ? (
                 <Pause className="w-3 h-3 fill-current" />
@@ -166,14 +166,14 @@ export function TrackRow({
             <span
               className={`font-medium truncate ${
                 isCurrent
-                  ? 'text-[#565ECF] dark:text-indigo-300 font-semibold'
-                  : 'text-[#182238] dark:text-slate-100 group-hover:text-black dark:group-hover:text-white'
+                  ? 'text-[var(--accent-primary)] dark:text-indigo-300 font-semibold'
+                  : 'text-[var(--text-primary)] dark:text-slate-100 group-hover:text-[var(--text-primary)] dark:group-hover:text-white'
               }`}
             >
               {track.metadata.title || track.name}
             </span>
             {extension && (
-              <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#DDE4EF]/70 dark:bg-white/[0.08] text-[#687995] dark:text-slate-400 uppercase tracking-wider font-mono shrink-0">
+              <span className="text-[9px] px-1.5 py-0.2 rounded bg-[var(--border-subtle)]/70 dark:bg-white/[0.08] text-[var(--text-secondary)] dark:text-slate-400 uppercase tracking-wider font-mono shrink-0">
                 {extension}
               </span>
             )}
@@ -187,19 +187,19 @@ export function TrackRow({
               </span>
             ) : null}
           </div>
-          <p className="text-[11px] text-[#687995] dark:text-slate-400 truncate mt-0.5">
+          <p className="text-[11px] text-[var(--text-secondary)] dark:text-slate-400 truncate mt-0.5">
             {track.metadata.artist || 'Unknown Artist'}
           </p>
         </div>
       </div>
 
       {/* Col 3: Album */}
-      <div className="text-[#687995] dark:text-slate-400 truncate text-[11px]">
+      <div className="text-[var(--text-secondary)] dark:text-slate-400 truncate text-[11px]">
         {track.metadata.album || 'Unknown Album'}
       </div>
 
       {/* Col 4: Duration */}
-      <div className="text-right text-[11px] font-mono text-[#687995] dark:text-slate-400">
+      <div className="text-right text-[11px] font-mono text-[var(--text-secondary)] dark:text-slate-400">
         {formatDuration(track.metadata.duration)}
       </div>
 

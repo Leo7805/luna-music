@@ -17,7 +17,7 @@ import { deriveViewHeaderInfo } from './utils/libraryAggregation';
 import { LibraryView, TrackItem } from './types/music';
 
 export function App() {
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme, lightStyle, setLightStyle } = useTheme();
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState<boolean>(true);
   const [isShortcutsOpen, setIsShortcutsOpen] = useState<boolean>(false);
 
@@ -101,7 +101,7 @@ export function App() {
   return (
     <div
       className={`relative h-screen w-screen flex flex-col overflow-hidden font-sans transition-colors duration-200 select-none ${
-        theme === 'dark' ? 'bg-[#071427] text-slate-100' : 'bg-[#F1F4F9] text-[#182238]'
+        theme === 'dark' ? 'bg-[#071427] text-slate-100' : 'bg-[var(--bg-app)] text-[var(--text-primary)]'
       }`}
     >
       {/* Background layer matching Luna Player */}
@@ -109,7 +109,7 @@ export function App() {
         className={`fixed inset-0 pointer-events-none z-0 transition-colors duration-200 ${
           theme === 'dark'
             ? 'bg-gradient-to-b from-[#102443] to-[#071427] ambient-glow-bg'
-            : 'bg-[#F1F4F9]'
+            : 'bg-[var(--bg-app)]'
         }`}
         data-testid="app-background"
       />
@@ -159,7 +159,7 @@ export function App() {
         />
 
         {/* Central Content Area */}
-        <main className="flex-1 flex flex-col min-w-0 bg-[#F5F7FB] dark:bg-transparent overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 bg-[var(--bg-main)] dark:bg-transparent overflow-hidden">
           {/* Header */}
           <Header
             title={viewTitle}
@@ -167,10 +167,12 @@ export function App() {
             searchQuery={library.searchQuery}
             breadcrumbs={hasLibrary && library.currentView === 'folder' ? breadcrumbs : undefined}
             theme={theme}
+            lightStyle={lightStyle}
             onSearchChange={library.setSearchQuery}
             onBreadcrumbClick={library.selectFolder}
             onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
-            onToggleTheme={toggleTheme}
+            onSelectTheme={setTheme}
+            onSelectLightStyle={setLightStyle}
           />
 
           {/* Central View Container */}

@@ -184,7 +184,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
         /* Empty State Large Split Button */
         <div
           data-testid="empty-state-split-button"
-          className="inline-flex items-stretch rounded-2xl bg-[#565ECF] hover:bg-[#4B52BA] text-white font-bold text-sm transition transform hover:scale-[1.02] active:scale-[0.98] select-none"
+          className="inline-flex items-stretch rounded-2xl bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white font-bold text-sm transition transform hover:scale-[1.02] active:scale-[0.98] select-none"
         >
           {/* Main Action Button */}
           <button
@@ -230,7 +230,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
         /* Sidebar Compact Full-Width Split Button */
         <div
           data-testid="sidebar-split-button"
-          className="w-full flex items-stretch rounded-xl bg-[#565ECF] hover:bg-[#4B52BA] text-white text-xs font-semibold shadow-md shadow-[#565ECF]/20 transition active:scale-[0.99] select-none"
+          className="w-full flex items-stretch rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-semibold shadow-md shadow-[var(--accent-primary)]/20 transition active:scale-[0.99] select-none"
         >
           {/* Main Action Button */}
           <button
@@ -280,7 +280,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
           role="menu"
           data-testid={`${variant}-open-menu`}
           onKeyDown={handleMenuKeyDown}
-          className={`absolute z-50 w-52 rounded-xl glass-panel shadow-2xl py-1.5 backdrop-blur-xl border border-[#DDE4EF] dark:border-white/15 select-none ${
+          className={`absolute z-50 w-52 rounded-xl glass-panel shadow-2xl py-1.5 backdrop-blur-xl border border-[var(--border-subtle)] dark:border-white/15 select-none ${
             variant === 'empty-state'
               ? 'left-1/2 -translate-x-1/2 top-full mt-2'
               : 'left-0 right-0 bottom-full mb-2'
@@ -292,9 +292,9 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
             role="menuitem"
             data-testid={`${variant}-menu-open-folder`}
             onClick={triggerOpenFolder}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#182238] dark:text-slate-100 hover:bg-[#E1E6FA] hover:text-[#565ECF] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[#E1E6FA] transition cursor-pointer text-left"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] dark:text-slate-100 hover:bg-[var(--bg-active)] hover:text-[var(--accent-primary)] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[var(--bg-active)] transition cursor-pointer text-left"
           >
-            <FolderOpen className="w-4 h-4 text-[#565ECF] dark:text-indigo-400 shrink-0" />
+            <FolderOpen className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400 shrink-0" />
             <span>Open Folder</span>
           </button>
 
@@ -304,7 +304,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
             role="menuitem"
             data-testid={`${variant}-menu-fallback-folder`}
             onClick={triggerFallbackFolder}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#182238] dark:text-slate-100 hover:bg-[#E1E6FA] hover:text-[#565ECF] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[#E1E6FA] transition cursor-pointer text-left"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] dark:text-slate-100 hover:bg-[var(--bg-active)] hover:text-[var(--accent-primary)] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[var(--bg-active)] transition cursor-pointer text-left"
           >
             <Folder className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
             <span>Folder Input Fallback</span>
@@ -316,7 +316,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
             role="menuitem"
             data-testid={`${variant}-menu-open-files`}
             onClick={triggerOpenFiles}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[#182238] dark:text-slate-100 hover:bg-[#E1E6FA] hover:text-[#565ECF] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[#E1E6FA] transition cursor-pointer text-left"
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] dark:text-slate-100 hover:bg-[var(--bg-active)] hover:text-[var(--accent-primary)] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[var(--bg-active)] transition cursor-pointer text-left"
           >
             <Disc className="w-4 h-4 text-sky-500 dark:text-sky-400 shrink-0" />
             <span>Open Files</span>
