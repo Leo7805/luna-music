@@ -217,7 +217,6 @@ export function App() {
             : false
         }
         isNowPlayingOpen={isNowPlayingOpen}
-        hasLyrics={audioPlayer.lyrics.length > 0}
         onTogglePlay={audioPlayer.togglePlay}
         onNextTrack={audioPlayer.nextTrack}
         onPrevTrack={audioPlayer.prevTrack}

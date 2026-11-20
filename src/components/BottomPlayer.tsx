@@ -12,7 +12,6 @@ import {
   VolumeX,
   Heart,
   List,
-  FileText,
 } from 'lucide-react';
 import { TrackItem, RepeatMode } from '../types/music';
 import { formatDuration } from '../utils/formatters';
@@ -30,7 +29,6 @@ interface BottomPlayerProps {
   shuffle: boolean;
   isFavourite: boolean;
   isNowPlayingOpen: boolean;
-  hasLyrics: boolean;
   onTogglePlay: () => void;
   onNextTrack: () => void;
   onPrevTrack: () => void;
@@ -54,7 +52,6 @@ export function BottomPlayer({
   shuffle,
   isFavourite,
   isNowPlayingOpen,
-  hasLyrics,
   onTogglePlay,
   onNextTrack,
   onPrevTrack,
@@ -246,22 +243,6 @@ export function BottomPlayer({
 
       {/* Right: Volume & Side Panels */}
       <div className="w-1/4 min-w-[180px] max-w-[280px] flex items-center justify-end gap-3">
-        {/* Lyrics Button */}
-        {hasLyrics && (
-          <button
-            type="button"
-            onClick={onToggleNowPlaying}
-            className={`p-2 rounded-xl border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 ${
-              isNowPlayingOpen
-                ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-300 border-emerald-500/30'
-                : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/[0.06]'
-            }`}
-            title="Toggle Synchronized Lyrics (L)"
-          >
-            <FileText className="w-4 h-4" />
-          </button>
-        )}
-
         {/* Volume Mute/Unmute */}
         <button
           type="button"
@@ -294,12 +275,12 @@ export function BottomPlayer({
           />
         </div>
 
-        {/* Requirement 5: Simplified Playlist/Queue Toggle with aria-pressed */}
+        {/* Authoritative Right Sidebar (Now Playing Panel) Toggle */}
         <button
           type="button"
           onClick={onToggleNowPlaying}
-          aria-pressed={isNowPlayingOpen}
-          aria-label={isNowPlayingOpen ? 'Collapse Now Playing panel' : 'Expand Now Playing panel'}
+          aria-expanded={isNowPlayingOpen}
+          aria-label={isNowPlayingOpen ? 'Hide Now Playing panel' : 'Show Now Playing panel'}
           data-testid="now-playing-toggle-button"
           className={`p-2 rounded-xl border transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/70 ${
             isNowPlayingOpen
