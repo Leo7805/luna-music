@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { MetadataExtractionQueue } from '../src/utils/metadataExtractionQueue';
 import { MetadataUpdateBatcher } from '../src/utils/metadataUpdateBatcher';
-import { updateTracksMetadataInLibrary } from '../src/utils/libraryAggregation';
+import {
+  updateTracksMetadataInLibrary,
+  mergeTrackMetadataSafely,
+} from '../src/utils/libraryAggregation';
 import { extractAudioMetadata } from '../src/utils/metadata';
 import { naturalSort } from '../src/utils/naturalSort';
 import {
@@ -253,5 +256,82 @@ describe('Metadata Cache Completeness, Parse Failure & Playback-Duration Provena
     const legacyTrack = makeTrack('f1:legacy.mp3', 'legacy.mp3');
     const hyd3 = applyCachedMetadataToTracks([legacyTrack], legacyPoisonedCache);
     expect(hyd3.tracksNeedingExtraction).toHaveLength(1);
+  });
+
+  it('extracts CBR MP3 without Xing header + ID3v1 tail quickly without full-frame Blob.slice storms', async () => {
+    // Build a 1,000-frame (~417 KB, ~26s) CBR 128kbps MP3 with NO Xing/VBRI header and an ID3v1 tail
+    const frame = new Uint8Array(417);
+    frame.set([0xff, 0xfb, 0x90, 0x00], 0);
+    const totalAudioBytes = frame.length * 1000;
+    const audio = new Uint8Array(totalAudioBytes);
+    for (let i = 0; i < 1000; i++) audio.set(frame, i * frame.length);
+
+    const enc = new TextEncoder();
+    const v1 = new Uint8Array(128);
+    v1.set(enc.encode('TAG'), 0);
+    v1.set(enc.encode('Fast CBR Song').slice(0, 30), 3);
+    v1.set(enc.encode('CBR Artist').slice(0, 30), 33);
+    v1.set(enc.encode('CBR Album').slice(0, 30), 63);
+
+    const rawBlob = new Blob([audio, v1], { type: 'audio/mpeg' });
+    let sliceCalls = 0;
+    const wrap = (b: Blob): Blob =>
+      new Proxy(b, {
+        get(target, prop) {
+          if (prop === 'slice') {
+            return (...args: Parameters<Blob['slice']>) => {
+              sliceCalls++;
+              return wrap(target.slice(...args));
+            };
+          }
+          const val = Reflect.get(target, prop);
+          return typeof val === 'function' ? val.bind(target) : val;
+        },
+      });
+
+    const parsed = await extractAudioMetadata(wrap(rawBlob), 'fallback');
+    expect(parsed.isMetadataLoaded).toBe(true);
+    expect(parsed.title).toBe('Fast CBR Song');
+    expect(parsed.artist).toBe('CBR Artist');
+    expect(parsed.album).toBe('CBR Album');
+    expect(parsed.duration).toBeGreaterThan(25);
+    expect(parsed.duration).toBeLessThan(27);
+    // With duration: false, parsing reads only header + tail (~20 slices), NOT ~2,000+ frame slices
+    expect(sliceCalls).toBeLessThan(100);
+  });
+
+  it('allows playback-measured duration to refine an estimate while preventing late background parsing from overwriting it', () => {
+    // 1. Playback refines a fast-pass VBR estimate (242.0 -> 248.27) while preserving Artist/Album
+    const estimated = {
+      title: 'VBR Song',
+      artist: 'Known Artist',
+      album: 'Known Album',
+      duration: 242.0,
+      isMetadataLoaded: true,
+    };
+    const refined = mergeTrackMetadataSafely(estimated, { duration: 248.27 });
+    expect(refined.duration).toBe(248.27);
+    expect(refined.artist).toBe('Known Artist');
+    expect(refined.album).toBe('Known Album');
+
+    // 2. Late background extraction (isMetadataLoaded: true) does NOT overwrite an already-measured playback duration
+    const afterPlaybackBeforeTags = {
+      title: 'vbr_song',
+      artist: 'Unknown Artist',
+      album: 'Unknown Album',
+      duration: 248.27,
+      isMetadataLoaded: false,
+    };
+    const lateExtraction = mergeTrackMetadataSafely(afterPlaybackBeforeTags, {
+      title: 'VBR Song',
+      artist: 'Real Artist',
+      album: 'Real Album',
+      duration: 242.0,
+      isMetadataLoaded: true,
+    });
+    expect(lateExtraction.duration).toBe(248.27);
+    expect(lateExtraction.artist).toBe('Real Artist');
+    expect(lateExtraction.album).toBe('Real Album');
+    expect(lateExtraction.isMetadataLoaded).toBe(true);
   });
 });

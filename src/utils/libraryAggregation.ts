@@ -187,10 +187,13 @@ export function mergeTrackMetadataSafely(
     next.album = incomingAlbum;
   }
 
+  const hasExistingDuration =
+    typeof existing.duration === 'number' && Number.isFinite(existing.duration) && existing.duration > 0;
   if (
     typeof incoming.duration === 'number' &&
     Number.isFinite(incoming.duration) &&
-    incoming.duration > 0
+    incoming.duration > 0 &&
+    (!hasExistingDuration || !incoming.isMetadataLoaded)
   ) {
     next.duration = incoming.duration;
   }

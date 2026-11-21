@@ -66,7 +66,7 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
 
   try {
     const parsed = await parseBlob(file, {
-      duration: true,
+      duration: false,
       skipPostHeaders: false,
     });
 
