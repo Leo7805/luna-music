@@ -5,18 +5,17 @@ import { parseFileList } from '../services/fallbackAccess';
 import {
   storeRegisteredFolders, clearStoredDirectoryHandle, storeImportedFiles,
   getMetadataCache, applyCachedMetadataToTracks, cleanupCacheOnSourceRemoval,
-  queueMetadataCacheUpsert, flushMetadataCacheWrites,
 } from '../services/idbStorage';
 import {
   buildFolderTree, buildUnifiedMultiFolderTree, combineFlatPlaylists,
   reconcileOverlappingTracks, migratePlaylistsTrackIds,
 } from '../utils/musicTree';
-import { updateTrackMetadataInLibrary } from '../utils/libraryAggregation';
-import { MetadataExtractionQueue } from '../utils/metadataExtractionQueue';
 import { revokeUnusedArtworkUrls } from '../utils/artworkLoader';
+import { useMetadataExtractionPipeline } from './useMetadataExtractionPipeline';
 
 export interface UseFolderScanningProps {
   library: MusicLibrary | null;
+  libraryRef?: React.MutableRefObject<MusicLibrary | null>;
   onLibraryUpdated: (updater: (prev: MusicLibrary | null) => MusicLibrary | null) => void;
   onMigrateFavourites: (idMigrations: Map<string, string>) => void;
   onResetNavigationForFolder: (folderId: string) => void;
@@ -50,6 +49,7 @@ export interface UseFolderScanningReturn {
  */
 export function useFolderScanning({
   library,
+  libraryRef: externalLibraryRef,
   onLibraryUpdated,
   onMigrateFavourites,
   onResetNavigationForFolder,
@@ -78,53 +78,18 @@ export function useFolderScanning({
     scanGenerationsRef.current.set(folderId, -1);
   };
 
-  const libraryRef = useRef<MusicLibrary | null>(library);
-  libraryRef.current = library;
+  const fallbackLibraryRef = useRef<MusicLibrary | null>(library);
+  fallbackLibraryRef.current = library;
+  const activeLibraryRef = externalLibraryRef || fallbackLibraryRef;
 
-  const extractionQueueRef = useRef<MetadataExtractionQueue | null>(null);
-  if (!extractionQueueRef.current) {
-    extractionQueueRef.current = new MetadataExtractionQueue({
-      concurrency: 3,
-      isTrackStillValid: (track, sourceId) => {
-        const curLib = libraryRef.current;
-        if (!curLib) return false;
-        if (sourceId && sourceId !== 'global' && !curLib.folders.some((f) => f.id === sourceId)) {
-          return false;
-        }
-        const live = curLib.flatPlaylist.find(
-          (t) => t.id === track.id || Boolean(t.aliases?.includes(track.id))
-        );
-        return Boolean(live && live.size === track.size && live.lastModified === track.lastModified);
-      },
-      onTrackExtracted: (track, meta) => {
-        onLibraryUpdated((prevLib) => (prevLib ? updateTrackMetadataInLibrary(prevLib, track.id, meta) : null));
-        queueMetadataCacheUpsert(track, meta);
-      },
-      onDrained: () => {
-        void flushMetadataCacheWrites();
-      },
-    });
-  }
-
-  // Enqueue incremental metadata extraction without cancelling unrelated source batches
-  const startIncrementalMetadataExtraction = useCallback(
-    (
-      tracks: TrackItem[],
-      sourceId = 'global',
-      options?: { invalidatePreviousForSource?: boolean }
-    ) => {
-      extractionQueueRef.current?.enqueueBatch(sourceId, tracks, options);
-    },
-    []
-  );
-
-  const invalidateMetadataSource = useCallback((sourceId: string) => {
-    extractionQueueRef.current?.invalidateSource(sourceId);
-  }, []);
-
-  const invalidateMetadataTracks = useCallback((trackIds: string[]) => {
-    extractionQueueRef.current?.invalidateTracks(trackIds);
-  }, []);
+  const {
+    startIncrementalMetadataExtraction,
+    invalidateMetadataSource,
+    invalidateMetadataTracks,
+  } = useMetadataExtractionPipeline({
+    libraryRef: activeLibraryRef,
+    onLibraryUpdated,
+  });
 
   // Refresh an existing root folder
   const refreshFolder = useCallback(

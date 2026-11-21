@@ -262,16 +262,26 @@ export function updateTrackInLibrary(
 }
 
 /**
- * Immutably updates metadata for an individual track (used during background extraction or playback duration discovery).
- * Never mutates track status, file size, or permissions.
+ * Immutably applies a batch of track metadata updates across flatPlaylist, folders,
+ * and folder trees in a single pass. Returns prevLib unchanged if nothing matched.
  */
-export function updateTrackMetadataInLibrary(
+export function updateTracksMetadataInLibrary(
   prevLib: MusicLibrary,
-  trackId: string,
-  meta: Partial<TrackItem['metadata']>
+  updatesByTrackId: Map<string, Partial<TrackItem['metadata']>>
 ): MusicLibrary {
+  if (updatesByTrackId.size === 0) return prevLib;
+
+  let anyChanged = false;
   const updateItem = (t: TrackItem): TrackItem => {
-    if (t.id !== trackId && (!t.aliases || !t.aliases.includes(trackId))) return t;
+    let meta = updatesByTrackId.get(t.id);
+    if (!meta && t.aliases) {
+      for (const alias of t.aliases) {
+        meta = updatesByTrackId.get(alias);
+        if (meta) break;
+      }
+    }
+    if (!meta) return t;
+    anyChanged = true;
     return {
       ...t,
       metadata: mergeTrackMetadataSafely(t.metadata, meta),
@@ -279,6 +289,7 @@ export function updateTrackMetadataInLibrary(
   };
 
   const updatedFlat = prevLib.flatPlaylist.map(updateItem);
+  if (!anyChanged) return prevLib;
 
   function updateNode(node: FolderNode): FolderNode {
     return {
@@ -300,6 +311,18 @@ export function updateTrackMetadataInLibrary(
     tree: updateNode(prevLib.tree),
     flatPlaylist: updatedFlat,
   };
+}
+
+/**
+ * Immutably updates metadata for an individual track (used during background extraction or playback duration discovery).
+ * Never mutates track status, file size, or permissions.
+ */
+export function updateTrackMetadataInLibrary(
+  prevLib: MusicLibrary,
+  trackId: string,
+  meta: Partial<TrackItem['metadata']>
+): MusicLibrary {
+  return updateTracksMetadataInLibrary(prevLib, new Map([[trackId, meta]]));
 }
 
 /**

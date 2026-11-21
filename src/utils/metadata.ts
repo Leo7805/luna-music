@@ -100,14 +100,20 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
     const codec = format.codec;
     const bitrate = format.bitrate;
 
+    const hasValidDuration = typeof duration === 'number' && Number.isFinite(duration) && duration > 0;
+    const hasEmbeddedTitle = Boolean(common.title?.trim());
+    const parsedAnySignal = Boolean(
+      hasEmbeddedTitle || artist || album || hasValidDuration || codec || bitrate || hasEmbeddedArtwork
+    );
+
     const result: Partial<TrackMetadata> = {
-      isMetadataLoaded: true,
+      isMetadataLoaded: parsedAnySignal,
       hasEmbeddedArtwork,
     };
     if (title) result.title = title;
     if (artist) result.artist = artist;
     if (album) result.album = album;
-    if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
+    if (hasValidDuration) {
       result.duration = duration;
     }
     if (trackNo) result.trackNo = trackNo;
@@ -120,9 +126,10 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
 
     return result;
   } catch {
-    // If parsing fails, retain fallback metadata
+    // Parsing failed (e.g. unreadable/corrupted file or transient I/O error):
+    // Do NOT mark as loaded so the track is not permanently cached as fallback-only.
     return {
-      isMetadataLoaded: true,
+      isMetadataLoaded: false,
     };
   }
 }

@@ -11,7 +11,12 @@ export interface MetadataExtractionQueueOptions {
   concurrency?: number;
   extractFn?: (blob: Blob, fallbackTitle: string) => Promise<Partial<TrackMetadata>>;
   isTrackStillValid?: (track: TrackItem, sourceId: string) => boolean;
-  onTrackExtracted: (track: TrackItem, metadata: Partial<TrackMetadata>) => void;
+  onTrackExtracted: (
+    track: TrackItem,
+    metadata: Partial<TrackMetadata>,
+    sourceId: string,
+    generation: number
+  ) => void;
   onDrained?: () => void;
 }
 
@@ -25,7 +30,12 @@ export class MetadataExtractionQueue {
   private readonly concurrency: number;
   private readonly extractFn: (blob: Blob, fallbackTitle: string) => Promise<Partial<TrackMetadata>>;
   private readonly isTrackStillValid?: (track: TrackItem, sourceId: string) => boolean;
-  private readonly onTrackExtracted: (track: TrackItem, metadata: Partial<TrackMetadata>) => void;
+  private readonly onTrackExtracted: (
+    track: TrackItem,
+    metadata: Partial<TrackMetadata>,
+    sourceId: string,
+    generation: number
+  ) => void;
   private readonly onDrained?: () => void;
 
   private sourceGenerations = new Map<string, number>();
@@ -41,6 +51,10 @@ export class MetadataExtractionQueue {
     this.isTrackStillValid = options.isTrackStillValid;
     this.onTrackExtracted = options.onTrackExtracted;
     this.onDrained = options.onDrained;
+  }
+
+  isSourceGenerationCurrent(sourceId: string, generation: number): boolean {
+    return this.getGeneration(sourceId) === generation;
   }
 
   private getGeneration(sourceId: string): number {
@@ -175,7 +189,12 @@ export class MetadataExtractionQueue {
       }
 
       const meta = await this.extractFn(blob, job.track.metadata.title);
-      if (!meta) return;
+      if (!meta || !meta.isMetadataLoaded) {
+        if (meta?.artworkUrl && typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') {
+          URL.revokeObjectURL(meta.artworkUrl);
+        }
+        return;
+      }
 
       // Re-verify before applying result to state or cache
       if (!this.isJobCurrent(job)) {
@@ -185,7 +204,7 @@ export class MetadataExtractionQueue {
         return;
       }
 
-      this.onTrackExtracted(job.track, meta);
+      this.onTrackExtracted(job.track, meta, job.sourceId, job.generation);
     } catch {
       // Ignore individual track extraction errors so other tracks proceed
     } finally {

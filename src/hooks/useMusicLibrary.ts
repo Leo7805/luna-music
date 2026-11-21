@@ -27,12 +27,21 @@ import { useLibraryInitialization } from './useLibraryInitialization';
  * favourites resolution, navigation state, and background scanning.
  */
 export function useMusicLibrary() {
-  // Authoritative source of truth for loaded library
-  const [library, setLibrary] = useState<MusicLibrary | null>(null);
+  // Authoritative source of truth for loaded library + synchronous ref for async pipelines
+  const [library, setLibraryState] = useState<MusicLibrary | null>(null);
   const [lastSourceRemoval, setLastSourceRemoval] = useState<SourceRemovalEvent | null>(null);
   const removalSeqRef = useRef<number>(0);
-  const libraryRef = useRef<MusicLibrary | null>(library);
-  libraryRef.current = library;
+  const libraryRef = useRef<MusicLibrary | null>(null);
+
+  // Updates libraryRef synchronously without side effects inside React state updaters
+  const updateLibrary = useCallback(
+    (updater: MusicLibrary | null | ((prev: MusicLibrary | null) => MusicLibrary | null)) => {
+      const next = typeof updater === 'function' ? updater(libraryRef.current) : updater;
+      libraryRef.current = next;
+      setLibraryState(next);
+    },
+    []
+  );
 
   const handleSourcesRemoved = useCallback(
     (remainingTracks: TrackItem[], removedIds: string[], idMigrations: Map<string, string>) => {
@@ -92,7 +101,8 @@ export function useMusicLibrary() {
   // Domain 5: Folder Scanning & Mutations
   const scanning = useFolderScanning({
     library,
-    onLibraryUpdated: setLibrary,
+    libraryRef,
+    onLibraryUpdated: updateLibrary,
     onMigrateFavourites: favouritesManager.migrateFavouritesOnRootRemoval,
     onResetNavigationForFolder: navigation.resetFolderSelectionIfMatching,
     onRemoveAllImportedFiles: removeAllImportedFilesRef,
@@ -104,7 +114,7 @@ export function useMusicLibrary() {
   // Domain 6: Imported Files Manager
   const importedFilesManager = useImportedFilesManager({
     library,
-    onLibraryUpdated: setLibrary,
+    onLibraryUpdated: updateLibrary,
     onRemoveFavourites: favouritesManager.removeFavouritesForTrackIds,
     onSourcesRemoved: handleSourcesRemoved,
     startMetadataExtraction: scanning.startIncrementalMetadataExtraction,
@@ -115,7 +125,7 @@ export function useMusicLibrary() {
   // Domain 7: Initialization & Permission Handling
   const initialization = useLibraryInitialization({
     library,
-    onLibraryInitialized: setLibrary,
+    onLibraryInitialized: updateLibrary,
     onSetInitialFavourites: favouritesManager.setFavourites,
     startIncrementalMetadataExtraction: scanning.startIncrementalMetadataExtraction,
     setIsLoading: scanning.setIsLoading,
@@ -129,37 +139,32 @@ export function useMusicLibrary() {
       size?: number,
       metadata?: Partial<TrackItem['metadata']>
     ) => {
-      setLibrary((prevLib) => {
+      updateLibrary((prevLib) => {
         if (!prevLib) return null;
         return updateTrackInLibrary(prevLib, trackId, status, size, metadata);
       });
     },
-    []
+    [updateLibrary]
   );
 
   // Update track metadata only across the library tree without altering status or size,
   // and persist valid metadata updates (such as playback-learned duration) to IndexedDB cache.
   const updateTrackMetadata = useCallback(
     (trackId: string, metadata: Partial<TrackItem['metadata']>) => {
-      let matchedTrack: TrackItem | undefined;
-      setLibrary((prevLib) => {
+      updateLibrary((prevLib) => {
         if (!prevLib) return null;
-        const nextLib = updateTrackMetadataInLibrary(prevLib, trackId, metadata);
-        matchedTrack = nextLib.flatPlaylist.find(
-          (t) => t.id === trackId || Boolean(t.aliases?.includes(trackId))
-        );
-        return nextLib;
+        return updateTrackMetadataInLibrary(prevLib, trackId, metadata);
       });
-      const liveTrack =
-        matchedTrack ||
-        libraryRef.current?.flatPlaylist.find(
-          (t) => t.id === trackId || Boolean(t.aliases?.includes(trackId))
-        );
+      const liveTrack = libraryRef.current?.flatPlaylist.find(
+        (t) => t.id === trackId || Boolean(t.aliases?.includes(trackId))
+      );
       if (liveTrack) {
-        queueMetadataCacheUpsert(liveTrack, metadata);
+        queueMetadataCacheUpsert(liveTrack, metadata, {
+          tagsParsed: liveTrack.metadata.isMetadataLoaded,
+        });
       }
     },
-    []
+    [updateLibrary]
   );
 
   // On-demand embedded artwork loader (priority-aware, deduplicated, bounded concurrency)
@@ -174,7 +179,7 @@ export function useMusicLibrary() {
         return Boolean(cur && cur.size === track.size && cur.lastModified === track.lastModified);
       },
       onArtworkLoaded: (trackId, artworkUrl) => {
-        setLibrary((prevLib) =>
+        updateLibrary((prevLib) =>
           prevLib ? updateTrackMetadataInLibrary(prevLib, trackId, { artworkUrl }) : null
         );
       },
