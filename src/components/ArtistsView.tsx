@@ -3,6 +3,12 @@ import { Play, ArrowLeft, Mic2, User } from 'lucide-react';
 import { ArtistGroup, Playlist, TrackItem } from '../types/music';
 import { TrackList } from './TrackList';
 import { formatDuration } from '../utils/formatters';
+import { useLazyArtwork } from '../hooks/useLazyArtwork';
+
+function ArtistArtworkProbe({ track }: { track?: TrackItem }) {
+  const ref = useLazyArtwork<HTMLSpanElement>(track);
+  return <span ref={ref} className="sr-only" aria-hidden="true" />;
+}
 
 interface ArtistsViewProps {
   artists: ArtistGroup[];
@@ -156,7 +162,10 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
                     loading="lazy"
                   />
                 ) : (
-                  <User className="w-10 h-10 text-slate-400 dark:text-white/50" />
+                  <>
+                    <ArtistArtworkProbe track={artist.tracks.find((t) => t.metadata.hasEmbeddedArtwork)} />
+                    <User className="w-10 h-10 text-slate-400 dark:text-white/50" />
+                  </>
                 )}
               </div>
 

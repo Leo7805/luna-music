@@ -4,3 +4,4 @@ export * from './folderStorage';
 export * from './importedFileStorage';
 export * from './playerStateStorage';
 export * from './playlistStorage';
+export * from './metadataCacheStorage';

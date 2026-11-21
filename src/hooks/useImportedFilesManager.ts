@@ -12,7 +12,11 @@ import {
   storeImportedFiles,
   storeRegisteredFolders,
   clearStoredDirectoryHandle,
+  getMetadataCache,
+  applyCachedMetadataToTracks,
+  cleanupCacheOnSourceRemoval,
 } from '../services/idbStorage';
+import { revokeUnusedArtworkUrls } from '../utils/artworkLoader';
 import {
   buildUnifiedMultiFolderTree,
   combineFlatPlaylists,
@@ -28,7 +32,8 @@ export interface UseImportedFilesManagerProps {
   library: MusicLibrary | null;
   onLibraryUpdated: (updater: (prev: MusicLibrary | null) => MusicLibrary | null) => void;
   onRemoveFavourites: (trackIds: string[]) => void;
-  startMetadataExtraction: (tracks: TrackItem[]) => void;
+  startMetadataExtraction: (tracks: TrackItem[], sourceId?: string) => void;
+  invalidateMetadataTracks: (trackIds: string[]) => void;
   setIsLoading: (loading: boolean) => void;
 }
 
@@ -85,6 +90,7 @@ export function useImportedFilesManager({
   onLibraryUpdated,
   onRemoveFavourites: _onRemoveFavourites,
   startMetadataExtraction,
+  invalidateMetadataTracks,
   setIsLoading,
 }: UseImportedFilesManagerProps): UseImportedFilesManagerReturn {
   // Pick individual files via native File System Access API
@@ -192,11 +198,13 @@ export function useImportedFilesManager({
         }
       }
 
-      const updatedImportedFolder = createImportedFolderRecord(
-        allImportedTracks,
-        existingImportedFolder?.addedAt
-      );
-      await persistImportedFileRecords(allImportedTracks);
+      const cache = await getMetadataCache();
+      const hydratedNew = applyCachedMetadataToTracks(newTracksForMetadata, cache);
+      const hydratedById = new Map(hydratedNew.hydratedTracks.map((t) => [t.id, t]));
+      const finalImportedTracks = allImportedTracks.map((t) => hydratedById.get(t.id) || t);
+
+      const updatedImportedFolder = createImportedFolderRecord(finalImportedTracks, existingImportedFolder?.addedAt);
+      await persistImportedFileRecords(finalImportedTracks);
 
       const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
       const nextFolders = [...otherFolders, updatedImportedFolder];
@@ -213,8 +221,8 @@ export function useImportedFilesManager({
         handle: nextFolders[0]?.handle,
       }));
 
-      if (newTracksForMetadata.length > 0) {
-        startMetadataExtraction(newTracksForMetadata);
+      if (hydratedNew.tracksNeedingExtraction.length > 0) {
+        startMetadataExtraction(hydratedNew.tracksNeedingExtraction, IMPORTED_FILES_ROOT_ID);
       }
     } catch (err) {
       console.error('Failed to open files:', err);
@@ -314,16 +322,15 @@ export function useImportedFilesManager({
         }
       }
 
-      const allTracks = [...updatedExistingTracks, ...newTracksToAdd];
+      const cache = await getMetadataCache();
+      const hydratedNew = applyCachedMetadataToTracks(newTracksToAdd, cache);
+      const allTracks = [...updatedExistingTracks, ...hydratedNew.hydratedTracks];
       if (allTracks.length === 0) {
         setIsLoading(false);
         return;
       }
 
-      const updatedImportedFolder = createImportedFolderRecord(
-        allTracks,
-        existingImportedFolder?.addedAt
-      );
+      const updatedImportedFolder = createImportedFolderRecord(allTracks, existingImportedFolder?.addedAt);
       await persistImportedFileRecords(allTracks);
 
       const otherFolders = (library?.folders || []).filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
@@ -341,7 +348,9 @@ export function useImportedFilesManager({
         handle: nextFolders[0]?.handle,
       }));
 
-      startMetadataExtraction(newTracksToAdd);
+      if (hydratedNew.tracksNeedingExtraction.length > 0) {
+        startMetadataExtraction(hydratedNew.tracksNeedingExtraction, IMPORTED_FILES_ROOT_ID);
+      }
       setIsLoading(false);
     },
     [library, onLibraryUpdated, startMetadataExtraction, setIsLoading]
@@ -357,6 +366,7 @@ export function useImportedFilesManager({
       if (!existingImportedFolder) return;
 
       const remainingTracks: TrackItem[] = [];
+      const removedTrackItems: TrackItem[] = [];
       const actuallyRemovedIds: string[] = [];
       const idMigrations = new Map<string, string>();
 
@@ -389,6 +399,7 @@ export function useImportedFilesManager({
             }
           } else {
             // Track has no other sources left: truly removed from library
+            removedTrackItems.push(track);
             actuallyRemovedIds.push(track.id);
             if (track.aliases) {
               track.aliases.forEach((a) => actuallyRemovedIds.push(a));
@@ -405,10 +416,8 @@ export function useImportedFilesManager({
       );
       await persistImportedFileRecords(remainingTracks);
 
-      // If canonical ID migrated, update stored playlists
-      if (idMigrations.size > 0) {
-        migratePlaylistsTrackIds(idMigrations);
-      }
+      if (actuallyRemovedIds.length > 0) invalidateMetadataTracks(actuallyRemovedIds);
+      if (idMigrations.size > 0) migratePlaylistsTrackIds(idMigrations);
 
       const otherFolders = (library?.folders || []).filter(
         (f) =>
@@ -439,6 +448,8 @@ export function useImportedFilesManager({
         remainingTracks.length > 0 ? [...cleanedOtherFolders, updatedFolder] : cleanedOtherFolders;
 
       if (nextFolders.length === 0) {
+        cleanupCacheOnSourceRemoval(actuallyRemovedIds, [], idMigrations);
+        revokeUnusedArtworkUrls(removedTrackItems, []);
         onLibraryUpdated(() => null);
         await storeRegisteredFolders([]);
         await clearStoredDirectoryHandle();
@@ -449,6 +460,8 @@ export function useImportedFilesManager({
 
       const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
       const flatPlaylist = combineFlatPlaylists(nextFolders);
+      cleanupCacheOnSourceRemoval(actuallyRemovedIds, flatPlaylist, idMigrations);
+      revokeUnusedArtworkUrls(removedTrackItems, flatPlaylist);
 
       onLibraryUpdated((prev) =>
         prev

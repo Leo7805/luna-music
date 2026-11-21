@@ -18,6 +18,8 @@ import {
   getStoredRegisteredFolders,
   getStoredImportedFiles,
   getStoredPlaybackState,
+  getMetadataCache,
+  applyCachedMetadataToTracks,
 } from '../services/idbStorage';
 import {
   buildFolderTree,
@@ -32,7 +34,11 @@ export interface UseLibraryInitializationProps {
   library: MusicLibrary | null;
   onLibraryInitialized: (library: MusicLibrary) => void;
   onSetInitialFavourites: (favourites: Set<string>) => void;
-  startIncrementalMetadataExtraction: (tracks: TrackItem[]) => void;
+  startIncrementalMetadataExtraction: (
+    tracks: TrackItem[],
+    sourceId?: string,
+    options?: { invalidatePreviousForSource?: boolean }
+  ) => void;
   setIsLoading: (loading: boolean) => void;
 }
 
@@ -62,13 +68,17 @@ export function useLibraryInitialization({
   // Load stored state and registered folders on mount
   useEffect(() => {
     async function init() {
-      const storedState = await getStoredPlaybackState();
+      const [storedState, metadataCache] = await Promise.all([
+        getStoredPlaybackState(),
+        getMetadataCache(),
+      ]);
       if (storedState.favourites) {
         onSetInitialFavourites(new Set(storedState.favourites));
       }
 
       let loadedFolders: ImportedFolder[] = [];
       let promptImportedFolders: ImportedFolder[] = [];
+      const extractionBatches: Array<{ sourceId: string; tracks: TrackItem[] }> = [];
 
       if (isFileSystemAccessSupported()) {
         const storedFolders = await getStoredRegisteredFolders();
@@ -140,6 +150,11 @@ export function useLibraryInitialization({
                   existingTracksAccum,
                   scanned.id
                 );
+                const hydrated = applyCachedMetadataToTracks(scanned.tracks, metadataCache);
+                scanned.tracks = hydrated.hydratedTracks;
+                if (hydrated.tracksNeedingExtraction.length > 0) {
+                  extractionBatches.push({ sourceId: scanned.id, tracks: hydrated.tracksNeedingExtraction });
+                }
                 scanned.tree = buildFolderTree(scanned.name, scanned.tracks, scanned.id);
                 scanned.permissionStatus = 'granted';
                 loadedFolders.push(scanned);
@@ -222,6 +237,15 @@ export function useLibraryInitialization({
           }
         }
 
+        const hydratedImported = applyCachedMetadataToTracks(importedTracks, metadataCache);
+        const finalImportedTracks = hydratedImported.hydratedTracks;
+        if (hydratedImported.tracksNeedingExtraction.length > 0) {
+          extractionBatches.push({
+            sourceId: IMPORTED_FILES_ROOT_ID,
+            tracks: hydratedImported.tracksNeedingExtraction,
+          });
+        }
+
         importedFilesFolder = {
           id: IMPORTED_FILES_ROOT_ID,
           name: IMPORTED_FILES_COLLECTION_NAME,
@@ -230,12 +254,12 @@ export function useLibraryInitialization({
             id: IMPORTED_FILES_ROOT_ID,
             name: IMPORTED_FILES_COLLECTION_NAME,
             relativePath: IMPORTED_FILES_ROOT_ID,
-            tracks: importedTracks,
+            tracks: finalImportedTracks,
             subfolders: [],
-            totalTrackCount: importedTracks.length,
+            totalTrackCount: finalImportedTracks.length,
           },
-          tracks: importedTracks,
-          trackCount: importedTracks.length,
+          tracks: finalImportedTracks,
+          trackCount: finalImportedTracks.length,
           addedAt: storedImported[0]?.addedAt || Date.now(),
           lastScannedAt: Date.now(),
           permissionStatus: 'granted',
@@ -268,8 +292,8 @@ export function useLibraryInitialization({
 
         onLibraryInitialized(initialLib);
 
-        if (flatPlaylist.length > 0) {
-          startIncrementalMetadataExtraction(flatPlaylist);
+        for (const batch of extractionBatches) {
+          startIncrementalMetadataExtraction(batch.tracks, batch.sourceId);
         }
       }
     }
@@ -282,8 +306,10 @@ export function useLibraryInitialization({
     if (pendingFolders.length === 0) return;
 
     setIsLoading(true);
+    const metadataCache = await getMetadataCache();
     const stillPending: StoredFolderRecord[] = [];
     const newlyGrantedFolders: ImportedFolder[] = [];
+    const grantedBatches: Array<{ sourceId: string; tracks: TrackItem[] }> = [];
 
     let currentTracks = library ? library.flatPlaylist : [];
 
@@ -294,6 +320,11 @@ export function useLibraryInitialization({
         if (granted) {
           const scanned = await scanRootFolderHandle(record.handle, record.id);
           scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, currentTracks, record.id);
+          const hydrated = applyCachedMetadataToTracks(scanned.tracks, metadataCache);
+          scanned.tracks = hydrated.hydratedTracks;
+          if (hydrated.tracksNeedingExtraction.length > 0) {
+            grantedBatches.push({ sourceId: record.id, tracks: hydrated.tracksNeedingExtraction });
+          }
           scanned.tree = buildFolderTree(scanned.name, scanned.tracks, record.id);
           newlyGrantedFolders.push(scanned);
           currentTracks = combineFlatPlaylists([...(library?.folders || []), ...newlyGrantedFolders]);
@@ -326,7 +357,9 @@ export function useLibraryInitialization({
       onLibraryInitialized(nextLib);
 
       await storeRegisteredFolders(mergedFolders);
-      startIncrementalMetadataExtraction(flatPlaylist);
+      for (const batch of grantedBatches) {
+        startIncrementalMetadataExtraction(batch.tracks, batch.sourceId);
+      }
     }
     setIsLoading(false);
   }, [pendingFolders, library, onLibraryInitialized, startIncrementalMetadataExtraction, setIsLoading]);
@@ -348,6 +381,9 @@ export function useLibraryInitialization({
           const otherTracks = otherFolders.flatMap((f) => f.tracks);
 
           scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, otherTracks, folderId);
+          const metadataCache = await getMetadataCache();
+          const hydrated = applyCachedMetadataToTracks(scanned.tracks, metadataCache);
+          scanned.tracks = hydrated.hydratedTracks;
           scanned.tree = buildFolderTree(scanned.name, scanned.tracks, folderId);
           scanned.permissionStatus = 'granted';
 
@@ -376,7 +412,7 @@ export function useLibraryInitialization({
           setNeedsPermission(remainingPending.length > 0);
 
           await storeRegisteredFolders(nextFolders);
-          startIncrementalMetadataExtraction(flatPlaylist);
+          startIncrementalMetadataExtraction(hydrated.tracksNeedingExtraction, folderId);
         } else {
           if (targetFolder) {
             targetFolder.permissionStatus = 'denied';

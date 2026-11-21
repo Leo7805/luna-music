@@ -1,12 +1,17 @@
-import { TrackMetadata } from '../types/music';
+import { TrackItem, TrackMetadata } from '../types/music';
+import { useLazyArtwork } from '../hooks/useLazyArtwork';
 
 export interface TrackThumbnailProps {
   metadata: TrackMetadata;
+  track?: TrackItem;
 }
 
-export function TrackThumbnail({ metadata }: TrackThumbnailProps) {
+export function TrackThumbnail({ metadata, track }: TrackThumbnailProps) {
+  const artworkRef = useLazyArtwork<HTMLDivElement>(track);
+
   return (
     <div
+      ref={artworkRef}
       className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden shadow-sm"
       style={{
         background:

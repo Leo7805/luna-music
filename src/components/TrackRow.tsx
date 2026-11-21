@@ -214,7 +214,7 @@ export function TrackRow({
 
       {/* Col 2: Thumbnail Artwork + Title + Artist + Badges */}
       <div className="flex items-center gap-3 min-w-0">
-        <TrackThumbnail metadata={track.metadata} />
+        <TrackThumbnail metadata={track.metadata} track={track} />
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">

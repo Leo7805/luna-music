@@ -8,6 +8,7 @@ export interface TrackMetadata {
   year?: number | string;
   genre?: string;
   artworkUrl?: string; // Blob object URL created from embedded image
+  hasEmbeddedArtwork?: boolean; // Persisted flag indicating embedded cover art exists
   placeholderGradient?: string; // CSS linear-gradient string
   codec?: string;
   bitrate?: number;

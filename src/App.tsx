@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LibraryContent } from './components/LibraryContent';
@@ -8,6 +8,7 @@ import { BottomPlayer } from './components/BottomPlayer';
 import { RecoveryBanner } from './components/RecoveryBanner';
 import { ShortcutsModal } from './components/ShortcutsModal';
 import { ErrorToast } from './components/ErrorToast';
+import { ArtworkRequestProvider } from './contexts/ArtworkRequestContext';
 import { useMusicLibrary } from './hooks/useMusicLibrary';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { usePlaylists } from './hooks/usePlaylists';
@@ -48,6 +49,14 @@ export function App() {
     onTrackStatusChanged: library.updateTrackStatus,
     onTrackMetadataUpdated: library.updateTrackMetadata,
   });
+
+  // Priority 1: Restore embedded artwork on demand for the currently playing track
+  useEffect(() => {
+    const cur = audioPlayer.currentTrack;
+    if (cur && cur.metadata.hasEmbeddedArtwork && !cur.metadata.artworkUrl) {
+      library.requestTrackArtwork(cur, 'high');
+    }
+  }, [audioPlayer.currentTrack, library.requestTrackArtwork]);
 
   // Keyboard shortcuts dispatcher
   const shortcutHandlers = useMemo(
@@ -145,6 +154,7 @@ export function App() {
   );
 
   return (
+    <ArtworkRequestProvider value={library.requestTrackArtwork}>
     <div
       className={`relative h-screen w-screen flex flex-col overflow-hidden font-sans transition-colors duration-200 select-none ${
         theme === 'dark' ? 'bg-[#071427] text-slate-100' : 'bg-[var(--bg-app)] text-[var(--text-primary)]'
@@ -311,5 +321,6 @@ export function App() {
         onClose={() => setIsShortcutsOpen(false)}
       />
     </div>
+    </ArtworkRequestProvider>
   );
 }

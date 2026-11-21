@@ -11,6 +11,7 @@ export const LAST_SOURCE_KEY = 'last_library_source';
 export const PLAYBACK_STATE_KEY = 'playback_state';
 export const LOCAL_STORAGE_STATE_KEY = 'luna_music_playback_state';
 export const PLAYLISTS_KEY = 'user_playlists';
+export const TRACK_METADATA_CACHE_KEY = 'track_metadata_cache';
 export const LOCAL_STORAGE_PLAYLISTS_KEY = 'luna_music_user_playlists';
 export const LOCAL_STORAGE_IMPORTED_FILES_KEY = 'luna_music_imported_files';
 

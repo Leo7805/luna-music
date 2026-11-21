@@ -74,8 +74,9 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
     const format = parsed.format;
 
     let artworkUrl: string | undefined;
+    const hasEmbeddedArtwork = Boolean(common.picture && common.picture.length > 0);
 
-    if (common.picture && common.picture.length > 0) {
+    if (hasEmbeddedArtwork && common.picture) {
       const cover = selectCover(common.picture);
       if (cover && cover.data) {
         try {
@@ -99,7 +100,10 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
     const codec = format.codec;
     const bitrate = format.bitrate;
 
-    const result: Partial<TrackMetadata> = { isMetadataLoaded: true };
+    const result: Partial<TrackMetadata> = {
+      isMetadataLoaded: true,
+      hasEmbeddedArtwork,
+    };
     if (title) result.title = title;
     if (artist) result.artist = artist;
     if (album) result.album = album;
@@ -120,5 +124,31 @@ export async function extractAudioMetadata(file: Blob, fallbackTitle = ''): Prom
     return {
       isMetadataLoaded: true,
     };
+  }
+}
+
+/**
+ * Extracts only the embedded cover artwork from a File/Blob on demand.
+ * Returns a temporary Blob URL if embedded artwork exists, otherwise null.
+ */
+export async function extractTrackArtwork(file: Blob): Promise<string | null> {
+  if (file.size === 0) return null;
+
+  try {
+    const parsed = await parseBlob(file, {
+      duration: false,
+      skipCovers: false,
+      skipPostHeaders: false,
+    });
+    const pictures = parsed.common.picture;
+    if (!pictures || pictures.length === 0) return null;
+
+    const cover = selectCover(pictures);
+    if (!cover || !cover.data) return null;
+
+    const blob = new Blob([cover.data as BlobPart], { type: cover.format || 'image/jpeg' });
+    return URL.createObjectURL(blob);
+  } catch {
+    return null;
   }
 }

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { TrackItem } from '../types/music';
 import { formatDuration } from '../utils/formatters';
+import { useLazyArtwork } from '../hooks/useLazyArtwork';
 
 export interface NowPlayingQueueRowProps {
   track: TrackItem;
@@ -47,6 +48,8 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
   onOpenTrackInfo,
   onRemoveFromQueue,
 }) => {
+  const artworkRef = useLazyArtwork<HTMLDivElement>(track);
+
   const handleRowClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('button, [data-queue-row-menu]')) return;
@@ -137,6 +140,7 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
       {/* Col 2: Artwork + Title + Artist */}
       <div className="flex items-center gap-3 min-w-0">
         <div
+          ref={artworkRef}
           className="w-9 h-9 rounded-lg shrink-0 overflow-hidden border border-[var(--border-subtle)] dark:border-white/[0.08] flex items-center justify-center"
           style={{
             background:

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import {
   MusicLibrary,
   FileStatus,
@@ -11,6 +11,8 @@ import {
   updateTrackInLibrary,
   updateTrackMetadataInLibrary,
 } from '../utils/libraryAggregation';
+import { queueMetadataCacheUpsert } from '../services/idbStorage';
+import { OnDemandArtworkLoader, ArtworkPriority } from '../utils/artworkLoader';
 import { useLibraryNavigation } from './useLibraryNavigation';
 import { useLibraryFavourites } from './useLibraryFavourites';
 import { useFolderScanning } from './useFolderScanning';
@@ -26,6 +28,8 @@ import { useLibraryInitialization } from './useLibraryInitialization';
 export function useMusicLibrary() {
   // Authoritative source of truth for loaded library
   const [library, setLibrary] = useState<MusicLibrary | null>(null);
+  const libraryRef = useRef<MusicLibrary | null>(library);
+  libraryRef.current = library;
 
   const flatPlaylist = useMemo(() => library?.flatPlaylist || [], [library?.flatPlaylist]);
 
@@ -86,6 +90,7 @@ export function useMusicLibrary() {
     onLibraryUpdated: setLibrary,
     onRemoveFavourites: favouritesManager.removeFavouritesForTrackIds,
     startMetadataExtraction: scanning.startIncrementalMetadataExtraction,
+    invalidateMetadataTracks: scanning.invalidateMetadataTracks,
     setIsLoading: scanning.setIsLoading,
   });
 
@@ -114,13 +119,53 @@ export function useMusicLibrary() {
     []
   );
 
-  // Update track metadata only across the library tree without altering status or size
+  // Update track metadata only across the library tree without altering status or size,
+  // and persist valid metadata updates (such as playback-learned duration) to IndexedDB cache.
   const updateTrackMetadata = useCallback(
     (trackId: string, metadata: Partial<TrackItem['metadata']>) => {
+      let matchedTrack: TrackItem | undefined;
       setLibrary((prevLib) => {
         if (!prevLib) return null;
-        return updateTrackMetadataInLibrary(prevLib, trackId, metadata);
+        const nextLib = updateTrackMetadataInLibrary(prevLib, trackId, metadata);
+        matchedTrack = nextLib.flatPlaylist.find(
+          (t) => t.id === trackId || Boolean(t.aliases?.includes(trackId))
+        );
+        return nextLib;
       });
+      const liveTrack =
+        matchedTrack ||
+        libraryRef.current?.flatPlaylist.find(
+          (t) => t.id === trackId || Boolean(t.aliases?.includes(trackId))
+        );
+      if (liveTrack) {
+        queueMetadataCacheUpsert(liveTrack, metadata);
+      }
+    },
+    []
+  );
+
+  // On-demand embedded artwork loader (priority-aware, deduplicated, bounded concurrency)
+  const artworkLoaderRef = useRef<OnDemandArtworkLoader | null>(null);
+  if (!artworkLoaderRef.current) {
+    artworkLoaderRef.current = new OnDemandArtworkLoader({
+      concurrency: 2,
+      isTrackStillValid: (track) => {
+        const cur = libraryRef.current?.flatPlaylist.find(
+          (t) => t.id === track.id || Boolean(t.aliases?.includes(track.id))
+        );
+        return Boolean(cur && cur.size === track.size && cur.lastModified === track.lastModified);
+      },
+      onArtworkLoaded: (trackId, artworkUrl) => {
+        setLibrary((prevLib) =>
+          prevLib ? updateTrackMetadataInLibrary(prevLib, trackId, { artworkUrl }) : null
+        );
+      },
+    });
+  }
+
+  const requestTrackArtwork = useCallback(
+    (track: TrackItem | null | undefined, priority: ArtworkPriority = 'normal') => {
+      artworkLoaderRef.current?.request(track, priority);
     },
     []
   );
@@ -167,5 +212,6 @@ export function useMusicLibrary() {
     requestPermissionForFolder: initialization.requestPermissionForFolder,
     updateTrackStatus,
     updateTrackMetadata,
+    requestTrackArtwork,
   };
 }

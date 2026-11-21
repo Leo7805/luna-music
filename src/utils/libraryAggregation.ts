@@ -202,6 +202,9 @@ export function mergeTrackMetadataSafely(
   }
   if (incoming.genre?.trim()) next.genre = incoming.genre.trim();
   if (incoming.artworkUrl) next.artworkUrl = incoming.artworkUrl;
+  if (typeof incoming.hasEmbeddedArtwork === 'boolean') {
+    next.hasEmbeddedArtwork = incoming.hasEmbeddedArtwork || Boolean(existing.hasEmbeddedArtwork);
+  }
   if (incoming.placeholderGradient && !existing.placeholderGradient) {
     next.placeholderGradient = incoming.placeholderGradient;
   }

@@ -3,6 +3,12 @@ import { Play, ArrowLeft, Disc } from 'lucide-react';
 import { AlbumGroup, Playlist, TrackItem } from '../types/music';
 import { TrackList } from './TrackList';
 import { formatDuration } from '../utils/formatters';
+import { useLazyArtwork } from '../hooks/useLazyArtwork';
+
+function AlbumArtworkProbe({ track }: { track?: TrackItem }) {
+  const ref = useLazyArtwork<HTMLSpanElement>(track);
+  return <span ref={ref} className="sr-only" aria-hidden="true" />;
+}
 
 interface AlbumsViewProps {
   albums: AlbumGroup[];
@@ -159,7 +165,10 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
                 loading="lazy"
               />
             ) : (
-              <Disc className="w-12 h-12 text-white/50" />
+              <>
+                <AlbumArtworkProbe track={album.tracks.find((t) => t.metadata.hasEmbeddedArtwork)} />
+                <Disc className="w-12 h-12 text-white/50" />
+              </>
             )}
 
             {/* Play Button Overlay */}
