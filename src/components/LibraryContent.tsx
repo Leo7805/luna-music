@@ -87,7 +87,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
     );
   }
 
-  if (!hasLibrary) {
+  if (!hasLibrary && currentView !== 'playlists') {
     return (
       <EmptyState
         isScanning={isLoading}

@@ -13,6 +13,7 @@ import {
 } from '../utils/libraryAggregation';
 import { queueMetadataCacheUpsert } from '../services/idbStorage';
 import { OnDemandArtworkLoader, ArtworkPriority } from '../utils/artworkLoader';
+import { SourceRemovalEvent } from '../utils/queueSourceRemoval';
 import { useLibraryNavigation } from './useLibraryNavigation';
 import { useLibraryFavourites } from './useLibraryFavourites';
 import { useFolderScanning } from './useFolderScanning';
@@ -28,8 +29,23 @@ import { useLibraryInitialization } from './useLibraryInitialization';
 export function useMusicLibrary() {
   // Authoritative source of truth for loaded library
   const [library, setLibrary] = useState<MusicLibrary | null>(null);
+  const [lastSourceRemoval, setLastSourceRemoval] = useState<SourceRemovalEvent | null>(null);
+  const removalSeqRef = useRef<number>(0);
   const libraryRef = useRef<MusicLibrary | null>(library);
   libraryRef.current = library;
+
+  const handleSourcesRemoved = useCallback(
+    (remainingTracks: TrackItem[], removedIds: string[], idMigrations: Map<string, string>) => {
+      removalSeqRef.current += 1;
+      setLastSourceRemoval({
+        seq: removalSeqRef.current,
+        remainingTracks,
+        removedIds,
+        idMigrations,
+      });
+    },
+    []
+  );
 
   const flatPlaylist = useMemo(() => library?.flatPlaylist || [], [library?.flatPlaylist]);
 
@@ -80,6 +96,7 @@ export function useMusicLibrary() {
     onMigrateFavourites: favouritesManager.migrateFavouritesOnRootRemoval,
     onResetNavigationForFolder: navigation.resetFolderSelectionIfMatching,
     onRemoveAllImportedFiles: removeAllImportedFilesRef,
+    onSourcesRemoved: handleSourcesRemoved,
     setPendingFolders: (val) => initialization.setPendingFolders(val),
     setNeedsPermission: (val) => initialization.setNeedsPermission(val),
   });
@@ -89,6 +106,7 @@ export function useMusicLibrary() {
     library,
     onLibraryUpdated: setLibrary,
     onRemoveFavourites: favouritesManager.removeFavouritesForTrackIds,
+    onSourcesRemoved: handleSourcesRemoved,
     startMetadataExtraction: scanning.startIncrementalMetadataExtraction,
     invalidateMetadataTracks: scanning.invalidateMetadataTracks,
     setIsLoading: scanning.setIsLoading,
@@ -183,6 +201,10 @@ export function useMusicLibrary() {
     favouritesCount: favouritesManager.favouritesCount,
     isLoading: scanning.isLoading,
     scanProgress: scanning.scanProgress,
+    isInitialized: initialization.isInitialized,
+    hasRegisteredSources:
+      Boolean(library && library.folders.length > 0) || initialization.pendingFolders.length > 0,
+    lastSourceRemoval,
     needsPermission: initialization.needsPermission,
     pendingFolders: initialization.pendingFolders,
     currentFolderNode: navigation.currentFolderNode,

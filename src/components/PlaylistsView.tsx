@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Playlist, TrackItem } from '../types/music';
 import { resolvePlaylistTracks } from '../utils/musicTree';
+import { isTrackPlayable } from '../utils/audioFileTypes';
 import { formatDuration } from '../utils/formatters';
 import { TrackList } from './TrackList';
 import { ConfirmModal } from './ConfirmModal';
@@ -83,6 +84,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
   const resolvedTracks = selectedPlaylist
     ? resolvePlaylistTracks(selectedPlaylist.tracks, libraryTracks)
     : [];
+  const playableTracks = resolvedTracks.filter(isTrackPlayable);
 
   const totalDuration = resolvedTracks.reduce(
     (acc, t) => acc + (t.metadata.duration || 0),
@@ -141,7 +143,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
               <div className="flex items-center justify-center sm:justify-start gap-2.5 pt-2 flex-wrap">
                 <button
                   type="button"
-                  disabled={resolvedTracks.length === 0}
+                  disabled={playableTracks.length === 0}
                   onClick={() => onPlayPlaylist(selectedPlaylist, 0, false)}
                   className="px-4 py-2 rounded-xl bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-white font-semibold text-xs shadow-md shadow-[var(--accent-primary)]/20 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                 >
@@ -151,7 +153,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
 
                 <button
                   type="button"
-                  disabled={resolvedTracks.length < 2}
+                  disabled={playableTracks.length < 2}
                   onClick={() => onPlayPlaylist(selectedPlaylist, 0, true)}
                   className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] dark:border-white/[0.1] text-[var(--text-primary)] dark:text-slate-300 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
                 >
@@ -162,8 +164,8 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                 {onAddToQueue && (
                   <button
                     type="button"
-                    disabled={resolvedTracks.length === 0}
-                    onClick={() => onAddToQueue(resolvedTracks)}
+                    disabled={playableTracks.length === 0}
+                    onClick={() => onAddToQueue(playableTracks)}
                     className="px-3.5 py-2 rounded-xl border border-[var(--border-subtle)] dark:border-white/[0.1] text-[var(--text-primary)] dark:text-slate-300 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] disabled:opacity-40 text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer"
                   >
                     <ListPlus className="w-3.5 h-3.5" />

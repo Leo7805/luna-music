@@ -3,20 +3,16 @@ import { TrackItem, RepeatMode, FileStatus } from '../types/music';
 import { isSameTrack } from '../utils/musicTree';
 import { isTrackPlayable } from '../utils/audioFileTypes';
 import { resolveInitialQueue, resolveInitialTrack } from '../utils/playbackSession';
-import {
-  reconcileQueueWithLibrary,
-  computeQueueRemovalTransition,
-} from '../utils/queueMetadata';
-import {
-  storePlaybackState,
-  getStoredPlaybackStateSync,
-} from '../services/idbStorage';
+import { reconcileQueueWithLibrary, computeQueueRemovalTransition } from '../utils/queueMetadata';
+import { storePlaybackState, getStoredPlaybackStateSync } from '../services/idbStorage';
 import { useArtworkColors } from './useArtworkColors';
 import { useTrackLyrics } from './useTrackLyrics';
 import { usePlaybackQueue } from './usePlaybackQueue';
 import { useAudioEngine } from './useAudioEngine';
 import { usePlaybackPreferences } from './usePlaybackPreferences';
 import { usePlaybackPersistence } from './usePlaybackPersistence';
+import { useSourceRemovalSync } from './useSourceRemovalSync';
+import { SourceRemovalEvent } from '../utils/queueSourceRemoval';
 
 export interface UseAudioPlayerProps {
   playlist?: TrackItem[];
@@ -28,16 +24,12 @@ export interface UseAudioPlayerProps {
   initialShuffle?: boolean;
   initialTrackId?: string | null;
   initialPosition?: number;
-  onTrackStatusChanged?: (
-    trackId: string,
-    status: FileStatus,
-    size?: number,
-    metadata?: Partial<TrackItem['metadata']>
-  ) => void;
-  onTrackMetadataUpdated?: (
-    trackId: string,
-    metadata: Partial<TrackItem['metadata']>
-  ) => void;
+  onTrackStatusChanged?: (trackId: string, status: FileStatus, size?: number, metadata?: Partial<TrackItem['metadata']>) => void;
+  onTrackMetadataUpdated?: (trackId: string, metadata: Partial<TrackItem['metadata']>) => void;
+  lastSourceRemoval?: SourceRemovalEvent | null;
+  isLibraryInitialized?: boolean;
+  hasRegisteredSources?: boolean;
+  needsPermission?: boolean;
 }
 
 /**
@@ -57,6 +49,10 @@ export function useAudioPlayer({
   initialPosition = 0,
   onTrackStatusChanged,
   onTrackMetadataUpdated,
+  lastSourceRemoval,
+  isLibraryInitialized = false,
+  hasRegisteredSources = true,
+  needsPermission = false,
 }: UseAudioPlayerProps = {}) {
   // Synchronous restoration from localStorage cache for instant hydration
   const syncState = getStoredPlaybackStateSync();
@@ -443,12 +439,20 @@ export function useAudioPlayer({
     [queueControls]
   );
 
-  // Persist queue order, current index, and playback position
+  const isPlayingRef = useRef<boolean>(audioEngine.isPlaying);
+  isPlayingRef.current = audioEngine.isPlaying;
+
+  useSourceRemovalSync({
+    lastSourceRemoval, isLibraryInitialized, hasRegisteredSources, needsPermission,
+    storedQueueIds: syncState.queueTrackIds || [], storedLastTrackId: effectiveInitialTrackId,
+    queueRef: queueControls.queueRef, currentTrackRef, isPlayingRef, repeatModeRef: prefs.repeatModeRef,
+    setQueueImmediate, setCurrentTrack, clearPlayNextOverride,
+    resetShuffleCycle: queueControls.resetShuffleCycle, stopPlayback: audioEngine.stopPlayback, loadAudioSource,
+  });
+
   usePlaybackPersistence({
-    queue,
-    currentTrack,
-    isPlaying: audioEngine.isPlaying,
-    audioRef: audioEngine.audioRef,
+    queue, currentTrack, isPlaying: audioEngine.isPlaying, audioRef: audioEngine.audioRef,
+    allowEmptyPersist: hasHydratedSessionRef.current || Boolean(lastSourceRemoval),
   });
 
   return {

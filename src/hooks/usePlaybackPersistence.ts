@@ -8,6 +8,7 @@ export interface UsePlaybackPersistenceProps {
   currentTrack: TrackItem | null;
   isPlaying: boolean;
   audioRef: React.MutableRefObject<HTMLAudioElement | null>;
+  allowEmptyPersist?: boolean;
 }
 
 /**
@@ -18,8 +19,9 @@ export function usePlaybackPersistence({
   currentTrack,
   isPlaying,
   audioRef,
+  allowEmptyPersist = false,
 }: UsePlaybackPersistenceProps) {
-  // Persist queue updates
+  // Persist queue updates (and explicitly clear stored state when emptied after hydration)
   useEffect(() => {
     if (queue.length > 0) {
       const qIds = queue.map((t) => t.id);
@@ -28,8 +30,15 @@ export function usePlaybackPersistence({
         queueTrackIds: qIds,
         queueIndex: currIdx >= 0 ? currIdx : 0,
       });
+    } else if (allowEmptyPersist) {
+      storePlaybackState({
+        queueTrackIds: [],
+        queueIndex: 0,
+        lastTrackId: null,
+        lastPosition: 0,
+      });
     }
-  }, [queue, currentTrack]);
+  }, [queue, currentTrack, allowEmptyPersist]);
 
   // Persist playback position throttled and on beforeunload
   useEffect(() => {

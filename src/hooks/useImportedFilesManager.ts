@@ -32,6 +32,7 @@ export interface UseImportedFilesManagerProps {
   library: MusicLibrary | null;
   onLibraryUpdated: (updater: (prev: MusicLibrary | null) => MusicLibrary | null) => void;
   onRemoveFavourites: (trackIds: string[]) => void;
+  onSourcesRemoved?: (remainingTracks: TrackItem[], removedIds: string[], idMigrations: Map<string, string>) => void;
   startMetadataExtraction: (tracks: TrackItem[], sourceId?: string) => void;
   invalidateMetadataTracks: (trackIds: string[]) => void;
   setIsLoading: (loading: boolean) => void;
@@ -89,6 +90,7 @@ export function useImportedFilesManager({
   library,
   onLibraryUpdated,
   onRemoveFavourites: _onRemoveFavourites,
+  onSourcesRemoved,
   startMetadataExtraction,
   invalidateMetadataTracks,
   setIsLoading,
@@ -451,6 +453,7 @@ export function useImportedFilesManager({
         cleanupCacheOnSourceRemoval(actuallyRemovedIds, [], idMigrations);
         revokeUnusedArtworkUrls(removedTrackItems, []);
         onLibraryUpdated(() => null);
+        onSourcesRemoved?.([], actuallyRemovedIds, idMigrations);
         await storeRegisteredFolders([]);
         await clearStoredDirectoryHandle();
         return;
@@ -462,6 +465,7 @@ export function useImportedFilesManager({
       const flatPlaylist = combineFlatPlaylists(nextFolders);
       cleanupCacheOnSourceRemoval(actuallyRemovedIds, flatPlaylist, idMigrations);
       revokeUnusedArtworkUrls(removedTrackItems, flatPlaylist);
+      onSourcesRemoved?.(flatPlaylist, actuallyRemovedIds, idMigrations);
 
       onLibraryUpdated((prev) =>
         prev

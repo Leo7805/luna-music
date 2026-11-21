@@ -48,6 +48,10 @@ export function App() {
     libraryTracks,
     onTrackStatusChanged: library.updateTrackStatus,
     onTrackMetadataUpdated: library.updateTrackMetadata,
+    lastSourceRemoval: library.lastSourceRemoval,
+    isLibraryInitialized: library.isInitialized,
+    hasRegisteredSources: library.hasRegisteredSources,
+    needsPermission: library.needsPermission,
   });
 
   // Priority 1: Restore embedded artwork on demand for the currently playing track

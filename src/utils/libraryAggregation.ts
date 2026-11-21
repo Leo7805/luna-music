@@ -331,6 +331,8 @@ export function deriveViewHeaderInfo(params: {
   let title = 'Music';
   if (searchQuery) {
     title = `Search Results: "${searchQuery}"`;
+  } else if (currentView === 'playlists') {
+    title = 'Playlists';
   } else if (!hasLibrary) {
     title = 'Music Library';
   } else {
@@ -344,9 +346,6 @@ export function deriveViewHeaderInfo(params: {
           : currentFolderNode
           ? currentFolderNode.name
           : 'Folder Browser';
-        break;
-      case 'playlists':
-        title = 'Playlists';
         break;
       case 'albums':
         title = selectedAlbumId ? 'Album' : 'Albums';
@@ -366,12 +365,10 @@ export function deriveViewHeaderInfo(params: {
   }
 
   let subtitle = '';
-  if (hasLibrary) {
-    if (currentView === 'playlists') {
-      subtitle = `${playlistsCount} ${playlistsCount === 1 ? 'playlist' : 'playlists'}`;
-    } else {
-      subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
-    }
+  if (currentView === 'playlists') {
+    subtitle = `${playlistsCount} ${playlistsCount === 1 ? 'playlist' : 'playlists'}`;
+  } else if (hasLibrary) {
+    subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
   }
 
   return { title, subtitle };

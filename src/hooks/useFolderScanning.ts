@@ -1,32 +1,15 @@
 import { useState, useRef, useCallback } from 'react';
-import {
-  TrackItem,
-  MusicLibrary,
-  StoredFolderRecord,
-  IMPORTED_FILES_ROOT_ID,
-} from '../types/music';
-import {
-  scanRootFolderHandle,
-  promptOpenDirectory,
-  verifyHandlePermission,
-} from '../services/directoryAccess';
+import { TrackItem, MusicLibrary, StoredFolderRecord, IMPORTED_FILES_ROOT_ID } from '../types/music';
+import { scanRootFolderHandle, promptOpenDirectory, verifyHandlePermission } from '../services/directoryAccess';
 import { parseFileList } from '../services/fallbackAccess';
 import {
-  storeRegisteredFolders,
-  clearStoredDirectoryHandle,
-  storeImportedFiles,
-  getMetadataCache,
-  applyCachedMetadataToTracks,
-  cleanupCacheOnSourceRemoval,
-  queueMetadataCacheUpsert,
-  flushMetadataCacheWrites,
+  storeRegisteredFolders, clearStoredDirectoryHandle, storeImportedFiles,
+  getMetadataCache, applyCachedMetadataToTracks, cleanupCacheOnSourceRemoval,
+  queueMetadataCacheUpsert, flushMetadataCacheWrites,
 } from '../services/idbStorage';
 import {
-  buildFolderTree,
-  buildUnifiedMultiFolderTree,
-  combineFlatPlaylists,
-  reconcileOverlappingTracks,
-  migratePlaylistsTrackIds,
+  buildFolderTree, buildUnifiedMultiFolderTree, combineFlatPlaylists,
+  reconcileOverlappingTracks, migratePlaylistsTrackIds,
 } from '../utils/musicTree';
 import { updateTrackMetadataInLibrary } from '../utils/libraryAggregation';
 import { MetadataExtractionQueue } from '../utils/metadataExtractionQueue';
@@ -38,6 +21,7 @@ export interface UseFolderScanningProps {
   onMigrateFavourites: (idMigrations: Map<string, string>) => void;
   onResetNavigationForFolder: (folderId: string) => void;
   onRemoveAllImportedFiles: () => Promise<void>;
+  onSourcesRemoved?: (remainingTracks: TrackItem[], removedIds: string[], idMigrations: Map<string, string>) => void;
   setPendingFolders: React.Dispatch<React.SetStateAction<StoredFolderRecord[]>>;
   setNeedsPermission: React.Dispatch<React.SetStateAction<boolean>>;
 }
@@ -70,6 +54,7 @@ export function useFolderScanning({
   onMigrateFavourites,
   onResetNavigationForFolder,
   onRemoveAllImportedFiles,
+  onSourcesRemoved,
   setPendingFolders,
   setNeedsPermission,
 }: UseFolderScanningProps): UseFolderScanningReturn {
@@ -337,6 +322,7 @@ export function useFolderScanning({
         cleanupCacheOnSourceRemoval(candidateRemovedIds, []);
         if (removedFolder) revokeUnusedArtworkUrls(removedFolder.tracks, []);
         onLibraryUpdated(() => null);
+        onSourcesRemoved?.([], candidateRemovedIds, new Map());
         await storeRegisteredFolders([]);
         await clearStoredDirectoryHandle();
         return;
@@ -423,6 +409,7 @@ export function useFolderScanning({
 
       cleanupCacheOnSourceRemoval(candidateRemovedIds, flatPlaylist, idMigrations);
       if (removedFolder) revokeUnusedArtworkUrls(removedFolder.tracks, flatPlaylist);
+      onSourcesRemoved?.(flatPlaylist, candidateRemovedIds, idMigrations);
 
       onLibraryUpdated((prev) =>
         prev

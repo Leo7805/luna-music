@@ -43,6 +43,7 @@ export interface UseLibraryInitializationProps {
 }
 
 export interface UseLibraryInitializationReturn {
+  isInitialized: boolean;
   needsPermission: boolean;
   setNeedsPermission: React.Dispatch<React.SetStateAction<boolean>>;
   pendingFolders: StoredFolderRecord[];
@@ -62,6 +63,7 @@ export function useLibraryInitialization({
   startIncrementalMetadataExtraction,
   setIsLoading,
 }: UseLibraryInitializationProps): UseLibraryInitializationReturn {
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [needsPermission, setNeedsPermission] = useState<boolean>(false);
   const [pendingFolders, setPendingFolders] = useState<StoredFolderRecord[]>([]);
 
@@ -296,6 +298,7 @@ export function useLibraryInitialization({
           startIncrementalMetadataExtraction(batch.tracks, batch.sourceId);
         }
       }
+      setIsInitialized(true);
     }
 
     init();
@@ -429,6 +432,7 @@ export function useLibraryInitialization({
   );
 
   return {
+    isInitialized,
     needsPermission,
     setNeedsPermission,
     pendingFolders,
