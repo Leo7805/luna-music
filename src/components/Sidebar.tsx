@@ -222,7 +222,8 @@ export function Sidebar({
       <ConfirmModal
         isOpen={showClearImportedFilesModal}
         title="Remove All Imported Files"
-        message="Are you sure you want to remove all imported files from your library? Your physical files on disk will not be deleted."
+        message="Are you sure you want to remove all imported files from your library?"
+        note="Your physical files on disk will not be deleted."
         confirmLabel="Remove All"
         cancelLabel="Cancel"
         isDanger={true}

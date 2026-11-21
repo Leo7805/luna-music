@@ -106,6 +106,37 @@ describe('Theme-Consistent Buttons & Option B Styling', () => {
       expect(html).toContain('bg-rose-600');
       expect(html).toContain('hover:bg-rose-700');
     });
+
+    it('separates header, full-width body with optional muted note, and right-aligned footer', () => {
+      const html = renderToStaticMarkup(
+        <ConfirmModal
+          isOpen={true}
+          title="Remove All Imported Files"
+          message="Are you sure you want to remove all imported files from your library?"
+          note="Your physical files on disk will not be deleted."
+          confirmLabel="Remove All"
+          cancelLabel="Cancel"
+          isDanger={true}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      expect(html).toContain('max-w-[420px]');
+      expect(html).toContain('data-testid="confirm-modal-header"');
+      expect(html).toContain('data-testid="confirm-modal-body"');
+      expect(html).toContain('data-testid="confirm-modal-footer"');
+      expect(html).toContain('Are you sure you want to remove all imported files from your library?');
+      expect(html).toContain('Your physical files on disk will not be deleted.');
+      expect(html).toContain('text-slate-500 dark:text-slate-400');
+      // Body section appears strictly after the header section closes
+      expect(html.indexOf('data-testid="confirm-modal-body"')).toBeGreaterThan(
+        html.indexOf('data-testid="confirm-modal-header"')
+      );
+      expect(html.indexOf('data-testid="confirm-modal-footer"')).toBeGreaterThan(
+        html.indexOf('data-testid="confirm-modal-body"')
+      );
+    });
   });
 
   describe('4. PlaylistModal Action Buttons and Inputs', () => {
