@@ -101,12 +101,12 @@ export function useAudioEngine({
       if (loadRequestIdRef.current !== requestId) return;
       const result = classifyPlayRejection(err, isAutoResume);
       if (result.ignore) return;
-      if (result.isAutoplayBlocked) {
-        console.warn('[Luna Music] Autoplay policy blocked resume:', err);
-      } else {
-        console.warn('[Luna Music] Playback play() rejected:', err);
-      }
       setIsPlaying(false);
+      if (result.isAutoplayBlocked && !result.message) {
+        setPlaybackError(null);
+        return;
+      }
+      console.warn('[Luna Music] Playback play() rejected:', err);
       if (result.message) setPlaybackError(result.message);
     });
   }, []);

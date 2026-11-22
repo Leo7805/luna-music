@@ -231,10 +231,21 @@ describe('Resume Playback After Page Refresh', () => {
       expect(classifyPlayRejection(abortErr, true).ignore).toBe(true);
 
       const notAllowedErr = Object.assign(new Error('not allowed'), { name: 'NotAllowedError' });
-      const blocked = classifyPlayRejection(notAllowedErr, true);
-      expect(blocked.ignore).toBe(false);
-      expect(blocked.isAutoplayBlocked).toBe(true);
-      expect(blocked.message).toContain('Click Play to continue');
+      const blockedAutoResume = classifyPlayRejection(notAllowedErr, true);
+      expect(blockedAutoResume.ignore).toBe(false);
+      expect(blockedAutoResume.isAutoplayBlocked).toBe(true);
+      expect(blockedAutoResume.message).toBeNull();
+
+      // User-initiated NotAllowedError and genuine playback errors still produce user-facing messages
+      const blockedManual = classifyPlayRejection(notAllowedErr, false);
+      expect(blockedManual.isAutoplayBlocked).toBe(true);
+      expect(blockedManual.message).toContain('autoplay policy');
+
+      const decodeErr = Object.assign(new Error('Failed to decode audio'), { name: 'NotSupportedError' });
+      const genuine = classifyPlayRejection(decodeErr, true);
+      expect(genuine.ignore).toBe(false);
+      expect(genuine.isAutoplayBlocked).toBe(false);
+      expect(genuine.message).toContain('Playback failed: Failed to decode audio');
     });
   });
 
@@ -377,12 +388,14 @@ describe('Resume Playback After Page Refresh', () => {
       });
       await Promise.resolve();
 
-      // Autoplay rejected: caught without unhandled rejection, single attempt (no loop), track stays normal, position preserved
+      // Autoplay rejected during auto-resume: silently stays paused, no toast/warning, single attempt (no loop), track stays normal, position preserved
       expect(mockAudio.playCalls).toHaveLength(1);
       expect(mockAudio.currentTime).toBe(155);
       expect(track2.status).toBe('normal');
       expect(onTrackStatusChanged).not.toHaveBeenCalled();
-      expect(warnSpy).toHaveBeenCalled();
+      expect(engine.isPlaying).toBe(false);
+      expect(engine.playbackError).toBeNull();
+      expect(warnSpy).not.toHaveBeenCalled();
 
       // User manually clicks Play -> resumes at 155
       mockAudio.playImpl = async () => {

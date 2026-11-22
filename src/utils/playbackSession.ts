@@ -170,7 +170,7 @@ export function classifyPlayRejection(err: unknown, isAutoResume: boolean): Play
       ignore: false,
       isAutoplayBlocked: true,
       message: isAutoResume
-        ? 'Browser paused automatic resume. Click Play to continue.'
+        ? null
         : 'Playback was blocked by browser autoplay policy. Click Play to start.',
     };
   }
