@@ -1,5 +1,6 @@
-import { TrackItem } from '../types/music';
+import { FavouriteTrackSnapshot, TrackItem } from '../types/music';
 import { createTrackReferenceResolver } from './trackReferenceResolver';
+import { createUnavailableTrack } from './trackPlaceholders';
 
 /**
  * Authoritative check if a track matches the user's favourites set.
@@ -29,22 +30,72 @@ export function isFavouriteTrack(
 
 export interface FavouriteResolutionResult {
   resolvedTracks: TrackItem[];
+  displayTracks: TrackItem[];
   unresolvedIds: string[];
   migratedMap: Map<string, string>;
 }
 
 /**
+ * Merges live TrackItem metadata into an existing FavouriteTrackSnapshot without
+ * overwriting previously valid Artist, Album, or Duration with placeholders/unknown values.
+ * Returns null if nothing changed.
+ */
+export function mergeFavouriteSnapshot(
+  existing: FavouriteTrackSnapshot | undefined,
+  track: TrackItem
+): FavouriteTrackSnapshot | null {
+  const incomingName = track.metadata.title?.trim() || track.name;
+  const incomingArtist =
+    track.metadata.artist && track.metadata.artist !== 'Unknown Artist'
+      ? track.metadata.artist.trim()
+      : undefined;
+  const incomingAlbum =
+    track.metadata.album && track.metadata.album !== 'Unknown Album'
+      ? track.metadata.album.trim()
+      : undefined;
+  const incomingDuration =
+    typeof track.metadata.duration === 'number' &&
+    Number.isFinite(track.metadata.duration) &&
+    track.metadata.duration > 0
+      ? track.metadata.duration
+      : undefined;
+
+  const next: FavouriteTrackSnapshot = {
+    trackId: track.id,
+    name: incomingName || existing?.name || track.name,
+    artist: incomingArtist || existing?.artist,
+    album: incomingAlbum || existing?.album,
+    duration: incomingDuration ?? existing?.duration,
+  };
+
+  if (
+    existing &&
+    existing.trackId === next.trackId &&
+    existing.name === next.name &&
+    existing.artist === next.artist &&
+    existing.album === next.album &&
+    existing.duration === next.duration
+  ) {
+    return null;
+  }
+  return next;
+}
+
+/**
  * Resolves stored favourite IDs against the library tracks using the shared resolver.
- * - Deduplicates resolved tracks by canonical ID (avoiding inflated counts).
- * - Preserves unresolved favourite IDs so they are not lost when folders are detached.
- * - Migrates resolved alias and unambiguous relativePath matches to current canonical IDs.
- * - Preserves ambiguous IDs in unresolvedIds to prevent marking the wrong track.
+ * - `resolvedTracks`: currently available canonical Library tracks (deduplicated).
+ * - `displayTracks`: full ordered display list including both available tracks and
+ *   shared unavailable placeholders for unresolved/ambiguous saved references.
+ * - `unresolvedIds`: saved IDs not currently matched to an unambiguous Library track.
+ * - `migratedMap`: alias/relativePath matches eligible for canonical ID migration.
  */
 export function resolveFavouriteTracks(
   libraryTracks: TrackItem[],
-  favourites: Set<string>
+  favourites: Set<string>,
+  snapshots?: Record<string, FavouriteTrackSnapshot>
 ): FavouriteResolutionResult {
   const resolvedTracks: TrackItem[] = [];
+  const displayTracks: TrackItem[] = [];
   const resolvedTrackIds = new Set<string>();
   const matchedFavIds = new Set<string>();
   const migratedMap = new Map<string, string>();
@@ -61,7 +112,23 @@ export function resolveFavouriteTracks(
       if (!resolvedTrackIds.has(res.track.id)) {
         resolvedTrackIds.add(res.track.id);
         resolvedTracks.push(res.track);
+        displayTracks.push(res.track);
       }
+    } else {
+      const snap = snapshots?.[favId];
+      displayTracks.push(
+        createUnavailableTrack(
+          snap
+            ? {
+                trackId: favId,
+                name: snap.name,
+                artist: snap.artist,
+                album: snap.album,
+                duration: snap.duration,
+              }
+            : { trackId: favId }
+        )
+      );
     }
   }
 
@@ -74,6 +141,7 @@ export function resolveFavouriteTracks(
 
   return {
     resolvedTracks,
+    displayTracks,
     unresolvedIds,
     migratedMap,
   };

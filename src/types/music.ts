@@ -134,6 +134,14 @@ export interface ArtistGroup {
   totalDuration: number;
 }
 
+export interface FavouriteTrackSnapshot {
+  trackId: string;
+  name: string;
+  artist?: string;
+  album?: string;
+  duration?: number;
+}
+
 export interface StoredPlaybackState {
   volume: number;
   isMuted: boolean;
@@ -142,6 +150,7 @@ export interface StoredPlaybackState {
   lastTrackId: string | null;
   lastPosition: number;
   favourites: string[];
+  favouriteSnapshots?: Record<string, FavouriteTrackSnapshot>;
   queueTrackIds?: string[];
   queueIndex?: number;
 }

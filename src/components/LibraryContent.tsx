@@ -76,6 +76,23 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
         (library.library.folders && library.library.folders.length > 0))
   );
 
+  // Keep hooks unconditional above early loading/empty-library returns
+  const handlePlayAllDisplayed = useCallback(() => {
+    const playable = displayedTracks.filter(isTrackPlayable);
+    if (playable.length === 0) return;
+
+    // Deduplicate logical tracks while preserving active search & sort order
+    const uniqueTracks: TrackItem[] = [];
+    for (const track of playable) {
+      if (!uniqueTracks.some((existing) => isSameTrack(existing, track))) {
+        uniqueTracks.push(track);
+      }
+    }
+    if (uniqueTracks.length === 0) return;
+
+    audioPlayer.playQueue(uniqueTracks, 0, false);
+  }, [displayedTracks, audioPlayer]);
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -87,7 +104,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
     );
   }
 
-  if (!hasLibrary && currentView !== 'playlists') {
+  if (!hasLibrary && currentView !== 'playlists' && currentView !== 'favourites') {
     return (
       <EmptyState
         isScanning={isLoading}
@@ -105,22 +122,6 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
   };
 
   const libraryTracks = library.library?.flatPlaylist || [];
-
-  const handlePlayAllDisplayed = useCallback(() => {
-    const playable = displayedTracks.filter(isTrackPlayable);
-    if (playable.length === 0) return;
-
-    // Deduplicate logical tracks while preserving active search & sort order
-    const uniqueTracks: TrackItem[] = [];
-    for (const track of playable) {
-      if (!uniqueTracks.some((existing) => isSameTrack(existing, track))) {
-        uniqueTracks.push(track);
-      }
-    }
-    if (uniqueTracks.length === 0) return;
-
-    audioPlayer.playQueue(uniqueTracks, 0, false);
-  }, [displayedTracks, audioPlayer]);
 
   const commonTrackListProps = {
     tracks: displayedTracks,

@@ -14,6 +14,7 @@ export const DEFAULT_STATE: StoredPlaybackState = {
   lastTrackId: null,
   lastPosition: 0,
   favourites: [],
+  favouriteSnapshots: {},
   queueTrackIds: [],
   queueIndex: 0,
 };
@@ -63,6 +64,10 @@ export function getStoredPlaybackStateSync(): StoredPlaybackState {
           ...DEFAULT_STATE,
           ...parsed,
           favourites: Array.isArray(parsed.favourites) ? parsed.favourites : [],
+          favouriteSnapshots:
+            parsed.favouriteSnapshots && typeof parsed.favouriteSnapshots === 'object'
+              ? parsed.favouriteSnapshots
+              : {},
           queueTrackIds: Array.isArray(parsed.queueTrackIds) ? parsed.queueTrackIds : [],
         };
       }
@@ -103,6 +108,10 @@ export async function getStoredPlaybackState(): Promise<StoredPlaybackState> {
               ...DEFAULT_STATE,
               ...result,
               favourites: Array.isArray(result.favourites) ? result.favourites : [],
+              favouriteSnapshots:
+                result.favouriteSnapshots && typeof result.favouriteSnapshots === 'object'
+                  ? result.favouriteSnapshots
+                  : {},
             });
           } else {
             resolve(DEFAULT_STATE);

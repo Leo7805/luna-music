@@ -114,7 +114,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <button
             type="button"
             onClick={onConfirm}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl border border-transparent text-xs font-semibold text-white shadow-sm transition-all cursor-pointer ${
               isDanger
                 ? 'bg-rose-600 hover:bg-rose-700 active:bg-rose-800'
                 : 'bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] active:opacity-90'

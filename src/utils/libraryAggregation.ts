@@ -107,14 +107,14 @@ export function deriveDisplayedTracks({
   favouriteTracks,
   searchQuery,
 }: DisplayedTracksOptions): TrackItem[] {
-  if (!library) return [];
-
   let baseList: TrackItem[] = [];
 
-  if (currentView === 'all') {
-    baseList = library.flatPlaylist;
-  } else if (currentView === 'favourites') {
+  if (currentView === 'favourites') {
     baseList = favouriteTracks;
+  } else if (!library) {
+    return [];
+  } else if (currentView === 'all') {
+    baseList = library.flatPlaylist;
   } else if (currentView === 'folder') {
     if (currentFolderNode) {
       baseList = currentFolderNode.tracks;
@@ -359,6 +359,8 @@ export function deriveViewHeaderInfo(params: {
     title = `Search Results: "${searchQuery}"`;
   } else if (currentView === 'playlists') {
     title = 'Playlists';
+  } else if (currentView === 'favourites') {
+    title = 'Favourites';
   } else if (!hasLibrary) {
     title = 'Music Library';
   } else {
@@ -379,9 +381,6 @@ export function deriveViewHeaderInfo(params: {
       case 'artists':
         title = selectedArtistName ? 'Artist' : 'Artists';
         break;
-      case 'favourites':
-        title = 'Favourites';
-        break;
       case 'imported-files':
         title = 'Imported Files';
         break;
@@ -393,7 +392,7 @@ export function deriveViewHeaderInfo(params: {
   let subtitle = '';
   if (currentView === 'playlists') {
     subtitle = `${playlistsCount} ${playlistsCount === 1 ? 'playlist' : 'playlists'}`;
-  } else if (hasLibrary) {
+  } else if (currentView === 'favourites' || hasLibrary) {
     subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
   }
 

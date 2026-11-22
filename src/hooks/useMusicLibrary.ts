@@ -126,7 +126,7 @@ export function useMusicLibrary() {
   const initialization = useLibraryInitialization({
     library,
     onLibraryInitialized: updateLibrary,
-    onSetInitialFavourites: favouritesManager.setFavourites,
+    onSetInitialFavourites: favouritesManager.setInitialFavourites,
     startIncrementalMetadataExtraction: scanning.startIncrementalMetadataExtraction,
     setIsLoading: scanning.setIsLoading,
   });

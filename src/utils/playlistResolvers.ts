@@ -1,6 +1,7 @@
 import { TrackItem, PlaylistTrackReference } from '../types/music';
 import { getStoredPlaylists, storePlaylists } from '../services/idbStorage';
 import { createTrackReferenceResolver } from './trackReferenceResolver';
+import { createUnavailableTrack } from './trackPlaceholders';
 
 /**
  * Updates stored playlists when tracks migrate to canonical IDs upon source removal.
@@ -53,22 +54,7 @@ export function resolvePlaylistTracks(
       return track;
     }
 
-    // Source is offline, disconnected, or ambiguous: preserve entry with 'unreadable' status
-    const placeholder: TrackItem = {
-      id: ref.trackId,
-      name: ref.name,
-      relativePath: ref.name,
-      size: 0,
-      lastModified: ref.addedAt,
-      status: 'unreadable',
-      metadata: {
-        title: ref.name,
-        artist: ref.artist || 'Unknown Artist',
-        album: ref.album || 'Unknown Album',
-        duration: ref.duration || 0,
-        isMetadataLoaded: true,
-      },
-    };
-    return placeholder;
+    // Source is offline, disconnected, or ambiguous: preserve entry with shared unavailable placeholder
+    return createUnavailableTrack(ref);
   });
 }

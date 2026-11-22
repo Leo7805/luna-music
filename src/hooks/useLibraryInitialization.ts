@@ -4,6 +4,7 @@ import {
   FileStatus,
   ImportedFolder,
   StoredFolderRecord,
+  FavouriteTrackSnapshot,
   MusicLibrary,
   IMPORTED_FILES_ROOT_ID,
   IMPORTED_FILES_COLLECTION_NAME,
@@ -33,7 +34,10 @@ import { createFallbackMetadata } from '../utils/metadata';
 export interface UseLibraryInitializationProps {
   library: MusicLibrary | null;
   onLibraryInitialized: (library: MusicLibrary) => void;
-  onSetInitialFavourites: (favourites: Set<string>) => void;
+  onSetInitialFavourites: (
+    favourites: Set<string>,
+    snapshots?: Record<string, FavouriteTrackSnapshot>
+  ) => void;
   startIncrementalMetadataExtraction: (
     tracks: TrackItem[],
     sourceId?: string,
@@ -75,7 +79,7 @@ export function useLibraryInitialization({
         getMetadataCache(),
       ]);
       if (storedState.favourites) {
-        onSetInitialFavourites(new Set(storedState.favourites));
+        onSetInitialFavourites(new Set(storedState.favourites), storedState.favouriteSnapshots);
       }
 
       let loadedFolders: ImportedFolder[] = [];

@@ -1,5 +1,6 @@
 import { ListPlus, Plus, FolderPlus, Heart, Trash2 } from 'lucide-react';
 import { TrackItem } from '../types/music';
+import { isTrackPlayable } from '../utils/audioFileTypes';
 
 export interface TrackActionMenuProps {
   track: TrackItem;
@@ -32,12 +33,14 @@ export function TrackActionMenu({
   onRemoveImportedFiles,
   showToast,
 }: TrackActionMenuProps) {
+  const playable = isTrackPlayable(track);
+
   return (
     <div
       className="absolute right-0 top-full mt-1 z-30 min-w-[170px] bg-white dark:bg-[#0c192c] border border-slate-200 dark:border-white/[0.1] rounded-xl shadow-xl py-1 text-xs select-none animate-scale-up"
       onClick={(e) => e.stopPropagation()}
     >
-      {onPlayNext && (
+      {playable && onPlayNext && (
         <button
           type="button"
           onClick={() => {
@@ -56,7 +59,7 @@ export function TrackActionMenu({
         </button>
       )}
 
-      {onAddToQueue && (
+      {playable && onAddToQueue && (
         <button
           type="button"
           onClick={() => {
@@ -75,17 +78,19 @@ export function TrackActionMenu({
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={() => {
-          onClose();
-          onOpenPlaylistModal(track);
-        }}
-        className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
-      >
-        <FolderPlus className="w-3.5 h-3.5 text-amber-500" />
-        <span>Add to Playlist...</span>
-      </button>
+      {playable && (
+        <button
+          type="button"
+          onClick={() => {
+            onClose();
+            onOpenPlaylistModal(track);
+          }}
+          className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors cursor-pointer"
+        >
+          <FolderPlus className="w-3.5 h-3.5 text-amber-500" />
+          <span>Add to Playlist...</span>
+        </button>
+      )}
 
       <button
         type="button"

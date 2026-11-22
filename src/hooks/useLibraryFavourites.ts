@@ -1,16 +1,23 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { TrackItem } from '../types/music';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { FavouriteTrackSnapshot, TrackItem } from '../types/music';
 import { storePlaybackState } from '../services/idbStorage';
 import { resolveFavouriteTracks, isFavouriteTrack } from '../utils/musicTree';
+import { mergeFavouriteSnapshot } from '../utils/favouriteResolvers';
 
 export interface UseLibraryFavouritesProps {
   initialFavourites?: Set<string>;
+  initialSnapshots?: Record<string, FavouriteTrackSnapshot>;
   flatPlaylist: TrackItem[];
 }
 
 export interface UseLibraryFavouritesReturn {
   favourites: Set<string>;
+  favouriteSnapshots: Record<string, FavouriteTrackSnapshot>;
   setFavourites: React.Dispatch<React.SetStateAction<Set<string>>>;
+  setInitialFavourites: (
+    favs: Set<string>,
+    snapshots?: Record<string, FavouriteTrackSnapshot>
+  ) => void;
   favouriteTracks: TrackItem[];
   favouritesCount: number;
   toggleFavourite: (trackId: string) => void;
@@ -21,34 +28,71 @@ export interface UseLibraryFavouritesReturn {
 }
 
 /**
- * Hook to manage favourite tracks, legacy ID resolution, auto-healing, and persistence.
+ * Hook to manage favourite tracks, lightweight display snapshots,
+ * unavailable placeholder display, legacy ID resolution, and persistence.
  */
 export function useLibraryFavourites({
   initialFavourites,
+  initialSnapshots,
   flatPlaylist,
 }: UseLibraryFavouritesProps): UseLibraryFavouritesReturn {
   const [favourites, setFavourites] = useState<Set<string>>(
     () => initialFavourites || new Set()
   );
+  const [favouriteSnapshots, setFavouriteSnapshots] = useState<
+    Record<string, FavouriteTrackSnapshot>
+  >(() => initialSnapshots || {});
+  const snapshotsRef = useRef<Record<string, FavouriteTrackSnapshot>>(favouriteSnapshots);
+  snapshotsRef.current = favouriteSnapshots;
 
-  // Resolve favourites against current flat library tracks
-  const favouriteResolution = useMemo(() => {
-    if (flatPlaylist.length === 0) {
-      return {
-        resolvedTracks: [],
-        unresolvedIds: Array.from(favourites),
-        migratedMap: new Map<string, string>(),
-      };
+  const setInitialFavourites = useCallback(
+    (favs: Set<string>, snapshots?: Record<string, FavouriteTrackSnapshot>) => {
+      setFavourites(favs);
+      if (snapshots && typeof snapshots === 'object') {
+        snapshotsRef.current = snapshots;
+        setFavouriteSnapshots(snapshots);
+      }
+    },
+    []
+  );
+
+  // Resolve favourites against current flat library tracks (includes unavailable placeholders)
+  const favouriteResolution = useMemo(
+    () => resolveFavouriteTracks(flatPlaylist, favourites, favouriteSnapshots),
+    [flatPlaylist, favourites, favouriteSnapshots]
+  );
+
+  const favouriteTracks = favouriteResolution.displayTracks;
+  const favouritesCount = favouriteResolution.displayTracks.length;
+
+  // Refresh lightweight display snapshots whenever resolved favourite tracks gain better metadata
+  useEffect(() => {
+    if (favouriteResolution.resolvedTracks.length === 0) return;
+    const prevSnaps = snapshotsRef.current;
+    let changed = false;
+    const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...prevSnaps };
+
+    for (const track of favouriteResolution.resolvedTracks) {
+      const merged = mergeFavouriteSnapshot(prevSnaps[track.id], track);
+      if (merged) {
+        nextSnaps[track.id] = merged;
+        changed = true;
+      }
     }
-    return resolveFavouriteTracks(flatPlaylist, favourites);
-  }, [flatPlaylist, favourites]);
 
-  const favouriteTracks = favouriteResolution.resolvedTracks;
-  const favouritesCount = favouriteTracks.length;
+    if (changed) {
+      snapshotsRef.current = nextSnaps;
+      setFavouriteSnapshots(nextSnaps);
+      storePlaybackState({ favouriteSnapshots: nextSnaps });
+    }
+  }, [favouriteResolution.resolvedTracks]);
 
   // Auto-heal legacy or alias favourite IDs to canonical IDs without dropping unresolved IDs
   useEffect(() => {
     if (favouriteResolution.migratedMap.size > 0) {
+      const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...snapshotsRef.current };
+      let snapsChanged = false;
+
       setFavourites((prev) => {
         let changed = false;
         const next = new Set(prev);
@@ -61,9 +105,23 @@ export function useLibraryFavourites({
             next.add(canonicalId);
             changed = true;
           }
+          if (nextSnaps[oldId]) {
+            if (!nextSnaps[canonicalId]) {
+              nextSnaps[canonicalId] = { ...nextSnaps[oldId], trackId: canonicalId };
+            }
+            delete nextSnaps[oldId];
+            snapsChanged = true;
+          }
         }
         if (changed) {
-          storePlaybackState({ favourites: Array.from(next) });
+          if (snapsChanged) {
+            snapshotsRef.current = nextSnaps;
+            setFavouriteSnapshots(nextSnaps);
+          }
+          storePlaybackState({
+            favourites: Array.from(next),
+            ...(snapsChanged ? { favouriteSnapshots: nextSnaps } : {}),
+          });
           return next;
         }
         return prev;
@@ -92,14 +150,20 @@ export function useLibraryFavourites({
           ? isFavouriteTrack(track, next, flatPlaylist)
           : next.has(trackId);
 
+        const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...snapshotsRef.current };
         if (isFav) {
           // 1. Remove canonical ID and trackId
           next.delete(canonicalId);
           next.delete(trackId);
+          delete nextSnaps[canonicalId];
+          delete nextSnaps[trackId];
 
           // 2. Remove verified aliases of this logical track
           if (track?.aliases) {
-            track.aliases.forEach((alias) => next.delete(alias));
+            track.aliases.forEach((alias) => {
+              next.delete(alias);
+              delete nextSnaps[alias];
+            });
           }
 
           // 3. Remove legacy relative-path key ONLY if it unambiguously belongs to this track
@@ -109,6 +173,7 @@ export function useLibraryFavourites({
             );
             if (sameRelPathTracks.length === 1) {
               next.delete(track.relativePath);
+              delete nextSnaps[track.relativePath];
             }
           }
 
@@ -116,12 +181,19 @@ export function useLibraryFavourites({
           for (const [oldId, mappedCanonicalId] of favouriteResolution.migratedMap.entries()) {
             if (mappedCanonicalId === canonicalId) {
               next.delete(oldId);
+              delete nextSnaps[oldId];
             }
           }
         } else {
           next.add(canonicalId);
+          if (track) {
+            const snap = mergeFavouriteSnapshot(nextSnaps[canonicalId], track);
+            if (snap) nextSnaps[canonicalId] = snap;
+          }
         }
-        storePlaybackState({ favourites: Array.from(next) });
+        snapshotsRef.current = nextSnaps;
+        setFavouriteSnapshots(nextSnaps);
+        storePlaybackState({ favourites: Array.from(next), favouriteSnapshots: nextSnaps });
         return next;
       });
     },
@@ -132,6 +204,7 @@ export function useLibraryFavourites({
   const addTracksToFavourites = useCallback((tracks: TrackItem[]) => {
     setFavourites((prev) => {
       const next = new Set(prev);
+      const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...snapshotsRef.current };
       let changed = false;
       for (const track of tracks) {
         const canonicalId = track.id;
@@ -139,24 +212,36 @@ export function useLibraryFavourites({
           next.add(canonicalId);
           changed = true;
         }
+        const snap = mergeFavouriteSnapshot(nextSnaps[canonicalId], track);
+        if (snap) {
+          nextSnaps[canonicalId] = snap;
+          changed = true;
+        }
       }
       if (changed) {
-        storePlaybackState({ favourites: Array.from(next) });
+        snapshotsRef.current = nextSnaps;
+        setFavouriteSnapshots(nextSnaps);
+        storePlaybackState({ favourites: Array.from(next), favouriteSnapshots: nextSnaps });
         return next;
       }
       return prev;
     });
   }, []);
 
-  // Bulk remove tracks from favourites
+  // Bulk remove tracks from favourites (works for both available tracks and unavailable placeholders)
   const removeTracksFromFavourites = useCallback((tracks: TrackItem[]) => {
     setFavourites((prev) => {
       const next = new Set(prev);
+      const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...snapshotsRef.current };
       let changed = false;
       for (const track of tracks) {
         const canonicalId = track.id;
         if (next.has(canonicalId)) {
           next.delete(canonicalId);
+          changed = true;
+        }
+        if (nextSnaps[canonicalId]) {
+          delete nextSnaps[canonicalId];
           changed = true;
         }
         if (track.aliases) {
@@ -165,49 +250,78 @@ export function useLibraryFavourites({
               next.delete(a);
               changed = true;
             }
+            if (nextSnaps[a]) {
+              delete nextSnaps[a];
+              changed = true;
+            }
           }
         }
       }
       if (changed) {
-        storePlaybackState({ favourites: Array.from(next) });
+        snapshotsRef.current = nextSnaps;
+        setFavouriteSnapshots(nextSnaps);
+        storePlaybackState({ favourites: Array.from(next), favouriteSnapshots: nextSnaps });
         return next;
       }
       return prev;
     });
   }, []);
 
-  // Remove favourites for specific track IDs (e.g., when imported files are removed)
+  // Remove favourites for specific track IDs
   const removeFavouritesForTrackIds = useCallback((trackIds: string[]) => {
     setFavourites((prev) => {
       let changed = false;
       const next = new Set(prev);
+      const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...snapshotsRef.current };
       for (const trackId of trackIds) {
         if (next.has(trackId)) {
           next.delete(trackId);
           changed = true;
         }
+        if (nextSnaps[trackId]) {
+          delete nextSnaps[trackId];
+          changed = true;
+        }
       }
       if (changed) {
-        storePlaybackState({ favourites: Array.from(next) });
+        snapshotsRef.current = nextSnaps;
+        setFavouriteSnapshots(nextSnaps);
+        storePlaybackState({ favourites: Array.from(next), favouriteSnapshots: nextSnaps });
         return next;
       }
       return prev;
     });
   }, []);
 
-  // Migrate favourites when root removal promotes aliases
+  // Migrate favourites and their snapshots when root removal promotes aliases
   const migrateFavouritesOnRootRemoval = useCallback(
     (idMigrations: Map<string, string>) => {
       if (idMigrations.size === 0) return;
       setFavourites((prev) => {
         const next = new Set(prev);
+        const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...snapshotsRef.current };
+        let snapsChanged = false;
         for (const [oldId, newId] of idMigrations.entries()) {
           if (next.has(oldId)) {
             next.delete(oldId);
             next.add(newId);
           }
+          if (nextSnaps[oldId]) {
+            if (!nextSnaps[newId]) {
+              nextSnaps[newId] = { ...nextSnaps[oldId], trackId: newId };
+            }
+            delete nextSnaps[oldId];
+            snapsChanged = true;
+          }
         }
-        storePlaybackState({ favourites: Array.from(next) });
+        if (snapsChanged) {
+          snapshotsRef.current = nextSnaps;
+          setFavouriteSnapshots(nextSnaps);
+        }
+        storePlaybackState({
+          favourites: Array.from(next),
+          ...(snapsChanged ? { favouriteSnapshots: nextSnaps } : {}),
+        });
         return next;
       });
     },
@@ -216,7 +330,9 @@ export function useLibraryFavourites({
 
   return {
     favourites,
+    favouriteSnapshots,
     setFavourites,
+    setInitialFavourites,
     favouriteTracks,
     favouritesCount,
     toggleFavourite,
