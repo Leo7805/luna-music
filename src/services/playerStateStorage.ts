@@ -13,6 +13,7 @@ export const DEFAULT_STATE: StoredPlaybackState = {
   shuffle: false,
   lastTrackId: null,
   lastPosition: 0,
+  wasPlaying: false,
   favourites: [],
   favouriteSnapshots: {},
   queueTrackIds: [],
@@ -20,10 +21,13 @@ export const DEFAULT_STATE: StoredPlaybackState = {
 };
 
 /**
- * Persists player state to both IndexedDB and localStorage for instant hydration.
+ * Synchronously merges and persists player state into localStorage.
+ * Safe for critical lifecycle events like beforeunload/pagehide where async IDB writes may not finish.
  */
-export async function storePlaybackState(state: Partial<StoredPlaybackState>): Promise<void> {
-  const current = await getStoredPlaybackState();
+export function storePlaybackStateSync(
+  state: Partial<StoredPlaybackState>
+): StoredPlaybackState {
+  const current = getStoredPlaybackStateSync();
   const merged: StoredPlaybackState = {
     ...current,
     ...state,
@@ -35,6 +39,35 @@ export async function storePlaybackState(state: Partial<StoredPlaybackState>): P
     }
   } catch {
     // Ignore localStorage quota errors
+  }
+
+  return merged;
+}
+
+/**
+ * Persists player state to both IndexedDB and localStorage for instant hydration.
+ */
+export async function storePlaybackState(state: Partial<StoredPlaybackState>): Promise<void> {
+  const hasLocalCache =
+    typeof localStorage !== 'undefined' &&
+    Boolean(localStorage.getItem(LOCAL_STORAGE_STATE_KEY));
+
+  let merged: StoredPlaybackState;
+  if (hasLocalCache) {
+    merged = storePlaybackStateSync(state);
+  } else {
+    const current = await getStoredPlaybackState();
+    merged = {
+      ...current,
+      ...state,
+    };
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(merged));
+      }
+    } catch {
+      // Ignore localStorage quota errors
+    }
   }
 
   try {

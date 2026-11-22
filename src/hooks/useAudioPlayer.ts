@@ -2,7 +2,11 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { TrackItem, RepeatMode, FileStatus } from '../types/music';
 import { isSameTrack } from '../utils/musicTree';
 import { isTrackPlayable } from '../utils/audioFileTypes';
-import { resolveInitialQueue, resolveInitialTrack } from '../utils/playbackSession';
+import {
+  resolveInitialQueue,
+  resolveInitialTrack,
+  isPageReloadNavigation,
+} from '../utils/playbackSession';
 import { reconcileQueueWithLibrary, computeQueueRemovalTransition } from '../utils/queueMetadata';
 import { storePlaybackState, getStoredPlaybackStateSync } from '../services/idbStorage';
 import { useArtworkColors } from './useArtworkColors';
@@ -11,6 +15,7 @@ import { usePlaybackQueue } from './usePlaybackQueue';
 import { useAudioEngine } from './useAudioEngine';
 import { usePlaybackPreferences } from './usePlaybackPreferences';
 import { usePlaybackPersistence } from './usePlaybackPersistence';
+import { usePlaybackSessionRestore } from './usePlaybackSessionRestore';
 import { useSourceRemovalSync } from './useSourceRemovalSync';
 import { SourceRemovalEvent } from '../utils/queueSourceRemoval';
 
@@ -54,8 +59,10 @@ export function useAudioPlayer({
   hasRegisteredSources = true,
   needsPermission = false,
 }: UseAudioPlayerProps = {}) {
-  // Synchronous restoration from localStorage cache for instant hydration
-  const syncState = getStoredPlaybackStateSync();
+  // Capture initial stored state and navigation type once on mount to avoid hydration races
+  const initialSyncStateRef = useRef(getStoredPlaybackStateSync());
+  const syncState = initialSyncStateRef.current;
+  const isReloadRef = useRef<boolean>(isPageReloadNavigation());
   const effectiveInitialVolume =
     initialVolume !== undefined ? initialVolume : (syncState.volume ?? 0.8);
   const effectiveInitialMuted =
@@ -128,38 +135,24 @@ export function useAudioPlayer({
   const lyrics = useTrackLyrics(currentTrack);
   const ambientColors = useArtworkColors(currentTrack?.metadata.artworkUrl);
 
-  // Restore initial track and queue on first load without auto-initiating playback
+  // Restore initial track, queue, and playing intent once library tracks are available
   const hasHydratedSessionRef = useRef<boolean>(false);
 
-  useEffect(() => {
-    if (hasHydratedSessionRef.current) return;
-    const availableTracks = libraryTracks && libraryTracks.length > 0 ? libraryTracks : queue;
-    if (availableTracks.length === 0) return;
-
-    const restoredQueue = resolveInitialQueue({
-      storedQueueIds: syncState.queueTrackIds,
-      effectiveInitialTrackId,
-      libraryTracks: availableTracks,
-    });
-
-    if (restoredQueue.length > 0) {
-      hasHydratedSessionRef.current = true;
-      setQueueImmediate(restoredQueue);
-
-      const targetTrack =
-        resolveInitialTrack({
-          effectiveInitialTrackId,
-          libraryTracks: availableTracks,
-          queue: restoredQueue,
-        }) || restoredQueue[0];
-
-      if (targetTrack) {
-        setCurrentTrack(targetTrack);
-        queueControls.resetShuffleCycle(targetTrack);
-        loadAudioSource(targetTrack, false);
-      }
-    }
-  }, [libraryTracks, queue, effectiveInitialTrackId, setQueueImmediate, loadAudioSource, syncState.queueTrackIds]);
+  usePlaybackSessionRestore({
+    libraryTracks,
+    queue,
+    storedQueueIds: syncState.queueTrackIds,
+    effectiveInitialTrackId,
+    effectiveInitialPosition,
+    wasPlaying: syncState.wasPlaying,
+    isReload: isReloadRef.current,
+    hasExplicitSourceRemoval: Boolean(lastSourceRemoval),
+    hasHydratedSessionRef,
+    setQueueImmediate,
+    setCurrentTrack,
+    resetShuffleCycle: queueControls.resetShuffleCycle,
+    loadAudioSource,
+  });
 
   // Keep Queue and currentTrack metadata (durations, artwork, lyrics) synced with canonical libraryTracks
   useEffect(() => {
@@ -410,7 +403,7 @@ export function useAudioPlayer({
         );
       setQueueImmediate(nextQueue);
       if (nextQueue.length === 0) {
-        storePlaybackState({ queueTrackIds: [], queueIndex: 0, lastTrackId: null, lastPosition: 0 });
+        storePlaybackState({ queueTrackIds: [], queueIndex: 0, lastTrackId: null, lastPosition: 0, wasPlaying: false });
       }
       if (wasCurrent) {
         clearPlayNextOverride();
@@ -453,6 +446,7 @@ export function useAudioPlayer({
   usePlaybackPersistence({
     queue, currentTrack, isPlaying: audioEngine.isPlaying, audioRef: audioEngine.audioRef,
     allowEmptyPersist: hasHydratedSessionRef.current || Boolean(lastSourceRemoval),
+    isHydrated: hasHydratedSessionRef.current,
   });
 
   return {

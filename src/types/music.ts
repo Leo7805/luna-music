@@ -149,6 +149,7 @@ export interface StoredPlaybackState {
   shuffle: boolean;
   lastTrackId: string | null;
   lastPosition: number;
+  wasPlaying?: boolean;
   favourites: string[];
   favouriteSnapshots?: Record<string, FavouriteTrackSnapshot>;
   queueTrackIds?: string[];

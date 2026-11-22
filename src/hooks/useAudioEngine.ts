@@ -1,8 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { TrackItem, FileStatus } from '../types/music';
-import { extractAudioMetadata } from '../utils/metadata';
 import { evaluatePlaybackMediaError } from '../utils/audioFileTypes';
+import { clampSeekPosition, classifyPlayRejection } from '../utils/playbackSession';
+import { resolvePlayableAudioFile } from '../utils/audioSourceLoader';
 import { storePlaybackState } from '../services/idbStorage';
+
+export interface LoadAudioSourceOptions {
+  preservePendingSeek?: boolean;
+  initialSeekPosition?: number;
+  isAutoResume?: boolean;
+}
 
 export interface UseAudioEngineProps {
   initialVolume?: number;
@@ -26,7 +33,7 @@ export interface UseAudioEngineReturn {
   isMuted: boolean;
   playbackError: string | null;
   setPlaybackError: (err: string | null) => void;
-  loadAudioSource: (track: TrackItem, autoPlay?: boolean) => Promise<void>;
+  loadAudioSource: (track: TrackItem, autoPlay?: boolean, options?: LoadAudioSourceOptions) => Promise<void>;
   stopPlayback: () => void;
   togglePlay: (onPlayFallback: () => void) => void;
   seekTo: (timeInSeconds: number) => void;
@@ -62,6 +69,7 @@ export function useAudioEngine({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const activeUrlRef = useRef<string | null>(null);
   const pendingSeekRef = useRef<number | null>(initialPosition > 0 ? initialPosition : null);
+  const pendingAutoPlayRef = useRef<{ requestId: number; isAutoResume: boolean } | null>(null);
   const loadRequestIdRef = useRef<number>(0);
   const loadedAudioTrackIdRef = useRef<string | null>(null);
 
@@ -88,12 +96,33 @@ export function useAudioEngine({
     audioRef.current = audio;
   }
 
+  const attemptAudioPlay = useCallback((audio: HTMLAudioElement, requestId: number, isAutoResume: boolean) => {
+    audio.play().catch((err: unknown) => {
+      if (loadRequestIdRef.current !== requestId) return;
+      const result = classifyPlayRejection(err, isAutoResume);
+      if (result.ignore) return;
+      if (result.isAutoplayBlocked) {
+        console.warn('[Luna Music] Autoplay policy blocked resume:', err);
+      } else {
+        console.warn('[Luna Music] Playback play() rejected:', err);
+      }
+      setIsPlaying(false);
+      if (result.message) setPlaybackError(result.message);
+    });
+  }, []);
+
   // Audio source loader with race-condition safety
-  const loadAudioSource = useCallback(async (track: TrackItem, autoPlay = true) => {
+  const loadAudioSource = useCallback(async (track: TrackItem, autoPlay = true, options?: LoadAudioSourceOptions) => {
     const audio = audioRef.current;
     if (!audio) return;
 
-    if (autoPlay) {
+    pendingAutoPlayRef.current = null;
+    if (options?.preservePendingSeek) {
+      if (typeof options.initialSeekPosition === 'number' && options.initialSeekPosition > 0) {
+        pendingSeekRef.current = options.initialSeekPosition;
+        setCurrentTime(options.initialSeekPosition);
+      }
+    } else if (autoPlay) {
       pendingSeekRef.current = null;
       setCurrentTime(0);
     }
@@ -109,125 +138,49 @@ export function useAudioEngine({
     }
 
     try {
-      if (track.status === 'unreadable') {
+      const resolved = await resolvePlayableAudioFile(
+        track,
+        () => loadRequestIdRef.current === requestId,
+        {
+          onTrackStatusChanged: onTrackStatusChangedRef.current,
+          onTrackUpdated: onTrackUpdatedRef.current,
+        }
+      );
+
+      if (resolved.aborted || loadRequestIdRef.current !== requestId) return;
+
+      if (!resolved.file) {
         audio.pause();
         audio.removeAttribute('src');
         audio.load();
         setIsPlaying(false);
         throw new Error(
-          'Cannot access this audio file. Please check file permissions or reopen the music folder.'
-        );
-      }
-
-      let file: File | Blob | null = null;
-      if (track.handle) {
-        try {
-          file = await track.handle.getFile();
-        } catch {
-          if (loadRequestIdRef.current !== requestId) return;
-          track.status = 'unreadable';
-          if (onTrackStatusChangedRef.current) {
-            onTrackStatusChangedRef.current(track.id, 'unreadable');
-          }
-          audio.pause();
-          audio.removeAttribute('src');
-          audio.load();
-          setIsPlaying(false);
-          throw new Error(
+          resolved.errorMessage ||
             'Cannot access this audio file. Please check file permissions or reopen the music folder.'
-          );
-        }
-      } else if (track.file) {
-        file = track.file;
-      }
-
-      if (loadRequestIdRef.current !== requestId) return;
-
-      if (!file) {
-        track.status = 'unreadable';
-        if (onTrackStatusChangedRef.current) {
-          onTrackStatusChangedRef.current(track.id, 'unreadable');
-        }
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-        setIsPlaying(false);
-        throw new Error(
-          'Cannot access this audio file. Please check file permissions or reopen the music folder.'
         );
       }
 
-      if (file.size === 0) {
-        track.status = 'empty';
-        track.size = 0;
-        if (onTrackStatusChangedRef.current) onTrackStatusChangedRef.current(track.id, 'empty', 0);
-        audio.pause();
-        audio.removeAttribute('src');
-        audio.load();
-        setIsPlaying(false);
-        throw new Error(
-          'This audio file is empty (0 bytes). Please check or replace the original file.'
-        );
-      }
-
-      // If the file was previously abnormal, or modified/replaced on disk, refresh status and metadata
-      const isStatusAbnormal = track.status && track.status !== 'normal';
-      const isFileModified =
-        (track.lastModified && 'lastModified' in file && track.lastModified !== (file as File).lastModified) ||
-        track.size !== file.size;
-
-      if (isStatusAbnormal || isFileModified) {
-        track.status = 'normal';
-        track.size = file.size;
-        if ('lastModified' in file) {
-          track.lastModified = (file as File).lastModified;
-        }
-
-        let freshMetadata: Partial<TrackItem['metadata']> | undefined;
-        try {
-          const extracted = await extractAudioMetadata(file, track.name);
-          if (extracted && loadRequestIdRef.current === requestId) {
-            if (
-              track.metadata.artworkUrl &&
-              extracted.artworkUrl &&
-              track.metadata.artworkUrl !== extracted.artworkUrl
-            ) {
-              URL.revokeObjectURL(track.metadata.artworkUrl);
-            }
-
-            freshMetadata = extracted;
-            track.metadata = {
-              ...track.metadata,
-              ...extracted,
-              isMetadataLoaded: true,
-            };
-            if (onTrackUpdatedRef.current) onTrackUpdatedRef.current({ ...track });
-          }
-        } catch {
-          // Ignore metadata parse error on raw audio
-        }
-
-        if (loadRequestIdRef.current !== requestId) return;
-
-        if (onTrackStatusChangedRef.current) onTrackStatusChangedRef.current(track.id, 'normal', file.size, freshMetadata);
-      }
-
-      if (loadRequestIdRef.current !== requestId) return;
-
-      const objectUrl = URL.createObjectURL(file);
+      const objectUrl = URL.createObjectURL(resolved.file);
       activeUrlRef.current = objectUrl;
       loadedAudioTrackIdRef.current = track.id;
       audio.src = objectUrl;
       audio.load();
 
       if (autoPlay) {
-        audio.play().catch((err: Error) => {
-          if (err.name !== 'AbortError') {
-            console.warn('[Luna Music] Autoplay blocked or interrupted:', err);
-            setPlaybackError(`Playback failed: ${err.message}`);
-            setIsPlaying(false);
+        const isAutoResume = Boolean(options?.isAutoResume);
+        if (pendingSeekRef.current !== null) {
+          if (audio.readyState >= 1) {
+            const targetPos = clampSeekPosition(pendingSeekRef.current, audio.duration);
+            audio.currentTime = targetPos;
+            setCurrentTime(targetPos);
+            pendingSeekRef.current = null;
+            attemptAudioPlay(audio, requestId, isAutoResume);
+          } else {
+            pendingAutoPlayRef.current = { requestId, isAutoResume };
           }
-        });
+        } else {
+          attemptAudioPlay(audio, requestId, isAutoResume);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load audio';
@@ -235,7 +188,7 @@ export function useAudioEngine({
       setPlaybackError(msg);
       setIsPlaying(false);
     }
-  }, []);
+  }, [attemptAudioPlay]);
 
   // Toggle play/pause
   const togglePlay = useCallback(
@@ -255,21 +208,19 @@ export function useAudioEngine({
       }
 
       if (audio.paused) {
+        pendingAutoPlayRef.current = null;
         if (pendingSeekRef.current !== null) {
-          audio.currentTime = pendingSeekRef.current;
-          setCurrentTime(pendingSeekRef.current);
+          const targetPos = clampSeekPosition(pendingSeekRef.current, audio.duration);
+          audio.currentTime = targetPos;
+          setCurrentTime(targetPos);
           pendingSeekRef.current = null;
         }
-        audio.play().catch((err: Error) => {
-          if (err.name !== 'AbortError') {
-            setPlaybackError(`Playback failed: ${err.message}`);
-          }
-        });
+        attemptAudioPlay(audio, loadRequestIdRef.current, false);
       } else {
         audio.pause();
       }
     },
-    []
+    [attemptAudioPlay]
   );
 
   // Seek absolute time
@@ -349,7 +300,10 @@ export function useAudioEngine({
     const audio = audioRef.current;
     if (!audio) return;
 
-    const onPlay = () => setIsPlaying(true);
+    const onPlay = () => {
+      setIsPlaying(true);
+      setPlaybackError(null);
+    };
     const onPause = () => setIsPlaying(false);
     const onTimeUpdate = () => setCurrentTime(audio.currentTime);
     const syncMeasuredDuration = (measured: number) => {
@@ -365,9 +319,15 @@ export function useAudioEngine({
     const onLoadedMetadata = () => {
       syncMeasuredDuration(audio.duration);
       if (pendingSeekRef.current !== null) {
-        audio.currentTime = pendingSeekRef.current;
-        setCurrentTime(pendingSeekRef.current);
+        const targetPos = clampSeekPosition(pendingSeekRef.current, audio.duration);
+        audio.currentTime = targetPos;
+        setCurrentTime(targetPos);
         pendingSeekRef.current = null;
+      }
+      if (pendingAutoPlayRef.current && pendingAutoPlayRef.current.requestId === loadRequestIdRef.current) {
+        const { requestId, isAutoResume } = pendingAutoPlayRef.current;
+        pendingAutoPlayRef.current = null;
+        attemptAudioPlay(audio, requestId, isAutoResume);
       }
     };
 
@@ -432,6 +392,7 @@ export function useAudioEngine({
     loadRequestIdRef.current++;
     loadedAudioTrackIdRef.current = null;
     pendingSeekRef.current = null;
+    pendingAutoPlayRef.current = null;
     if (activeUrlRef.current) {
       URL.revokeObjectURL(activeUrlRef.current);
       activeUrlRef.current = null;
