@@ -1,10 +1,9 @@
 import { TrackItem } from '../types/music';
+import { createTrackReferenceResolver } from './trackReferenceResolver';
 
 /**
  * Authoritative check if a track matches the user's favourites set.
- * Checks canonical id, aliases, and relative path matching.
- * When libraryTracks is provided, legacy relative path matching is only applied
- * if the relative path unambiguously refers to exactly one track in the library.
+ * Checks canonical id, aliases, and unambiguous legacy relative-path matching.
  */
 export function isFavouriteTrack(
   track: TrackItem,
@@ -15,17 +14,12 @@ export function isFavouriteTrack(
   if (favourites.has(track.id)) return true;
   if (track.aliases && track.aliases.some((alias) => favourites.has(alias))) return true;
 
-  // Check legacy relative path matching (bare relativePath without folder prefix)
+  // Check legacy bare relative path matching (without folder prefix)
   if (favourites.has(track.relativePath)) {
     if (libraryTracks && libraryTracks.length > 0) {
-      const matchCount = libraryTracks.filter(
-        (t) => t.relativePath === track.relativePath
-      ).length;
-      if (matchCount === 1) {
-        return true;
-      }
-      // Ambiguous: multiple tracks across independent folders share this relative path
-      return false;
+      const resolver = createTrackReferenceResolver(libraryTracks);
+      const res = resolver.resolve(track.relativePath, { allowRelativePathFallback: true });
+      return Boolean(res.track && res.track.id === track.id);
     }
     return true;
   }
@@ -40,10 +34,10 @@ export interface FavouriteResolutionResult {
 }
 
 /**
- * Resolves stored favourite IDs against the library tracks.
+ * Resolves stored favourite IDs against the library tracks using the shared resolver.
  * - Deduplicates resolved tracks by canonical ID (avoiding inflated counts).
  * - Preserves unresolved favourite IDs so they are not lost when folders are detached.
- * - Only migrates legacy relativePath matches when the match is strictly unambiguous (exactly 1 track).
+ * - Migrates resolved alias and unambiguous relativePath matches to current canonical IDs.
  * - Preserves ambiguous IDs in unresolvedIds to prevent marking the wrong track.
  */
 export function resolveFavouriteTracks(
@@ -55,54 +49,18 @@ export function resolveFavouriteTracks(
   const matchedFavIds = new Set<string>();
   const migratedMap = new Map<string, string>();
 
-  const trackById = new Map<string, TrackItem>();
-  const trackByAlias = new Map<string, TrackItem>();
-  const tracksByRelativePath = new Map<string, TrackItem[]>();
-
-  for (const track of libraryTracks) {
-    trackById.set(track.id, track);
-    if (track.aliases) {
-      for (const alias of track.aliases) {
-        trackByAlias.set(alias, track);
-      }
-    }
-    const relList = tracksByRelativePath.get(track.relativePath);
-    if (relList) {
-      relList.push(track);
-    } else {
-      tracksByRelativePath.set(track.relativePath, [track]);
-    }
-  }
+  const resolver = createTrackReferenceResolver(libraryTracks);
 
   for (const favId of favourites) {
-    let matchedTrack: TrackItem | undefined = trackById.get(favId);
-
-    if (!matchedTrack) {
-      matchedTrack = trackByAlias.get(favId);
-      if (matchedTrack) {
-        migratedMap.set(favId, matchedTrack.id);
+    const res = resolver.resolve(favId, { allowRelativePathFallback: true });
+    if (res.track) {
+      if (res.matchedBy !== 'id' && res.track.id !== favId) {
+        migratedMap.set(favId, res.track.id);
       }
-    }
-
-    if (!matchedTrack) {
-      let relativePathCandidate = favId;
-      const colonIdx = favId.indexOf(':');
-      if (colonIdx >= 0) {
-        relativePathCandidate = favId.slice(colonIdx + 1);
-      }
-      const candidates = tracksByRelativePath.get(relativePathCandidate);
-      // Strictly require unambiguous match (exactly 1 track across all imported folders)
-      if (candidates && candidates.length === 1) {
-        matchedTrack = candidates[0];
-        migratedMap.set(favId, matchedTrack.id);
-      }
-    }
-
-    if (matchedTrack) {
       matchedFavIds.add(favId);
-      if (!resolvedTrackIds.has(matchedTrack.id)) {
-        resolvedTrackIds.add(matchedTrack.id);
-        resolvedTracks.push(matchedTrack);
+      if (!resolvedTrackIds.has(res.track.id)) {
+        resolvedTrackIds.add(res.track.id);
+        resolvedTracks.push(res.track);
       }
     }
   }

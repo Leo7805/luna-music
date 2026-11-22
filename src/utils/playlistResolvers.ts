@@ -1,5 +1,6 @@
 import { TrackItem, PlaylistTrackReference } from '../types/music';
 import { getStoredPlaylists, storePlaylists } from '../services/idbStorage';
+import { createTrackReferenceResolver } from './trackReferenceResolver';
 
 /**
  * Updates stored playlists when tracks migrate to canonical IDs upon source removal.
@@ -34,31 +35,25 @@ export async function migratePlaylistsTrackIds(idMigrations: Map<string, string>
 
 /**
  * Resolves an ordered list of PlaylistTrackReferences against library tracks,
- * using canonical track IDs and aliases.
- * If a track is not currently loaded in the library (e.g. source folder disconnected or offline),
- * creates a placeholder TrackItem with status 'unreadable' preserving its metadata.
+ * using the shared track reference resolver (canonical ID, verified aliases,
+ * and unambiguous relativePath fallback).
+ * Does not prematurely mutate persisted Playlist Track IDs on relativePath fallback.
+ * If a track is unresolved or ambiguous, creates a placeholder TrackItem with
+ * status 'unreadable' preserving its saved metadata and Playlist order.
  */
 export function resolvePlaylistTracks(
   references: PlaylistTrackReference[],
   libraryTracks: TrackItem[]
 ): TrackItem[] {
-  const idMap = new Map<string, TrackItem>();
-  for (const track of libraryTracks) {
-    idMap.set(track.id, track);
-    if (track.aliases) {
-      for (const alias of track.aliases) {
-        idMap.set(alias, track);
-      }
-    }
-  }
+  const resolver = createTrackReferenceResolver(libraryTracks);
 
   return references.map((ref) => {
-    const matched = idMap.get(ref.trackId);
-    if (matched) {
-      return matched;
+    const { track } = resolver.resolve(ref.trackId, { allowRelativePathFallback: true });
+    if (track) {
+      return track;
     }
 
-    // Source is offline / disconnected: preserve entry with 'unreadable' status
+    // Source is offline, disconnected, or ambiguous: preserve entry with 'unreadable' status
     const placeholder: TrackItem = {
       id: ref.trackId,
       name: ref.name,
