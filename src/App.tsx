@@ -17,6 +17,7 @@ import { useTheme } from './hooks/useTheme';
 import { getBreadcrumbs } from './utils/musicTree';
 import { deriveViewHeaderInfo } from './utils/libraryAggregation';
 import { getStoredNavigation, storeNavigation } from './utils/navigationStorage';
+import { isFavouriteTrack } from './utils/favouriteResolvers';
 import { LibraryView, TrackItem } from './types/music';
 
 export function App() {
@@ -232,9 +233,12 @@ export function App() {
               currentTrack={audioPlayer.currentTrack}
               isPlaying={audioPlayer.isPlaying}
               playlists={playlists.playlists}
+              favourites={library.favourites}
+              libraryTracks={libraryTracks}
               theme={theme}
               lightStyle={lightStyle}
               onPlayQueueTrack={audioPlayer.playQueueTrack}
+              onToggleFavourite={library.toggleFavourite}
               onPlayNext={audioPlayer.playNext}
               onRemoveFromQueue={audioPlayer.removeFromQueue}
               onRemoveTracksFromQueue={audioPlayer.removeTracksFromQueue}
@@ -298,8 +302,7 @@ export function App() {
         shuffle={audioPlayer.shuffle}
         isFavourite={
           audioPlayer.currentTrack
-            ? library.favourites.has(audioPlayer.currentTrack.id) ||
-              Boolean(audioPlayer.currentTrack.aliases?.some((a) => library.favourites.has(a)))
+            ? isFavouriteTrack(audioPlayer.currentTrack, library.favourites, libraryTracks)
             : false
         }
         isLyricsOpen={isLyricsOpen}

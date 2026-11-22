@@ -5,24 +5,27 @@ import {
   ListPlus,
   Info,
   Trash2,
-  MoreHorizontal,
   CheckSquare,
   Square,
 } from 'lucide-react';
 import { TrackItem } from '../types/music';
-import { formatDuration } from '../utils/formatters';
-import { useLazyArtwork } from '../hooks/useLazyArtwork';
+import { TrackRowLayout } from './TrackRowLayout';
+import { TrackPlayingIndicator } from './TrackPlayingIndicator';
+import { TrackFavouriteButton } from './TrackFavouriteButton';
+import { TrackActionMenuTrigger } from './TrackActionMenuTrigger';
 
 export interface NowPlayingQueueRowProps {
   track: TrackItem;
   originalIndex: number;
   isCurrent: boolean;
   isPlaying: boolean;
+  isFavourite?: boolean;
   isSelectMode: boolean;
   isSelected: boolean;
   isMenuOpen: boolean;
   rowRef?: React.Ref<HTMLDivElement>;
   onPlayQueueTrack: (track: TrackItem) => void;
+  onToggleFavourite?: (trackId: string) => void;
   onToggleSelect: (index: number) => void;
   onToggleMenu: (index: number | null) => void;
   onPlayNext?: (track: TrackItem) => void;
@@ -36,11 +39,13 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
   originalIndex,
   isCurrent,
   isPlaying,
+  isFavourite = false,
   isSelectMode,
   isSelected,
   isMenuOpen,
   rowRef,
   onPlayQueueTrack,
+  onToggleFavourite,
   onToggleSelect,
   onToggleMenu,
   onPlayNext,
@@ -48,11 +53,9 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
   onOpenTrackInfo,
   onRemoveFromQueue,
 }) => {
-  const artworkRef = useLazyArtwork<HTMLDivElement>(track);
-
   const handleRowClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button, [data-queue-row-menu]')) return;
+    if (target.closest('button, [data-queue-row-menu], input, a')) return;
     if (isSelectMode) {
       if (!isCurrent) onToggleSelect(originalIndex);
       return;
@@ -65,164 +68,86 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
     onToggleMenu(isMenuOpen ? null : originalIndex);
   };
 
-  return (
-    <div
-      ref={rowRef}
-      data-testid={`queue-row-${originalIndex}`}
-      data-current={isCurrent ? 'true' : undefined}
-      tabIndex={0}
-      role="button"
-      onClick={handleRowClick}
-      onContextMenu={handleContextMenu}
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const target = e.target as HTMLElement;
+    if (
+      target !== e.currentTarget &&
+      target.closest('button, [data-queue-row-menu], input, a')
+    ) {
+      return;
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      if (isSelectMode) {
+        if (!isCurrent) onToggleSelect(originalIndex);
+      } else {
+        onPlayQueueTrack(track);
+      }
+    }
+  };
+
+  const leadingSlot = isSelectMode ? (
+    <button
+      type="button"
+      disabled={isCurrent}
+      onMouseDown={(e) => e.stopPropagation()}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!isCurrent) onToggleSelect(originalIndex);
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          if (isSelectMode) {
-            if (!isCurrent) onToggleSelect(originalIndex);
-          } else {
-            onPlayQueueTrack(track);
-          }
+          e.stopPropagation();
         }
       }}
-      className="group relative grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.2fr)_72px_44px] gap-3 items-center px-4 py-2.5 rounded-xl border border-transparent text-xs transition-colors duration-150 cursor-pointer hover:bg-[var(--bg-hover)]/70 dark:hover:bg-white/[0.04] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 focus-visible:border-transparent"
+      aria-label={
+        isCurrent
+          ? 'Currently playing track cannot be bulk removed'
+          : `Select ${track.metadata.title || track.name}`
+      }
+      title={isCurrent ? 'Currently playing track is protected' : undefined}
+      data-testid={`queue-checkbox-${originalIndex}`}
+      className="p-1 rounded text-slate-400 hover:text-[var(--accent-primary)] dark:hover:text-indigo-400 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50"
     >
-      {/* Col 1: Checkbox (in select mode) OR Equalizer / Original Queue Number */}
-      <div className="flex items-center justify-center">
-        {isSelectMode ? (
-          <button
-            type="button"
-            disabled={isCurrent}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (!isCurrent) onToggleSelect(originalIndex);
-            }}
-            aria-label={isCurrent ? 'Currently playing track cannot be bulk removed' : `Select ${track.metadata.title || track.name}`}
-            title={isCurrent ? 'Currently playing track is protected' : undefined}
-            data-testid={`queue-checkbox-${originalIndex}`}
-            className="p-1 rounded text-slate-400 hover:text-[var(--accent-primary)] dark:hover:text-indigo-400 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
-          >
-            {isSelected ? (
-              <CheckSquare className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
-            ) : (
-              <Square className="w-4 h-4" />
-            )}
-          </button>
-        ) : isCurrent ? (
-          <span
-            data-testid="queue-playing-indicator"
-            data-playing={isPlaying ? 'true' : 'false'}
-            aria-label={isPlaying ? 'Playing' : 'Paused'}
-            className="w-3.5 h-3.5 inline-flex items-end justify-center gap-[2px]"
-          >
-            <span
-              className={`w-[2.5px] rounded-full bg-[var(--accent-primary)] dark:bg-indigo-300 ${
-                isPlaying ? 'animate-bar-1' : 'h-[45%]'
-              }`}
-            />
-            <span
-              className={`w-[2.5px] rounded-full bg-[var(--accent-primary)] dark:bg-indigo-300 ${
-                isPlaying ? 'animate-bar-2' : 'h-[85%]'
-              }`}
-            />
-            <span
-              className={`w-[2.5px] rounded-full bg-[var(--accent-primary)] dark:bg-indigo-300 ${
-                isPlaying ? 'animate-bar-3' : 'h-[60%]'
-              }`}
-            />
-          </span>
-        ) : (
-          <span className="text-[11px] tabular-nums text-[var(--text-secondary)] dark:text-slate-500">
-            {originalIndex + 1}
-          </span>
-        )}
-      </div>
+      {isSelected ? (
+        <CheckSquare className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
+      ) : (
+        <Square className="w-4 h-4" />
+      )}
+    </button>
+  ) : isCurrent ? (
+    <TrackPlayingIndicator
+      isPlaying={isPlaying}
+      testId="queue-playing-indicator"
+    />
+  ) : (
+    <span className="text-[11px] tabular-nums text-[var(--text-secondary)] dark:text-slate-500">
+      {originalIndex + 1}
+    </span>
+  );
 
-      {/* Col 2: Artwork + Title + Artist */}
-      <div className="flex items-center gap-3 min-w-0">
-        <div
-          ref={artworkRef}
-          className="w-9 h-9 rounded-lg shrink-0 overflow-hidden border border-[var(--border-subtle)] dark:border-white/[0.08] flex items-center justify-center"
-          style={{
-            background:
-              track.metadata.placeholderGradient ||
-              'linear-gradient(135deg, #4338ca, #6d28d9)',
-          }}
-        >
-          {track.metadata.artworkUrl ? (
-            <img
-              src={track.metadata.artworkUrl}
-              alt={track.metadata.title || track.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-[9px] font-bold text-white/70 uppercase">
-              {(track.metadata.title || track.name).substring(0, 2)}
-            </span>
-          )}
-        </div>
+  const actionsSlot = (
+    <>
+      <TrackFavouriteButton
+        isFavourite={isFavourite}
+        onToggle={() => onToggleFavourite?.(track.id)}
+        testId={`queue-favourite-button-${originalIndex}`}
+      />
 
-        <div className="min-w-0 flex-1">
-          <p
-            className={`truncate text-xs ${
-              isCurrent
-                ? 'font-semibold text-[var(--accent-primary)] dark:text-white'
-                : 'font-medium text-[var(--text-primary)]/90 dark:text-slate-200'
-            }`}
-            title={track.metadata.title || track.name}
-          >
-            {track.metadata.title || track.name}
-          </p>
-          <p
-            className={`truncate text-[11px] mt-0.5 ${
-              isCurrent
-                ? 'text-[var(--text-primary)]/75 dark:text-slate-300'
-                : 'text-[var(--text-secondary)] dark:text-slate-400'
-            }`}
-          >
-            {track.metadata.artist || 'Unknown Artist'}
-          </p>
-        </div>
-      </div>
-
-      {/* Col 3: Album */}
-      <div className="truncate text-xs text-[var(--text-secondary)] dark:text-slate-400">
-        {track.metadata.album || 'Unknown Album'}
-      </div>
-
-      {/* Col 4: Duration */}
-      <div
-        className={`text-right text-[11px] font-mono tabular-nums ${
-          isCurrent
-            ? 'text-[var(--accent-primary)] dark:text-slate-200 font-medium'
-            : 'text-[var(--text-secondary)] dark:text-slate-400'
-        }`}
-      >
-        {formatDuration(track.metadata.duration)}
-      </div>
-
-      {/* Col 5: Context Menu (...) */}
       <div className="relative flex justify-end" data-queue-row-menu>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleMenu(isMenuOpen ? null : originalIndex);
-          }}
-          aria-label={`Queue actions for ${track.metadata.title || track.name}`}
-          title="Track actions"
-          data-testid={`queue-menu-button-${originalIndex}`}
-          className={`p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] dark:text-slate-400 dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] transition-opacity cursor-pointer ${
-            isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'
-          }`}
-        >
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+        <TrackActionMenuTrigger
+          isOpen={isMenuOpen}
+          onToggle={() => onToggleMenu(isMenuOpen ? null : originalIndex)}
+          ariaLabel={`Queue actions for ${track.metadata.title || track.name}`}
+          testId={`queue-menu-button-${originalIndex}`}
+        />
 
         {isMenuOpen && (
           <div
             data-testid={`queue-menu-dropdown-${originalIndex}`}
             className="absolute right-0 top-full mt-1 w-48 py-1.5 rounded-xl bg-[var(--bg-panel)] dark:bg-[#0c192c] border border-[var(--border-subtle)] dark:border-white/[0.1] shadow-xl z-40 text-xs"
             onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
           >
             {!isCurrent && (
               <button
@@ -295,6 +220,25 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
           </div>
         )}
       </div>
-    </div>
+    </>
+  );
+
+  return (
+    <TrackRowLayout
+      track={track}
+      isCurrent={isCurrent}
+      isSelected={isSelected}
+      isMenuOpen={isMenuOpen}
+      currentHighlight="text-only"
+      leadingSlot={leadingSlot}
+      actionsSlot={actionsSlot}
+      rowRef={rowRef}
+      testId={`queue-row-${originalIndex}`}
+      tabIndex={0}
+      role="button"
+      onClick={handleRowClick}
+      onContextMenu={handleContextMenu}
+      onKeyDown={handleKeyDown}
+    />
   );
 };

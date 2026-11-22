@@ -12,7 +12,7 @@ export function TrackThumbnail({ metadata, track }: TrackThumbnailProps) {
   return (
     <div
       ref={artworkRef}
-      className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden shadow-sm"
+      className="w-10 h-10 rounded-lg shrink-0 flex items-center justify-center overflow-hidden border border-[var(--border-subtle)]/60 dark:border-white/[0.08]"
       style={{
         background:
           metadata.placeholderGradient ||

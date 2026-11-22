@@ -19,16 +19,24 @@ import { PlaylistModal } from './PlaylistModal';
 import { TrackPlaylistModals } from './TrackPlaylistModals';
 import { TrackInfoModal } from './TrackInfoModal';
 import { NowPlayingQueueRow } from './NowPlayingQueueRow';
+import { TRACK_ROW_GRID_CLASS } from './TrackRowLayout';
 import { calculateQueueScrollOffset } from '../utils/queueScroll';
+import { isFavouriteTrack } from '../utils/favouriteResolvers';
+
+const EMPTY_FAVOURITES = new Set<string>();
+const EMPTY_TRACKS: TrackItem[] = [];
 
 export interface NowPlayingViewProps {
   queue: TrackItem[];
   currentTrack: TrackItem | null;
   isPlaying: boolean;
   playlists: Playlist[];
+  favourites?: Set<string>;
+  libraryTracks?: TrackItem[];
   theme: Theme;
   lightStyle: LightStyle;
   onPlayQueueTrack: (track: TrackItem) => void;
+  onToggleFavourite?: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => void;
   onRemoveFromQueue: (index: number) => void;
   onRemoveTracksFromQueue: (indices: number[]) => number;
@@ -45,9 +53,12 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
   currentTrack,
   isPlaying,
   playlists,
+  favourites = EMPTY_FAVOURITES,
+  libraryTracks = EMPTY_TRACKS,
   theme,
   lightStyle,
   onPlayQueueTrack,
+  onToggleFavourite,
   onPlayNext,
   onRemoveFromQueue,
   onRemoveTracksFromQueue,
@@ -332,7 +343,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
         ) : (
           <>
             {/* Table Headings */}
-            <div className="grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.2fr)_72px_44px] gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] dark:text-slate-400 border-b border-[var(--border-subtle)] dark:border-white/[0.06] select-none">
+            <div className={`${TRACK_ROW_GRID_CLASS} text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] dark:text-slate-400 border-b border-[var(--border-subtle)] dark:border-white/[0.06] select-none`}>
               <div className="flex items-center justify-center">
                 {isSelectMode ? (
                   <button
@@ -368,6 +379,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
               <div className="divide-y divide-slate-200/50 dark:divide-white/[0.03] mt-1">
                 {filteredEntries.map(({ track, originalIndex }) => {
                   const isCurrent = currentTrack ? isSameTrack(track, currentTrack) : false;
+                  const isFavourite = isFavouriteTrack(track, favourites, libraryTracks);
                   return (
                     <NowPlayingQueueRow
                       key={`${track.id}-${originalIndex}`}
@@ -375,11 +387,13 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                       originalIndex={originalIndex}
                       isCurrent={isCurrent}
                       isPlaying={isPlaying}
+                      isFavourite={isFavourite}
                       isSelectMode={isSelectMode}
                       isSelected={selectedIndices.has(originalIndex)}
                       isMenuOpen={activeMenuIndex === originalIndex}
                       rowRef={isCurrent ? activeRowRef : undefined}
                       onPlayQueueTrack={onPlayQueueTrack}
+                      onToggleFavourite={onToggleFavourite}
                       onToggleSelect={toggleSelectIndex}
                       onToggleMenu={setActiveMenuIndex}
                       onPlayNext={(t) => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, CheckSquare, Square } from 'lucide-react';
+import { TRACK_ROW_GRID_CLASS } from './TrackRowLayout';
 
 export interface TrackListHeaderProps {
   tracksCount: number;
@@ -72,7 +73,7 @@ export function TrackListHeader({
       {beforeTable}
 
       {/* Table Header */}
-      <div className="grid grid-cols-[48px_minmax(200px,2fr)_minmax(120px,1.5fr)_72px_88px] gap-3 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] dark:text-slate-400 border-b border-[var(--border-subtle)] dark:border-white/[0.06] select-none">
+      <div className={`${TRACK_ROW_GRID_CLASS} text-[11px] font-semibold uppercase tracking-wider text-[var(--text-secondary)] dark:text-slate-400 border-b border-[var(--border-subtle)] dark:border-white/[0.06] select-none`}>
         <div className="text-center flex items-center justify-center">
           {showCheckboxes ? (
             <button
