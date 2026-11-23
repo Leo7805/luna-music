@@ -62,6 +62,7 @@ export function useLibraryNavigation(
   }, [library, selectedFolderPath]);
 
   const setCurrentView = useCallback((view: LibraryView) => {
+    setSearchQuery('');
     setCurrentViewState(view);
     if (view !== 'folder') {
       setSelectedFolderPathState('');
@@ -72,12 +73,14 @@ export function useLibraryNavigation(
   }, []);
 
   const selectFolder = useCallback((path: string) => {
+    setSearchQuery('');
     setSelectedFolderPathState(path);
     setCurrentViewState('folder');
     storeNavigation({ view: 'folder', selectedFolderPath: path });
   }, []);
 
   const selectArtist = useCallback((artistName: string | null) => {
+    setSearchQuery('');
     setSelectedArtistNameState(artistName);
     setSelectedFolderPathState('');
     setCurrentViewState('artists');
@@ -85,6 +88,7 @@ export function useLibraryNavigation(
   }, []);
 
   const selectAlbum = useCallback((albumId: string | null) => {
+    setSearchQuery('');
     setSelectedAlbumIdState(albumId);
     setSelectedFolderPathState('');
     setCurrentViewState('albums');

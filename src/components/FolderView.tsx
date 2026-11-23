@@ -5,13 +5,20 @@ import { isSameTrack } from '../utils/trackIdentity';
 import { isTrackPlayable } from '../utils/audioFileTypes';
 import { TrackList, TrackListProps } from './TrackList';
 import { PlayAllButton, SelectModeButton } from './TrackListActions';
+import { TrackListEmptyState } from './TrackListEmptyState';
 import { isImportedFilesCollection } from '../utils/folderCollections';
+import {
+  filterFolderNodesByQuery,
+  filterTracksByQuery,
+  normalizeSearchQuery,
+} from '../utils/librarySearch';
 import { ImportedFilesIcon, IMPORTED_FILES_ICON_SURFACE_CLASS } from './ImportedFilesIcon';
 
 interface FolderViewProps {
   currentNode: FolderNode | null;
   isFolderOverview?: boolean;
   overviewNodes?: FolderNode[];
+  searchQuery?: string;
   renderLayout?: TrackListProps['renderLayout'];
   libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
@@ -38,6 +45,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
   currentNode,
   isFolderOverview = false,
   overviewNodes,
+  searchQuery = '',
   renderLayout,
   libraryTracks,
   currentTrackId,
@@ -77,9 +85,14 @@ export const FolderView: React.FC<FolderViewProps> = ({
     return activeLayout ? activeLayout({ actions: disabledActions, content: empty }) : empty;
   }
 
+  const hasQuery = Boolean(normalizeSearchQuery(searchQuery));
+  const visibleTracks = !isFolderOverview && hasQuery
+    ? filterTracksByQuery(currentNode.tracks, searchQuery)
+    : currentNode.tracks;
+
   const handlePlayAll = () => {
     if (!currentNode) return;
-    const playable = currentNode.tracks.filter(isTrackPlayable);
+    const playable = visibleTracks.filter(isTrackPlayable);
     if (playable.length === 0) return;
 
     const uniqueTracks: TrackItem[] = [];
@@ -99,7 +112,10 @@ export const FolderView: React.FC<FolderViewProps> = ({
     }
   };
 
-  const subfolders = isFolderOverview && overviewNodes ? overviewNodes : currentNode.subfolders;
+  const baseSubfolders = isFolderOverview && overviewNodes ? overviewNodes : currentNode.subfolders;
+  const subfolders = isFolderOverview && hasQuery
+    ? filterFolderNodesByQuery(baseSubfolders, searchQuery)
+    : baseSubfolders;
   const subfoldersSection =
     subfolders.length > 0 ? (
       <div data-testid="folder-subfolders-section" className="pb-4 pt-1">
@@ -133,6 +149,17 @@ export const FolderView: React.FC<FolderViewProps> = ({
       </div>
     ) : null;
 
+  if (isFolderOverview && hasQuery && subfolders.length === 0) {
+    return (
+      <div data-testid="folder-search-empty" className="py-16 text-center text-slate-500 dark:text-slate-400">
+        <Folder className="w-10 h-10 mx-auto mb-2.5 opacity-30 text-[var(--accent-primary)] dark:text-indigo-400" />
+        <p className="text-sm font-medium text-[var(--text-primary)] dark:text-slate-300">
+          No folders match &ldquo;{searchQuery.trim()}&rdquo;
+        </p>
+      </div>
+    );
+  }
+
   if (currentNode.tracks.length === 0 && subfolders.length > 0) {
     if (isFolderOverview) return subfoldersSection;
     if (activeLayout) {
@@ -156,10 +183,22 @@ export const FolderView: React.FC<FolderViewProps> = ({
     );
   }
 
+  if (!isFolderOverview && hasQuery && visibleTracks.length === 0 && subfoldersSection) {
+    const emptyWithSubs = (
+      <div>
+        {subfoldersSection}
+        <TrackListEmptyState emptyVariant="search" />
+      </div>
+    );
+    return activeLayout
+      ? activeLayout({ actions: disabledActions, content: emptyWithSubs })
+      : emptyWithSubs;
+  }
+
   return (
     <TrackList
       key={currentNode.id}
-      tracks={currentNode.tracks}
+      tracks={visibleTracks}
       libraryTracks={libraryTracks}
       currentTrackId={currentTrackId}
       isPlaying={isPlaying}
@@ -168,6 +207,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
       hideTrackCount={Boolean(activeLayout)}
       beforeTable={subfoldersSection}
       renderLayout={activeLayout}
+      emptyVariant={hasQuery ? 'search' : 'default'}
       onPlayAll={handlePlayAll}
       onPlayTrack={onPlayTrack}
       onTogglePlay={onTogglePlay}

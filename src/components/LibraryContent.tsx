@@ -198,7 +198,7 @@ export function LibraryContent({
           {...commonTrackListProps}
           hideTrackCount={true}
           renderLayout={unifiedLayout}
-          emptyVariant={searchQuery ? 'search' : 'default'}
+          emptyVariant={searchQuery.trim() ? 'search' : 'default'}
         />
       );
 
@@ -208,7 +208,7 @@ export function LibraryContent({
           {...commonTrackListProps}
           hideTrackCount={true}
           renderLayout={unifiedLayout}
-          emptyVariant="favourites"
+          emptyVariant={searchQuery.trim() ? 'search' : 'favourites'}
         />
       );
 
@@ -220,7 +220,7 @@ export function LibraryContent({
           renderLayout={unifiedLayout}
           onRemoveImportedFiles={removeImportedFiles}
           isImportedFilesView={true}
-          emptyVariant={searchQuery ? 'search' : 'default'}
+          emptyVariant={searchQuery.trim() ? 'search' : 'default'}
           emptyMessage="No imported files found."
         />
       );
@@ -231,11 +231,15 @@ export function LibraryContent({
           playlists={playlistList}
           selectedPlaylistId={selectedPlaylistId}
           libraryTracks={libraryTracks}
+          searchQuery={searchQuery}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}
           favourites={favourites}
           renderLayout={unifiedLayout}
-          onSelectPlaylist={selectPlaylist}
+          onSelectPlaylist={(id) => {
+            library.setSearchQuery('');
+            selectPlaylist(id);
+          }}
           onCreatePlaylist={createPlaylist}
           onRenamePlaylist={renamePlaylist}
           onDeletePlaylist={deletePlaylist}
@@ -245,6 +249,7 @@ export function LibraryContent({
             if (playable.length === 0) return;
             playQueue(playable, startIndex, shuffle);
           }}
+          onPlayQueue={playQueue}
           onPlayTrack={playTrack}
           onTogglePlay={togglePlay}
           onToggleFavourite={toggleFavourite}
@@ -268,6 +273,7 @@ export function LibraryContent({
           currentNode={currentFolderNode}
           isFolderOverview={isFolderOverview}
           overviewNodes={(folderCollections ?? deriveFolderCollections(library.folders ?? library.library?.folders ?? [])).overviewNodes}
+          searchQuery={searchQuery}
           renderLayout={isFolderOverview ? undefined : unifiedLayout}
           libraryTracks={libraryTracks}
           currentTrackId={currentTrack?.id}
@@ -296,6 +302,7 @@ export function LibraryContent({
           albums={albums}
           selectedAlbumId={selectedAlbumId}
           libraryTracks={libraryTracks}
+          searchQuery={searchQuery}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}
           favourites={favourites}
@@ -323,6 +330,7 @@ export function LibraryContent({
           artists={artists}
           selectedArtistName={selectedArtistName}
           libraryTracks={libraryTracks}
+          searchQuery={searchQuery}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}
           favourites={favourites}

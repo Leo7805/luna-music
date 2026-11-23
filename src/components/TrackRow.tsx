@@ -84,7 +84,8 @@ export function TrackRow({
 }: TrackRowProps) {
   const lastPlayClickRef = useRef<{ id: string; time: number }>({ id: '', time: 0 });
   const isFav = isFavouriteTrack(track, favourites, libraryTracks || allTracks);
-  const isMenuOpen = activeMenuTrackId === track.id;
+  const menuKey = `${track.id}-${index}`;
+  const isMenuOpen = activeMenuTrackId === menuKey;
 
   const handleRowClick = (e: React.MouseEvent) => {
     // 1. Interactive child controls: do not trigger row-level playback or selection
@@ -225,7 +226,7 @@ export function TrackRow({
       <div className="relative" data-track-menu>
         <TrackActionMenuTrigger
           isOpen={isMenuOpen}
-          onToggle={() => onToggleMenu(track.id)}
+          onToggle={() => onToggleMenu(menuKey)}
           ariaLabel={`Track actions for ${track.metadata.title || track.name}`}
           testId={`track-menu-button-${track.id}`}
         />
@@ -237,7 +238,7 @@ export function TrackRow({
             isFav={isFav}
             isPlaylistView={isPlaylistView}
             isImportedFilesView={isImportedFilesView}
-            onClose={() => onToggleMenu(track.id)}
+            onClose={() => onToggleMenu(menuKey)}
             onPlayNext={onPlayNext}
             onAddToQueue={onAddToQueue}
             onOpenPlaylistModal={onOpenPlaylistModal}

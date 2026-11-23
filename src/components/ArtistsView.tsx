@@ -2,6 +2,11 @@ import React from 'react';
 import { Play, Mic2, User } from 'lucide-react';
 import { ArtistGroup, Playlist, TrackItem } from '../types/music';
 import { isTrackPlayable } from '../utils/audioFileTypes';
+import {
+  filterArtistsByQuery,
+  filterTracksByQuery,
+  normalizeSearchQuery,
+} from '../utils/librarySearch';
 import { TrackList, TrackListProps } from './TrackList';
 import { PlayAllButton, SelectModeButton } from './TrackListActions';
 import { TrackListEmptyState } from './TrackListEmptyState';
@@ -16,6 +21,7 @@ function ArtistArtworkProbe({ track }: { track?: TrackItem }) {
 interface ArtistsViewProps {
   artists: ArtistGroup[];
   selectedArtistName: string | null;
+  searchQuery?: string;
   libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
@@ -40,6 +46,7 @@ interface ArtistsViewProps {
 export const ArtistsView: React.FC<ArtistsViewProps> = ({
   artists,
   selectedArtistName,
+  searchQuery = '',
   libraryTracks,
   currentTrackId,
   isPlaying,
@@ -60,6 +67,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
   onAddTracksToFavourites,
   onRemoveTracksFromFavourites,
 }) => {
+  const hasQuery = Boolean(normalizeSearchQuery(searchQuery));
   const selectedArtist =
     selectedArtistName !== null
       ? artists.find((a) => a.id === selectedArtistName || a.name === selectedArtistName) || null
@@ -67,9 +75,12 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
 
   if (selectedArtist) {
     const firstCover = selectedArtist.tracks.find((t) => t.metadata.artworkUrl)?.metadata.artworkUrl;
+    const visibleTracks = hasQuery
+      ? filterTracksByQuery(selectedArtist.tracks, searchQuery)
+      : selectedArtist.tracks;
 
     const handlePlayArtist = () => {
-      const playable = selectedArtist.tracks.filter(isTrackPlayable);
+      const playable = visibleTracks.filter(isTrackPlayable);
       if (playable.length === 0) return;
       if (onPlayQueue) {
         onPlayQueue(playable, 0, false);
@@ -117,11 +128,11 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
       </div>
     );
 
-    if (selectedArtist.tracks.length === 0) {
+    if (visibleTracks.length === 0) {
       const emptyContent = (
         <div>
           {heroPanel}
-          <TrackListEmptyState emptyVariant="default" />
+          <TrackListEmptyState emptyVariant={hasQuery ? 'search' : 'default'} />
         </div>
       );
       if (renderLayout) {
@@ -141,7 +152,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
     return (
       <TrackList
         key={selectedArtist.id}
-        tracks={selectedArtist.tracks}
+        tracks={visibleTracks}
         libraryTracks={libraryTracks}
         currentTrackId={currentTrackId}
         isPlaying={isPlaying}
@@ -150,6 +161,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
         hideTrackCount={Boolean(renderLayout)}
         beforeTable={heroPanel}
         renderLayout={renderLayout}
+        emptyVariant={hasQuery ? 'search' : 'default'}
         onPlayAll={handlePlayArtist}
         onPlayTrack={onPlayTrack}
         onTogglePlay={onTogglePlay}
@@ -175,12 +187,25 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
     );
   }
 
+  const visibleArtists = hasQuery ? filterArtistsByQuery(artists, searchQuery) : artists;
+
+  if (hasQuery && visibleArtists.length === 0) {
+    return (
+      <div data-testid="artists-search-empty" className="py-16 text-center text-slate-500 dark:text-slate-400">
+        <Mic2 className="w-10 h-10 mx-auto mb-2.5 opacity-30 text-purple-500 dark:text-purple-400" />
+        <p className="text-sm font-medium text-[var(--text-primary)] dark:text-slate-300">
+          No artists match &ldquo;{searchQuery.trim()}&rdquo;
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="artists-overview-grid"
       className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
     >
-      {artists.map((artist) => {
+      {visibleArtists.map((artist) => {
         const cover = artist.tracks.find((t) => t.metadata.artworkUrl)?.metadata.artworkUrl;
 
         return (

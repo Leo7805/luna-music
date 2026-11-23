@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ListMusic,
   Play,
@@ -7,11 +7,19 @@ import {
   Edit2,
   Clock,
   Music2,
+  Search,
 } from 'lucide-react';
 import { Playlist, TrackItem } from '../types/music';
 import { resolvePlaylistTracks } from '../utils/musicTree';
+import { isTrackPlayable } from '../utils/audioFileTypes';
+import {
+  filterIndexedTracksByQuery,
+  filterPlaylistsByQuery,
+  normalizeSearchQuery,
+} from '../utils/librarySearch';
 import { formatDuration } from '../utils/formatters';
 import { TrackList, TrackListProps } from './TrackList';
+import { TrackListEmptyState } from './TrackListEmptyState';
 import { PlayAllButton, SelectModeButton } from './TrackListActions';
 import { ConfirmModal } from './ConfirmModal';
 import { PlaylistModal } from './PlaylistModal';
@@ -20,6 +28,7 @@ interface PlaylistsViewProps {
   playlists: Playlist[];
   selectedPlaylistId: string | null;
   libraryTracks: TrackItem[];
+  searchQuery?: string;
   currentTrackId?: string | null;
   isPlaying: boolean;
   favourites: Set<string>;
@@ -29,6 +38,7 @@ interface PlaylistsViewProps {
   onRenamePlaylist: (id: string, newName: string) => void;
   onDeletePlaylist: (id: string) => void;
   onPlayPlaylist: (playlist: Playlist, startIndex?: number, shuffle?: boolean) => void;
+  onPlayQueue?: (tracks: TrackItem[], startIndex?: number, shuffle?: boolean) => void;
   onPlayTrack: (track: TrackItem) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
@@ -49,6 +59,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
   playlists,
   selectedPlaylistId,
   libraryTracks,
+  searchQuery = '',
   currentTrackId,
   isPlaying,
   favourites,
@@ -58,6 +69,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
   onRenamePlaylist,
   onDeletePlaylist,
   onPlayPlaylist,
+  onPlayQueue,
   onPlayTrack,
   onTogglePlay,
   onToggleFavourite,
@@ -78,11 +90,29 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null);
 
   const selectedPlaylist = playlists.find((p) => p.id === selectedPlaylistId) || null;
+  const normalizedQuery = normalizeSearchQuery(searchQuery);
+  const hasQuery = normalizedQuery.length > 0;
 
   // Resolved tracks for selected playlist (includes unreadable placeholders for offline files)
-  const resolvedTracks = selectedPlaylist
-    ? resolvePlaylistTracks(selectedPlaylist.tracks, libraryTracks)
-    : [];
+  const resolvedTracks = useMemo(
+    () => (selectedPlaylist ? resolvePlaylistTracks(selectedPlaylist.tracks, libraryTracks) : []),
+    [selectedPlaylist, libraryTracks]
+  );
+
+  const filteredEntries = useMemo(
+    () => filterIndexedTracksByQuery(resolvedTracks, normalizedQuery),
+    [resolvedTracks, normalizedQuery]
+  );
+
+  const visibleTracks = useMemo(
+    () => filteredEntries.map((entry) => entry.track),
+    [filteredEntries]
+  );
+
+  const visiblePlaylists = useMemo(
+    () => filterPlaylistsByQuery(playlists, normalizedQuery, libraryTracks),
+    [playlists, normalizedQuery, libraryTracks]
+  );
 
   const totalDuration = resolvedTracks.reduce(
     (acc, t) => acc + (t.metadata.duration || 0),
@@ -152,11 +182,25 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
         </div>
       );
 
-      if (resolvedTracks.length > 0) {
+      const handlePlayAll = () => {
+        if (!hasQuery) {
+          onPlayPlaylist(selectedPlaylist, 0, false);
+          return;
+        }
+        const playable = visibleTracks.filter(isTrackPlayable);
+        if (playable.length === 0) return;
+        if (onPlayQueue) {
+          onPlayQueue(playable, 0, false);
+        } else {
+          onPlayTrack(playable[0]);
+        }
+      };
+
+      if (resolvedTracks.length > 0 && visibleTracks.length > 0) {
         const trackList = (
           <TrackList
             key={selectedPlaylist.id}
-            tracks={resolvedTracks}
+            tracks={visibleTracks}
             libraryTracks={libraryTracks}
             currentTrackId={currentTrackId}
             isPlaying={isPlaying}
@@ -164,7 +208,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
             playlists={playlists}
             hideTrackCount={Boolean(renderLayout)}
             beforeTable={heroPanel}
-            onPlayAll={() => onPlayPlaylist(selectedPlaylist, 0, false)}
+            onPlayAll={handlePlayAll}
             renderLayout={
               renderLayout
                 ? ({ actions, content }) =>
@@ -192,19 +236,26 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
             onAddToPlaylist={onAddToPlaylist}
             onAddTracksToPlaylist={onAddTracksToPlaylist}
             onCreateAndAddToPlaylist={onCreateAndAddToPlaylist}
-            onRemoveFromPlaylist={(_, idx) =>
-              onRemoveTrackFromPlaylist(selectedPlaylist.id, '', idx)
-            }
+            onRemoveFromPlaylist={(_, filteredIdx) => {
+              const entry = filteredEntries[filteredIdx];
+              if (entry) {
+                onRemoveTrackFromPlaylist(selectedPlaylist.id, '', entry.originalIndex);
+              }
+            }}
             onRemoveTracksFromPlaylist={(trackIds) =>
               onRemoveTracksFromPlaylist?.(selectedPlaylist.id, trackIds)
             }
             onAddTracksToFavourites={onAddTracksToFavourites}
             onRemoveTracksFromFavourites={onRemoveTracksFromFavourites}
-            onMoveTrackUp={(idx) =>
-              onReorderPlaylistTracks(selectedPlaylist.id, idx, idx - 1)
+            onMoveTrackUp={
+              hasQuery
+                ? undefined
+                : (idx) => onReorderPlaylistTracks(selectedPlaylist.id, idx, idx - 1)
             }
-            onMoveTrackDown={(idx) =>
-              onReorderPlaylistTracks(selectedPlaylist.id, idx, idx + 1)
+            onMoveTrackDown={
+              hasQuery
+                ? undefined
+                : (idx) => onReorderPlaylistTracks(selectedPlaylist.id, idx, idx + 1)
             }
             isPlaylistView={true}
           />
@@ -219,15 +270,19 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
       const emptyDetailContent = (
         <div className="animate-fade-in" data-testid="playlists-view-container">
           {heroPanel}
-          <div className="py-16 text-center text-slate-400 dark:text-slate-500">
-            <Music2 className="w-10 h-10 mx-auto mb-2 opacity-30 text-indigo-500" />
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-              This playlist is empty
-            </p>
-            <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
-              Add songs to this playlist from All Tracks, Albums, or Folders using the track action menu.
-            </p>
-          </div>
+          {resolvedTracks.length > 0 && hasQuery ? (
+            <TrackListEmptyState emptyVariant="search" />
+          ) : (
+            <div className="py-16 text-center text-slate-400 dark:text-slate-500">
+              <Music2 className="w-10 h-10 mx-auto mb-2 opacity-30 text-indigo-500" />
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                This playlist is empty
+              </p>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                Add songs to this playlist from All Tracks, Albums, or Folders using the track action menu.
+              </p>
+            </div>
+          )}
         </div>
       );
 
@@ -261,12 +316,25 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
     );
 
     const overviewBody =
-      playlists.length > 0 ? (
+      playlists.length > 0 && hasQuery && visiblePlaylists.length === 0 ? (
+        <div
+          data-testid="playlists-search-empty"
+          className="flex flex-col items-center justify-center py-20 text-center"
+        >
+          <Search className="w-10 h-10 text-slate-300 dark:text-slate-600 mb-3" />
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            No playlists match &ldquo;{searchQuery.trim()}&rdquo;
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            Try a different search term or clear the search.
+          </p>
+        </div>
+      ) : visiblePlaylists.length > 0 ? (
         <div
           data-testid="playlists-overview-grid"
           className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
         >
-          {playlists.map((pl) => (
+          {visiblePlaylists.map((pl) => (
             <div
               key={pl.id}
               data-testid={`playlist-card-${pl.id}`}

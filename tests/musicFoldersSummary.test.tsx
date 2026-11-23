@@ -120,16 +120,21 @@ describe('Music Folders summary in the actual App composition', () => {
     expect(byId('folder-subfolders-section').textContent).not.toContain('A');
   });
 
-  it('retains the search title and explicitly labels the unfiltered total', () => {
-    libraryData = library([folder('A', [track('a:1', 'Alpha.mp3')]), folder('B', [track('b:1', 'Beta.mp3')])]);
-    mount(); const cards = byId('folder-subfolders-section');
-    search('Alpha');
-    expect(host.querySelector('main h1')?.textContent).toBe('Search Results: "Alpha"');
-    expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks total');
-    expect(byId('folder-subfolders-section')).toBe(cards);
-    expect(cards.textContent).toContain('A'); expect(cards.textContent).toContain('B');
-    search('no matches'); expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks total');
-    search(''); expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks');
+  it('filters overview collection cards by name and shows N of M collections while searching', () => {
+    libraryData = library([folder('Rock Classics', [track('a:1', 'Alpha.mp3')]), folder('Jazz Club', [track('b:1', 'Beta.mp3')])]);
+    mount();
+    search('Rock');
+    expect(host.querySelector('main h1')?.textContent).toBe('Search Results: "Rock"');
+    expect(byId('header-subtitle').textContent).toBe('1 of 2 collections');
+    expect(byId('folder-subfolders-section').textContent).toContain('Rock Classics');
+    expect(byId('folder-subfolders-section').textContent).not.toContain('Jazz Club');
+    search('no matches');
+    expect(byId('header-subtitle').textContent).toBe('0 of 2 collections');
+    expect(byId('folder-search-empty').textContent).toContain('No folders match');
+    search('');
+    expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks');
+    expect(byId('folder-subfolders-section').textContent).toContain('Rock Classics');
+    expect(byId('folder-subfolders-section').textContent).toContain('Jazz Club');
   });
 
   it('preserves real folder detail counts, controls, descendant cards and breadcrumbs', () => {

@@ -18,6 +18,7 @@ import { useTheme } from './hooks/useTheme';
 import { getBreadcrumbs } from './utils/musicTree';
 import { deriveViewHeaderInfo } from './utils/libraryAggregation';
 import { deriveFolderCollections } from './utils/folderCollections';
+import { deriveSearchHeaderCounts } from './utils/librarySearch';
 import { getStoredNavigation, storeNavigation } from './utils/navigationStorage';
 import { isFavouriteTrack } from './utils/favouriteResolvers';
 import { LibraryView, TrackItem } from './types/music';
@@ -115,9 +116,10 @@ export function App() {
   const handleSelectPlaylist = useCallback(
     (playlistId: string | null) => {
       closeNowPlayingView();
+      library.setSearchQuery('');
       playlists.selectPlaylist(playlistId);
     },
-    [closeNowPlayingView, playlists]
+    [closeNowPlayingView, library, playlists]
   );
 
   const handleCreateAndAddToPlaylist = useCallback(
@@ -169,6 +171,38 @@ export function App() {
     [playlists.playlists]
   );
 
+  const searchHeaderCounts = useMemo(
+    () =>
+      deriveSearchHeaderCounts({
+        currentView: library.currentView,
+        searchQuery: library.searchQuery,
+        isFolderOverview: library.currentView === 'folder' && !library.selectedFolderPath,
+        currentFolderNode: library.currentFolderNode,
+        overviewNodes: folderCollections.overviewNodes,
+        albums: library.albums,
+        selectedAlbum,
+        artists: library.artists,
+        selectedArtist,
+        playlists: playlists.playlists,
+        selectedPlaylist,
+        libraryTracks,
+      }),
+    [
+      library.currentView,
+      library.searchQuery,
+      library.selectedFolderPath,
+      library.currentFolderNode,
+      folderCollections.overviewNodes,
+      library.albums,
+      selectedAlbum,
+      library.artists,
+      selectedArtist,
+      playlists.playlists,
+      selectedPlaylist,
+      libraryTracks,
+    ]
+  );
+
   // Compute view title & subtitle
   const { title: viewTitle, subtitle: viewSubtitle } = useMemo(
     () =>
@@ -193,6 +227,7 @@ export function App() {
         selectedAlbumName: selectedAlbum?.name ?? null,
         isArtistDetail: Boolean(selectedArtist),
         selectedArtistLabel: selectedArtist?.name ?? null,
+        ...searchHeaderCounts,
       }),
     [
       hasLibrary,
@@ -212,6 +247,7 @@ export function App() {
       library.artists.length,
       selectedAlbum,
       selectedArtist,
+      searchHeaderCounts,
     ]
   );
 
@@ -238,7 +274,7 @@ export function App() {
   const handleHeaderBreadcrumbClick =
     library.currentView === 'playlists'
       ? (path: string) => {
-          if (!path) playlists.selectPlaylist(null);
+          if (!path) handleSelectPlaylist(null);
         }
       : library.currentView === 'albums'
       ? (path: string) => {
@@ -261,7 +297,12 @@ export function App() {
         subtitle={viewSubtitle}
         searchQuery={library.searchQuery}
         breadcrumbs={headerBreadcrumbs}
-        keepBreadcrumbsOnSearch={Boolean(selectedPlaylist || selectedAlbum || selectedArtist)}
+        keepBreadcrumbsOnSearch={Boolean(
+          selectedPlaylist ||
+            selectedAlbum ||
+            selectedArtist ||
+            (library.currentView === 'folder' && library.selectedFolderPath !== '')
+        )}
         theme={theme}
         lightStyle={lightStyle}
         onSearchChange={library.setSearchQuery}

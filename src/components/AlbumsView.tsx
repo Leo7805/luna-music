@@ -2,6 +2,11 @@ import React from 'react';
 import { Play, Disc } from 'lucide-react';
 import { AlbumGroup, Playlist, TrackItem } from '../types/music';
 import { isTrackPlayable } from '../utils/audioFileTypes';
+import {
+  filterAlbumsByQuery,
+  filterTracksByQuery,
+  normalizeSearchQuery,
+} from '../utils/librarySearch';
 import { TrackList, TrackListProps } from './TrackList';
 import { PlayAllButton, SelectModeButton } from './TrackListActions';
 import { TrackListEmptyState } from './TrackListEmptyState';
@@ -16,6 +21,7 @@ function AlbumArtworkProbe({ track }: { track?: TrackItem }) {
 interface AlbumsViewProps {
   albums: AlbumGroup[];
   selectedAlbumId: string | null;
+  searchQuery?: string;
   libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
@@ -40,6 +46,7 @@ interface AlbumsViewProps {
 export const AlbumsView: React.FC<AlbumsViewProps> = ({
   albums,
   selectedAlbumId,
+  searchQuery = '',
   libraryTracks,
   currentTrackId,
   isPlaying,
@@ -60,12 +67,17 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
   onAddTracksToFavourites,
   onRemoveTracksFromFavourites,
 }) => {
+  const hasQuery = Boolean(normalizeSearchQuery(searchQuery));
   const selectedAlbum =
     selectedAlbumId !== null ? albums.find((a) => a.id === selectedAlbumId) || null : null;
 
   if (selectedAlbum) {
+    const visibleTracks = hasQuery
+      ? filterTracksByQuery(selectedAlbum.tracks, searchQuery)
+      : selectedAlbum.tracks;
+
     const handlePlayAlbum = () => {
-      const playable = selectedAlbum.tracks.filter(isTrackPlayable);
+      const playable = visibleTracks.filter(isTrackPlayable);
       if (playable.length === 0) return;
       if (onPlayQueue) {
         onPlayQueue(playable, 0, false);
@@ -118,11 +130,11 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
       </div>
     );
 
-    if (selectedAlbum.tracks.length === 0) {
+    if (visibleTracks.length === 0) {
       const emptyContent = (
         <div>
           {heroPanel}
-          <TrackListEmptyState emptyVariant="default" />
+          <TrackListEmptyState emptyVariant={hasQuery ? 'search' : 'default'} />
         </div>
       );
       if (renderLayout) {
@@ -142,7 +154,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
     return (
       <TrackList
         key={selectedAlbum.id}
-        tracks={selectedAlbum.tracks}
+        tracks={visibleTracks}
         libraryTracks={libraryTracks}
         currentTrackId={currentTrackId}
         isPlaying={isPlaying}
@@ -151,6 +163,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
         hideTrackCount={Boolean(renderLayout)}
         beforeTable={heroPanel}
         renderLayout={renderLayout}
+        emptyVariant={hasQuery ? 'search' : 'default'}
         onPlayAll={handlePlayAlbum}
         onPlayTrack={onPlayTrack}
         onTogglePlay={onTogglePlay}
@@ -176,12 +189,25 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
     );
   }
 
+  const visibleAlbums = hasQuery ? filterAlbumsByQuery(albums, searchQuery) : albums;
+
+  if (hasQuery && visibleAlbums.length === 0) {
+    return (
+      <div data-testid="albums-search-empty" className="py-16 text-center text-slate-500 dark:text-slate-400">
+        <Disc className="w-10 h-10 mx-auto mb-2.5 opacity-30 text-[var(--accent-primary)] dark:text-indigo-400" />
+        <p className="text-sm font-medium text-[var(--text-primary)] dark:text-slate-300">
+          No albums match &ldquo;{searchQuery.trim()}&rdquo;
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="albums-overview-grid"
       className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
     >
-      {albums.map((album) => (
+      {visibleAlbums.map((album) => (
         <div
           key={album.id}
           data-testid={`album-card-${album.id}`}
