@@ -413,9 +413,10 @@ describe('App Composition & Component Integration (Stage 7)', () => {
         displayedTracksCount: 10,
         playlistsCount: 0,
         folderOverviewTracksCount: 12,
+        folderOverviewFoldersCount: 3,
       });
       expect(folderRootInfo.title).toBe('Music Folders');
-      expect(folderRootInfo.subtitle).toBe('12 tracks');
+      expect(folderRootInfo.subtitle).toBe('3 folders · 12 tracks');
     });
 
     it('computes breadcrumbs correctly for folder navigation', () => {

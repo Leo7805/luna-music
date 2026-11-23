@@ -17,6 +17,7 @@ import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
 import { getBreadcrumbs } from './utils/musicTree';
 import { deriveViewHeaderInfo } from './utils/libraryAggregation';
+import { deriveFolderCollections } from './utils/folderCollections';
 import { getStoredNavigation, storeNavigation } from './utils/navigationStorage';
 import { isFavouriteTrack } from './utils/favouriteResolvers';
 import { LibraryView, TrackItem } from './types/music';
@@ -132,6 +133,11 @@ export function App() {
     return getBreadcrumbs(library.library.name, library.selectedFolderPath, library.library.folders);
   }, [library.library, library.selectedFolderPath]);
 
+  const folderCollections = useMemo(
+    () => deriveFolderCollections(library.folders),
+    [library.folders]
+  );
+
   // Compute view title & subtitle
   const { title: viewTitle, subtitle: viewSubtitle } = useMemo(
     () =>
@@ -144,6 +150,7 @@ export function App() {
         selectedAlbumId: library.selectedAlbumId,
         selectedArtistName: library.selectedArtistName,
         displayedTracksCount: library.displayedTracks.length,
+        folderOverviewFoldersCount: folderCollections.physicalFoldersCount,
         folderOverviewTracksCount: library.library?.flatPlaylist.length ?? 0,
         playlistsCount: playlists.playlists.length,
       }),
@@ -157,6 +164,7 @@ export function App() {
       library.selectedArtistName,
       library.displayedTracks.length,
       library.library?.flatPlaylist.length,
+      folderCollections.physicalFoldersCount,
       playlists.playlists.length,
     ]
   );
@@ -224,6 +232,7 @@ export function App() {
           selectedFolderPath={library.selectedFolderPath}
           folderTree={library.library?.tree || null}
           folders={library.folders}
+          folderCollections={folderCollections}
           playlists={playlists.playlists}
           selectedPlaylistId={playlists.selectedPlaylistId}
           favouritesCount={library.favouritesCount}
@@ -282,10 +291,11 @@ export function App() {
               library={library}
               playlists={playlists}
               audioPlayer={audioPlayer}
+              folderCollections={folderCollections}
               renderAllTracksLayout={renderLibraryLayout}
             />
           ) : renderLibraryLayout({ content: (
-            <LibraryContent library={library} playlists={playlists} audioPlayer={audioPlayer} />
+            <LibraryContent library={library} playlists={playlists} audioPlayer={audioPlayer} folderCollections={folderCollections} />
           ) })}
         </main>
 

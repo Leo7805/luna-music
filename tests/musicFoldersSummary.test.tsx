@@ -4,7 +4,7 @@ import { createRoot, Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from '../src/App';
 import { FolderView } from '../src/components/FolderView';
-import { ImportedFolder, LibraryView, MusicLibrary, TrackItem } from '../src/types/music';
+import { ImportedFolder, LibraryView, MusicLibrary, TrackItem, IMPORTED_FILES_ROOT_ID } from '../src/types/music';
 import { buildFolderTree, buildUnifiedMultiFolderTree, combineFlatPlaylists, findFolderNodeByPath } from '../src/utils/musicTree';
 import { deriveDisplayedTracks } from '../src/utils/libraryAggregation';
 import { useMusicLibrary } from '../src/hooks/useMusicLibrary';
@@ -84,7 +84,7 @@ describe('Music Folders summary in the actual App composition', () => {
     expect(libraryData.tree.tracks).toHaveLength(0);
     mount();
     expect(host.querySelector('main h1')?.textContent).toBe('Music Folders');
-    expect(byId('header-subtitle').textContent).toBe('363 tracks');
+    expect(byId('header-subtitle').textContent).toBe('3 folders · 363 tracks');
     expect(host.querySelector('main')?.textContent?.match(/363 tracks/g)).toHaveLength(1);
     expect(byId('tracklist-toolbar')).toBeNull(); expect(byId('tracklist-count')).toBeNull();
     const cards = byId('folder-subfolders-section').textContent;
@@ -97,26 +97,26 @@ describe('Music Folders summary in the actual App composition', () => {
     libraryData = library([folder('Parent', [shared, track('parent:Other.mp3')]), folder('Child', [alias])]);
     expect(libraryData.tree.totalTrackCount).toBe(3);
     expect(libraryData.flatPlaylist).toHaveLength(2);
-    mount(); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+    mount(); expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks');
   });
 
   it('keeps identical filenames from distinct track identities separate', () => {
     libraryData = library([folder('A', [track('a:same.mp3')]), folder('B', [track('b:same.mp3')])]);
-    mount(); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+    mount(); expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks');
   });
 
   it('shows Music Folders and zero for an empty Library', () => {
     mount(); expect(host.querySelector('main h1')?.textContent).toBe('Music Folders');
-    expect(byId('header-subtitle').textContent).toBe('0 tracks');
+    expect(byId('header-subtitle').textContent).toBe('0 folders · 0 tracks');
     expect(host.querySelector('main')?.textContent).toContain('Your Music');
   });
 
   it('refreshes the derived count and cards as Library folders are added and removed', () => {
     const a = folder('A', [track('a:1')]); const b = folder('B', [track('b:1'), track('b:2')]);
-    libraryData = library([a]); mount(); expect(byId('header-subtitle').textContent).toBe('1 track');
-    libraryData = library([a, b]); mount(); expect(byId('header-subtitle').textContent).toBe('3 tracks');
+    libraryData = library([a]); mount(); expect(byId('header-subtitle').textContent).toBe('1 folder · 1 track');
+    libraryData = library([a, b]); mount(); expect(byId('header-subtitle').textContent).toBe('2 folders · 3 tracks');
     expect(byId('folder-subfolders-section').textContent).toContain('B');
-    libraryData = library([b]); mount(); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+    libraryData = library([b]); mount(); expect(byId('header-subtitle').textContent).toBe('1 folder · 2 tracks');
     expect(byId('folder-subfolders-section').textContent).not.toContain('A');
   });
 
@@ -125,11 +125,11 @@ describe('Music Folders summary in the actual App composition', () => {
     mount(); const cards = byId('folder-subfolders-section');
     search('Alpha');
     expect(host.querySelector('main h1')?.textContent).toBe('Search Results: "Alpha"');
-    expect(byId('header-subtitle').textContent).toBe('2 tracks total');
+    expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks total');
     expect(byId('folder-subfolders-section')).toBe(cards);
     expect(cards.textContent).toContain('A'); expect(cards.textContent).toContain('B');
-    search('no matches'); expect(byId('header-subtitle').textContent).toBe('2 tracks total');
-    search(''); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+    search('no matches'); expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks total');
+    search(''); expect(byId('header-subtitle').textContent).toBe('2 folders · 2 tracks');
   });
 
   it('preserves real folder detail counts, controls, descendant cards and breadcrumbs', () => {
@@ -164,4 +164,58 @@ describe('Music Folders summary in the actual App composition', () => {
     expect(host.querySelector('main h1')?.textContent).toBe('Favourites');
     expect(host.querySelector('main')?.textContent).toContain('No favourite tracks yet');
   });
+
+  it('shares source order and counts with Sidebar, with one sky Files card last', () => {
+    const physical = [28, 16, 319].map((count, n) => ({
+      ...folder(`root${n}`, Array.from({ length: count }, (_, i) => track(`${n}:${i}`, `Song ${i}.mp3`))),
+      name: ['周杰伦', 'hot-2026.11.19', 'mp3'][n],
+    }));
+    const files = { ...folder(IMPORTED_FILES_ROOT_ID, [
+      { ...track('alias0'), aliases: ['0:0'] }, { ...track('alias1'), aliases: ['1:0'] },
+      track('imported:0'), track('imported:1'), track('imported:2'),
+    ]), name: 'Imported Files', sourceType: 'files' as const };
+    libraryData = library([physical[0], files, physical[1], physical[2]]);
+    mount();
+    expect(byId('header-subtitle').textContent).toBe('3 folders · 366 tracks');
+    expect(byId('nav-badge-folders').textContent).toBe('3');
+    const expected = ['root0', 'root1', 'root2', IMPORTED_FILES_ROOT_ID];
+    const cardIds = () => [...byId('folder-subfolders-section').querySelectorAll('[data-testid^="folder-card-"]')]
+      .map((card) => card.getAttribute('data-testid')!.replace('folder-card-', ''));
+    expect(cardIds()).toEqual(expected);
+    expect([...host.querySelectorAll('aside [data-testid^="root-folder-"], aside [data-testid="sidebar-imported-files"]')]
+      .map((item) => item.getAttribute('data-testid')!.replace('root-folder-', '').replace('sidebar-imported-files', IMPORTED_FILES_ROOT_ID)))
+      .toEqual(expected);
+    const importedCard = byId(`folder-card-${IMPORTED_FILES_ROOT_ID}`);
+    expect(importedCard.querySelector('.lucide-files')?.getAttribute('class')).toContain('text-sky-500 dark:text-sky-400');
+    expect(byId('sidebar-imported-files').querySelector('.lucide-files')?.getAttribute('class')).toContain('text-sky-500 dark:text-sky-400');
+    expect(importedCard.querySelector('.lucide-files')?.parentElement?.className).toContain('bg-sky-500/10');
+    expect(importedCard.textContent).toContain('5 tracks');
+    const ordinary = byId('folder-card-root0');
+    expect(ordinary.querySelector('.lucide-folder')).not.toBeNull();
+    expect(ordinary.querySelector('.lucide-files')).toBeNull();
+    expect(host.querySelector('main')?.textContent?.match(/3 folders · 366 tracks/g)).toHaveLength(1);
+    mount(); expect(cardIds()).toEqual(expected);
+    libraryData = library([physical[0], files, physical[2]]); mount();
+    expect(cardIds()).toEqual(['root0', 'root2', IMPORTED_FILES_ROOT_ID]);
+    expect(byId('nav-badge-folders').textContent).toBe('2');
+    expect(byId('header-subtitle').textContent).toMatch(/^2 folders · /);
+    click(byId(`folder-card-${IMPORTED_FILES_ROOT_ID}`));
+    expect(byId('folder-breadcrumb').textContent).toContain('Imported Files');
+    expect(host.querySelector('h1')?.textContent).toBe('Imported Files');
+    expect(byId('sidebar-imported-files').querySelector('[data-active]')?.getAttribute('data-active')).toBe('false');
+  });
+
+  it('does not apply the overview projection to nested folders or change card destinations', () => {
+    const current = buildFolderTree('Root', [track('one', 'One.mp3', 'Z/One.mp3'), track('two', 'Two.mp3', 'A/Two.mp3')], 'root');
+    const onSelect = vi.fn();
+    act(() => root.render(<FolderView currentNode={current} isFolderOverview={false}
+      overviewNodes={[folder('unrelated', []).tree]} isPlaying={false} favourites={favourites}
+      onSelectFolder={onSelect} onPlayTrack={noop} onTogglePlay={noop} onToggleFavourite={noop} />));
+    expect([...byId('folder-subfolders-section').querySelectorAll('[data-testid^="folder-card-"]')]
+      .map((card) => card.getAttribute('data-testid'))).toEqual(['folder-card-root/A', 'folder-card-root/Z']);
+    click(byId('folder-card-root/Z'));
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith(current.subfolders[1].relativePath);
+    expect(byId('tracklist-count').textContent).toBe('0 tracks');
+  });
+
 });

@@ -1,3 +1,4 @@
+import { deriveFolderCollections } from '../src/utils/folderCollections';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Sidebar } from '../src/components/Sidebar';
@@ -196,6 +197,7 @@ describe('Sidebar Alignment & Consistent Open Music Placement', () => {
   it('5. sidebar Open Music is visible when library is empty (hasLibrary=false)', () => {
     const htmlEmpty = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([])}
         currentView="folder"
         selectedFolderPath=""
         folders={[]}
@@ -219,6 +221,7 @@ describe('Sidebar Alignment & Consistent Open Music Placement', () => {
   it('6. sidebar Open Music is visible when library is populated (hasLibrary=true)', () => {
     const htmlPopulated = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([mockFolderFlat, mockFolderWithSubfolders, mockImportedFiles])}
         currentView="folder"
         selectedFolderPath=""
         folders={[mockFolderFlat, mockFolderWithSubfolders, mockImportedFiles]}
@@ -265,6 +268,7 @@ describe('Sidebar Alignment & Consistent Open Music Placement', () => {
   it('8. folder container is scrollable (overflow-y-auto) and bottom open music is shrink-0', () => {
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([mockFolderFlat])}
         currentView="folder"
         selectedFolderPath=""
         folders={[mockFolderFlat]}
@@ -312,6 +316,7 @@ describe('Sidebar Alignment & Consistent Open Music Placement', () => {
   it('10. sidebar supports responsive width for desktop and narrow screens', () => {
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([])}
         currentView="folder"
         selectedFolderPath=""
         folders={[]}

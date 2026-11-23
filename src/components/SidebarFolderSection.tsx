@@ -4,8 +4,8 @@ import {
   FolderNode,
   ImportedFolder,
   LibraryView,
-  IMPORTED_FILES_ROOT_ID,
 } from '../types/music';
+import { deriveFolderCollections, FolderCollections } from '../utils/folderCollections';
 import { isFileSystemAccessSupported } from '../services/directoryAccess';
 import { RootFolderItem } from './RootFolderItem';
 import { SidebarImportedFiles } from './SidebarImportedFiles';
@@ -15,6 +15,7 @@ export interface SidebarFolderSectionProps {
   currentView: LibraryView;
   selectedFolderPath: string;
   folders: ImportedFolder[];
+  folderCollections?: FolderCollections;
   folderTree?: FolderNode | null;
   activeMenuFolderId: string | null;
   onToggleMenu: (id: string) => void;
@@ -32,6 +33,7 @@ export function SidebarFolderSection({
   currentView,
   selectedFolderPath,
   folders,
+  folderCollections,
   folderTree,
   activeMenuFolderId,
   onToggleMenu,
@@ -52,8 +54,7 @@ export function SidebarFolderSection({
       folderInputRef.current?.click();
     }
   };
-  const physicalFolders = folders.filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
-  const importedFilesFolder = folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
+  const { physicalFolders, importedFilesFolder } = folderCollections ?? deriveFolderCollections(folders);
   const activePhysicalFolderPath = currentView === 'folder' ? selectedFolderPath : '';
 
   return (
@@ -107,7 +108,7 @@ export function SidebarFolderSection({
             ))}
 
             {/* Virtual Imported Files collection rendered after physical folders */}
-            {importedFilesFolder && importedFilesFolder.tracks.length > 0 && (
+            {importedFilesFolder && (
               <SidebarImportedFiles
                 importedFolder={importedFilesFolder}
                 isSelected={currentView === 'imported-files'}

@@ -1,3 +1,4 @@
+import { deriveFolderCollections } from '../src/utils/folderCollections';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Sidebar } from '../src/components/Sidebar';
@@ -201,6 +202,7 @@ describe('Sidebar Source Selection & Softened Active States', () => {
   it('6. Folders overview has Folders active in primary nav and zero active sources', () => {
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([folderA, folderB, importedFiles])}
         currentView="folder"
         selectedFolderPath=""
         folders={[folderA, folderB, importedFiles]}
@@ -255,6 +257,7 @@ describe('Sidebar Source Selection & Softened Active States', () => {
   it('10, 11, 12 & 13. enforces soft theme-token styling, accessible focus, two-level hierarchy, and preserved nav badges', () => {
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([folderA, folderB, importedFiles])}
         currentView="imported-files"
         selectedFolderPath=""
         folders={[folderA, folderB, importedFiles]}

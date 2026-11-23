@@ -1,3 +1,4 @@
+import { deriveFolderCollections } from '../src/utils/folderCollections';
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Sidebar } from '../src/components/Sidebar';
@@ -112,6 +113,7 @@ describe('Sidebar Navigation Unified Count Badges', () => {
   it('2. displays zero counts for all six navigation items when library is empty', () => {
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([])}
         currentView="all"
         selectedFolderPath=""
         folders={[]}
@@ -143,6 +145,7 @@ describe('Sidebar Navigation Unified Count Badges', () => {
 
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([folder1, folder2, importedFiles])}
         currentView="folder"
         selectedFolderPath=""
         folders={[folder1, folder2, importedFiles]}
@@ -191,6 +194,7 @@ describe('Sidebar Navigation Unified Count Badges', () => {
 
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections(folders)}
         currentView="all"
         selectedFolderPath=""
         folders={folders}

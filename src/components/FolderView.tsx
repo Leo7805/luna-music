@@ -4,10 +4,13 @@ import { FolderNode, Playlist, TrackItem } from '../types/music';
 import { isSameTrack } from '../utils/trackIdentity';
 import { isTrackPlayable } from '../utils/audioFileTypes';
 import { TrackList } from './TrackList';
+import { isImportedFilesCollection } from '../utils/folderCollections';
+import { ImportedFilesIcon, IMPORTED_FILES_ICON_SURFACE_CLASS } from './ImportedFilesIcon';
 
 interface FolderViewProps {
   currentNode: FolderNode | null;
   isFolderOverview?: boolean;
+  overviewNodes?: FolderNode[];
   libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
@@ -32,6 +35,7 @@ interface FolderViewProps {
 export const FolderView: React.FC<FolderViewProps> = ({
   currentNode,
   isFolderOverview = false,
+  overviewNodes,
   libraryTracks,
   currentTrackId,
   isPlaying,
@@ -83,18 +87,25 @@ export const FolderView: React.FC<FolderViewProps> = ({
     }
   };
 
+  const subfolders = isFolderOverview && overviewNodes ? overviewNodes : currentNode.subfolders;
   const subfoldersSection =
-    currentNode.subfolders.length > 0 ? (
+    subfolders.length > 0 ? (
       <div data-testid="folder-subfolders-section" className="pb-4 pt-1">
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {currentNode.subfolders.map((sub) => (
-            <div
+          {subfolders.map((sub) => (
+            <button
+              type="button"
               key={sub.id}
+              data-testid={`folder-card-${sub.id}`}
               onClick={() => onSelectFolder(sub.relativePath)}
-              className="group p-3 rounded-xl glass-panel hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] hover:border-[var(--accent-primary)]/30 transition-colors duration-150 cursor-pointer flex items-center gap-3 select-none"
+              className="group w-full text-left p-3 rounded-xl glass-panel hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] hover:border-[var(--accent-primary)]/30 transition-colors duration-150 cursor-pointer flex items-center gap-3 select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30"
             >
-              <div className="w-9 h-9 rounded-lg bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <Folder className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform ${
+                isImportedFilesCollection(sub.id) ? IMPORTED_FILES_ICON_SURFACE_CLASS : 'bg-[var(--accent-primary)]/10 border border-[var(--accent-primary)]/20'
+              }`}>
+                {isImportedFilesCollection(sub.id)
+                  ? <ImportedFilesIcon className="w-4 h-4" />
+                  : <Folder className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-[var(--text-primary)] dark:text-slate-200 group-hover:text-black dark:group-hover:text-white truncate">
@@ -104,13 +115,13 @@ export const FolderView: React.FC<FolderViewProps> = ({
                   {sub.totalTrackCount} {sub.totalTrackCount === 1 ? 'track' : 'tracks'}
                 </p>
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </div>
     ) : null;
 
-  if (currentNode.tracks.length === 0 && currentNode.subfolders.length > 0) {
+  if (currentNode.tracks.length === 0 && subfolders.length > 0) {
     if (isFolderOverview) return subfoldersSection;
     return (
       <div className="space-y-3">

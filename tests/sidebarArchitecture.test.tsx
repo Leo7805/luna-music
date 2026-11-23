@@ -1,3 +1,4 @@
+import { deriveFolderCollections } from '../src/utils/folderCollections';
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { Sidebar } from '../src/components/Sidebar';
@@ -258,6 +259,7 @@ describe('Sidebar Architecture & Component Decomposition (Stage 3)', () => {
     // In 'all' view: contextual section is hidden
     const htmlAll = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([mockFolder1])}
         currentView="all"
         selectedFolderPath=""
         folders={[mockFolder1]}
@@ -279,6 +281,7 @@ describe('Sidebar Architecture & Component Decomposition (Stage 3)', () => {
     // In 'folder' view: Music Folders is visible
     const htmlFolder = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([mockFolder1])}
         currentView="folder"
         selectedFolderPath=""
         folders={[mockFolder1]}
@@ -299,6 +302,7 @@ describe('Sidebar Architecture & Component Decomposition (Stage 3)', () => {
     // In 'playlists' view: My Playlists is visible
     const htmlPlaylists = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([mockFolder1])}
         currentView="playlists"
         selectedFolderPath=""
         folders={[mockFolder1]}
@@ -329,6 +333,7 @@ describe('Sidebar Architecture & Component Decomposition (Stage 3)', () => {
 
     const html = renderToStaticMarkup(
       <Sidebar
+        folderCollections={deriveFolderCollections([])}
         currentView="folder"
         selectedFolderPath=""
         folderTree={legacyTree}

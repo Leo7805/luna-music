@@ -13,15 +13,17 @@ import { useMusicLibrary } from '../hooks/useMusicLibrary';
 import { usePlaylists } from '../hooks/usePlaylists';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { TrackItem } from '../types/music';
+import { deriveFolderCollections, FolderCollections } from '../utils/folderCollections';
 
 export interface LibraryContentProps {
   library: ReturnType<typeof useMusicLibrary>;
   playlists: ReturnType<typeof usePlaylists>;
   audioPlayer: ReturnType<typeof useAudioPlayer>;
+  folderCollections?: FolderCollections;
   renderAllTracksLayout?: TrackListProps['renderLayout'];
 }
 
-export function LibraryContent({ library, playlists, audioPlayer, renderAllTracksLayout }: LibraryContentProps) {
+export function LibraryContent({ library, playlists, audioPlayer, folderCollections, renderAllTracksLayout }: LibraryContentProps) {
   const {
     currentView,
     isLoading,
@@ -233,6 +235,7 @@ export function LibraryContent({ library, playlists, audioPlayer, renderAllTrack
         <FolderView
           currentNode={currentFolderNode}
           isFolderOverview={library.selectedFolderPath === ''}
+          overviewNodes={(folderCollections ?? deriveFolderCollections(library.folders ?? library.library?.folders ?? [])).overviewNodes}
           libraryTracks={libraryTracks}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}

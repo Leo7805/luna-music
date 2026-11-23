@@ -1,5 +1,6 @@
-import { Files, MoreHorizontal, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { ImportedFolder } from '../types/music';
+import { ImportedFilesIcon } from './ImportedFilesIcon';
 
 export interface SidebarImportedFilesProps {
   importedFolder: ImportedFolder;
@@ -39,7 +40,7 @@ export function SidebarImportedFiles({
         onClick={onSelect}
       >
         <div className="flex items-center gap-2 min-w-0 flex-1">
-          <Files className="w-3.5 h-3.5 shrink-0 text-sky-500 dark:text-sky-400" />
+          <ImportedFilesIcon className="w-3.5 h-3.5 shrink-0" />
           <span className="truncate text-xs font-medium" title="Imported Files">
             Imported Files
           </span>

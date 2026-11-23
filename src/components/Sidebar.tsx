@@ -4,8 +4,8 @@ import {
   ImportedFolder,
   LibraryView,
   Playlist,
-  IMPORTED_FILES_ROOT_ID,
 } from '../types/music';
+import { FolderCollections } from '../utils/folderCollections';
 import { OpenMusicControl } from './OpenMusicControl';
 import { ConfirmModal } from './ConfirmModal';
 import { PlaylistModal } from './PlaylistModal';
@@ -18,6 +18,7 @@ export interface SidebarProps {
   selectedFolderPath: string;
   folderTree?: FolderNode | null;
   folders?: ImportedFolder[];
+  folderCollections: FolderCollections;
   playlists?: Playlist[];
   selectedPlaylistId?: string | null;
   favouritesCount: number;
@@ -48,6 +49,7 @@ export function Sidebar({
   selectedFolderPath,
   folderTree,
   folders = [],
+  folderCollections,
   playlists = [],
   selectedPlaylistId,
   favouritesCount,
@@ -127,8 +129,6 @@ export function Sidebar({
     setPlaylistToDelete(null);
   };
 
-  const physicalFoldersCount = folders.filter((f) => f.id !== IMPORTED_FILES_ROOT_ID).length;
-
   return (
     <aside className="w-64 md:w-72 shrink-0 flex flex-col h-full bg-[var(--bg-sidebar)] dark:bg-[#071427]/95 backdrop-blur-xl border-r border-[var(--border-subtle)] dark:border-white/[0.08] select-none text-[var(--text-primary)] dark:text-slate-100 transition-colors duration-200">
       {/* Brand Header */}
@@ -154,7 +154,7 @@ export function Sidebar({
       <SidebarNavigation
         currentView={currentView}
         totalTracksCount={totalTracksCount}
-        foldersCount={physicalFoldersCount}
+        foldersCount={folderCollections.physicalFoldersCount}
         playlistsCount={playlists.length}
         albumsCount={albumsCount}
         artistsCount={artistsCount}
@@ -169,6 +169,7 @@ export function Sidebar({
           currentView={currentView}
           selectedFolderPath={selectedFolderPath}
           folders={folders}
+          folderCollections={folderCollections}
           folderTree={folderTree}
           activeMenuFolderId={activeMenuFolderId}
           onToggleMenu={(id) =>
