@@ -286,13 +286,15 @@ export function App() {
               onSelectLightStyle={setLightStyle}
               onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
             />
-          ) : library.currentView === 'all' ? (
+          ) : library.currentView === 'all' ||
+            library.currentView === 'imported-files' ||
+            (library.currentView === 'folder' && library.selectedFolderPath !== '') ? (
             <LibraryContent
               library={library}
               playlists={playlists}
               audioPlayer={audioPlayer}
               folderCollections={folderCollections}
-              renderAllTracksLayout={renderLibraryLayout}
+              renderUnifiedLayout={renderLibraryLayout}
             />
           ) : renderLibraryLayout({ content: (
             <LibraryContent library={library} playlists={playlists} audioPlayer={audioPlayer} folderCollections={folderCollections} />

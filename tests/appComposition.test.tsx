@@ -323,20 +323,20 @@ describe('App Composition & Component Integration (Stage 7)', () => {
     });
   });
 
-  describe('All Tracks layout composition boundary', () => {
+  describe('Unified header layout composition boundary', () => {
     it.each(['all', 'favourites', 'folder', 'imported-files', 'albums', 'artists', 'playlists'] as const)(
-      'uses the external layout only for %s when All Tracks is active', (currentView) => {
+      'applies unified layout to all & imported-files and preserves legacy boundary for %s', (currentView) => {
         const html = renderToStaticMarkup(
           <LibraryContent library={createMockLibraryHook({ currentView })}
             playlists={createMockPlaylistsHook()} audioPlayer={createMockAudioPlayerHook()}
-            renderAllTracksLayout={({ actions, content }) => <>
-              <Header title="All Tracks" searchQuery="" theme="light" lightStyle="warm"
+            renderUnifiedLayout={({ actions, content }) => <>
+              <Header title="Header" searchQuery="" theme="light" lightStyle="warm"
                 actions={actions} onSearchChange={() => {}} onOpenShortcutsModal={() => {}}
                 onSelectTheme={() => {}} onSelectLightStyle={() => {}} />
               <section data-testid="external-scroll">{content}</section>
             </>} />
         );
-        if (currentView === 'all') {
+        if (currentView === 'all' || currentView === 'imported-files') {
           const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
           expect(header).toContain('data-testid="play-all-button"');
           expect(header).toContain('data-testid="toggle-select-mode"');

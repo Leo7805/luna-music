@@ -136,8 +136,10 @@ describe('Music Folders summary in the actual App composition', () => {
     libraryData = library([folder('Root', [track('a:1', 'Direct.mp3'), track('a:2', 'Child.mp3', 'Disc/Child.mp3')])]);
     mount(); click(byId('folder-subfolders-section').querySelector<HTMLElement>('.group')!);
     expect(byId('folder-breadcrumb').textContent).toContain('Root');
-    expect(byId('tracklist-count').textContent).toBe('1 track');
-    expect(byId('play-all-button')).not.toBeNull(); expect(byId('toggle-select-mode')).not.toBeNull();
+    expect(byId('header-subtitle').textContent).toBe('1 track');
+    expect(byId('tracklist-toolbar')).toBeNull();
+    expect(byId('play-all-button').closest('header')).not.toBeNull();
+    expect(byId('toggle-select-mode').closest('header')).not.toBeNull();
     expect(byId('folder-subfolders-section').textContent).toContain('Disc');
   });
 

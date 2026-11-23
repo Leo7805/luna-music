@@ -114,8 +114,9 @@ describe('Compact Library Headers (All Tracks & Folder View)', () => {
     expect(html).toContain('Music Library');
     // Folder name appears exactly once as the inline h1
     expect((html.match(/>mp3</g) || []).length).toBe(1);
-    // Subtitle count is NOT duplicated in Row 1 for folder view
-    expect(html).not.toContain('319 tracks');
+    // Subtitle count renders inline alongside the breadcrumb in Row 1
+    expect(html).toContain('data-testid="header-subtitle"');
+    expect(html).toContain('319 tracks');
   });
 
   it('FolderView with no subfolders hides Subfolders(0)/Go Up/Folder Tracks and renders count + Play All only once', () => {

@@ -3,7 +3,8 @@ import { Folder } from 'lucide-react';
 import { FolderNode, Playlist, TrackItem } from '../types/music';
 import { isSameTrack } from '../utils/trackIdentity';
 import { isTrackPlayable } from '../utils/audioFileTypes';
-import { TrackList } from './TrackList';
+import { TrackList, TrackListProps } from './TrackList';
+import { PlayAllButton, SelectModeButton } from './TrackListActions';
 import { isImportedFilesCollection } from '../utils/folderCollections';
 import { ImportedFilesIcon, IMPORTED_FILES_ICON_SURFACE_CLASS } from './ImportedFilesIcon';
 
@@ -11,6 +12,7 @@ interface FolderViewProps {
   currentNode: FolderNode | null;
   isFolderOverview?: boolean;
   overviewNodes?: FolderNode[];
+  renderLayout?: TrackListProps['renderLayout'];
   libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
@@ -36,6 +38,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
   currentNode,
   isFolderOverview = false,
   overviewNodes,
+  renderLayout,
   libraryTracks,
   currentTrackId,
   isPlaying,
@@ -56,13 +59,22 @@ export const FolderView: React.FC<FolderViewProps> = ({
   onAddTracksToFavourites,
   onRemoveTracksFromFavourites,
 }) => {
+  const activeLayout = isFolderOverview ? undefined : renderLayout;
+  const disabledActions = (
+    <>
+      <PlayAllButton onClick={() => {}} disabled />
+      <SelectModeButton active={false} onClick={() => {}} disabled />
+    </>
+  );
+
   if (!currentNode) {
-    return (
+    const empty = (
       <div className="p-8 text-center text-slate-500 dark:text-slate-400">
         <Folder className="w-12 h-12 mx-auto mb-3 opacity-30 text-indigo-500 dark:text-indigo-400" />
         <p>No folder selected. Pick a folder from the sidebar.</p>
       </div>
     );
+    return activeLayout ? activeLayout({ actions: disabledActions, content: empty }) : empty;
   }
 
   const handlePlayAll = () => {
@@ -123,6 +135,9 @@ export const FolderView: React.FC<FolderViewProps> = ({
 
   if (currentNode.tracks.length === 0 && subfolders.length > 0) {
     if (isFolderOverview) return subfoldersSection;
+    if (activeLayout) {
+      return activeLayout({ actions: disabledActions, content: subfoldersSection });
+    }
     return (
       <div className="space-y-3">
         <div
@@ -143,13 +158,16 @@ export const FolderView: React.FC<FolderViewProps> = ({
 
   return (
     <TrackList
+      key={currentNode.id}
       tracks={currentNode.tracks}
       libraryTracks={libraryTracks}
       currentTrackId={currentTrackId}
       isPlaying={isPlaying}
       favourites={favourites}
       playlists={playlists}
+      hideTrackCount={Boolean(activeLayout)}
       beforeTable={subfoldersSection}
+      renderLayout={activeLayout}
       onPlayAll={handlePlayAll}
       onPlayTrack={onPlayTrack}
       onTogglePlay={onTogglePlay}

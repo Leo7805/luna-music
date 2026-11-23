@@ -20,10 +20,19 @@ export interface LibraryContentProps {
   playlists: ReturnType<typeof usePlaylists>;
   audioPlayer: ReturnType<typeof useAudioPlayer>;
   folderCollections?: FolderCollections;
+  renderUnifiedLayout?: TrackListProps['renderLayout'];
+  /** @deprecated Prefer renderUnifiedLayout */
   renderAllTracksLayout?: TrackListProps['renderLayout'];
 }
 
-export function LibraryContent({ library, playlists, audioPlayer, folderCollections, renderAllTracksLayout }: LibraryContentProps) {
+export function LibraryContent({
+  library,
+  playlists,
+  audioPlayer,
+  folderCollections,
+  renderUnifiedLayout,
+  renderAllTracksLayout,
+}: LibraryContentProps) {
   const {
     currentView,
     isLoading,
@@ -97,10 +106,18 @@ export function LibraryContent({ library, playlists, audioPlayer, folderCollecti
     audioPlayer.playQueue(uniqueTracks, 0, false);
   }, [displayedTracks, audioPlayer]);
 
+  const isFolderOverview = currentView === 'folder' && !library.selectedFolderPath;
+  const unifiedLayout = renderUnifiedLayout ?? renderAllTracksLayout;
+  const usesUnifiedLayout =
+    Boolean(unifiedLayout) &&
+    (currentView === 'all' ||
+      currentView === 'imported-files' ||
+      (currentView === 'folder' && !isFolderOverview));
+
   // Loading and source-empty states have no mounted list selection controller.
   const wrapUnavailableContent = (content: React.ReactNode) =>
-    currentView === 'all' && renderAllTracksLayout
-      ? renderAllTracksLayout({
+    usesUnifiedLayout && unifiedLayout
+      ? unifiedLayout({
           actions: (
             <>
               <PlayAllButton onClick={handlePlayAllDisplayed} disabled />
@@ -168,7 +185,7 @@ export function LibraryContent({ library, playlists, audioPlayer, folderCollecti
         <TrackList
           {...commonTrackListProps}
           hideTrackCount={true}
-          renderLayout={renderAllTracksLayout}
+          renderLayout={unifiedLayout}
           emptyVariant={searchQuery ? 'search' : 'default'}
         />
       );
@@ -187,6 +204,7 @@ export function LibraryContent({ library, playlists, audioPlayer, folderCollecti
         <TrackList
           {...commonTrackListProps}
           hideTrackCount={true}
+          renderLayout={unifiedLayout}
           onRemoveImportedFiles={removeImportedFiles}
           isImportedFilesView={true}
           emptyVariant={searchQuery ? 'search' : 'default'}
@@ -234,8 +252,9 @@ export function LibraryContent({ library, playlists, audioPlayer, folderCollecti
       return (
         <FolderView
           currentNode={currentFolderNode}
-          isFolderOverview={library.selectedFolderPath === ''}
+          isFolderOverview={isFolderOverview}
           overviewNodes={(folderCollections ?? deriveFolderCollections(library.folders ?? library.library?.folders ?? [])).overviewNodes}
+          renderLayout={isFolderOverview ? undefined : unifiedLayout}
           libraryTracks={libraryTracks}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}
