@@ -346,6 +346,8 @@ export function deriveViewHeaderInfo(params: {
   totalOverviewCollectionsCount?: number;
   filteredDetailTracksCount?: number;
   totalDetailTracksCount?: number;
+  filteredSubfoldersCount?: number;
+  totalSubfoldersCount?: number;
 }): { title: string; subtitle: string } {
   const {
     hasLibrary,
@@ -372,6 +374,8 @@ export function deriveViewHeaderInfo(params: {
     totalOverviewCollectionsCount,
     filteredDetailTracksCount,
     totalDetailTracksCount,
+    filteredSubfoldersCount,
+    totalSubfoldersCount,
   } = params;
   const isFolderOverview = currentView === 'folder' && !selectedFolderPath;
   const hasQuery = Boolean(searchQuery.trim());
@@ -458,7 +462,17 @@ export function deriveViewHeaderInfo(params: {
       subtitle = `${artistsCount} ${artistsCount === 1 ? 'artist' : 'artists'} · ${folderOverviewTracksCount} ${folderOverviewTracksCount === 1 ? 'track' : 'tracks'}${hasQuery ? ' total' : ''}`;
     }
   } else if (currentView === 'folder' && !isFolderOverview && hasLibrary && hasQuery && totalDetailTracksCount !== undefined) {
-    subtitle = formatDetailFiltered(filteredDetailTracksCount ?? displayedTracksCount, totalDetailTracksCount);
+    const totalSubs = totalSubfoldersCount ?? 0;
+    const filteredSubs = filteredSubfoldersCount ?? 0;
+    const filteredTrks = filteredDetailTracksCount ?? displayedTracksCount;
+    const formatSubs = `${filteredSubs} of ${totalSubs} ${totalSubs === 1 ? 'folder' : 'folders'}`;
+    if (totalSubs > 0 && totalDetailTracksCount > 0) {
+      subtitle = `${formatSubs} · ${formatDetailFiltered(filteredTrks, totalDetailTracksCount)}`;
+    } else if (totalSubs > 0) {
+      subtitle = formatSubs;
+    } else {
+      subtitle = formatDetailFiltered(filteredTrks, totalDetailTracksCount);
+    }
   } else if (currentView === 'favourites' || hasLibrary) {
     subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
   }

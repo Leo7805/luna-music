@@ -267,7 +267,7 @@ describe('Music Library Lifecycle & Operations (Stage 6)', () => {
   });
 
   describe('24. Search Filter & Displayed Tracks Derivation', () => {
-    it('filters tracks case-insensitively across title, artist, album, and filename', () => {
+    it('filters tracks case-insensitively by displayed song title only', () => {
       const t1 = createMockTrack('1', 'electric_dreams.flac', 'f1', {
         metadata: { title: 'Electric Dreams', artist: 'Synth Band', album: 'Neon', duration: 100, isMetadataLoaded: true },
       });
@@ -284,7 +284,21 @@ describe('Music Library Lifecycle & Operations (Stage 6)', () => {
         sourceType: 'fs-access',
       };
 
-      const result = deriveDisplayedTracks({
+      const titleMatch = deriveDisplayedTracks({
+        library: lib,
+        currentView: 'all',
+        currentFolderNode: null,
+        selectedArtistName: null,
+        selectedAlbumId: null,
+        albums: [],
+        favouriteTracks: [],
+        searchQuery: 'ELECTRIC',
+      });
+
+      expect(titleMatch.length).toBe(1);
+      expect(titleMatch[0].id).toBe('1');
+
+      const artistOnly = deriveDisplayedTracks({
         library: lib,
         currentView: 'all',
         currentFolderNode: null,
@@ -295,8 +309,7 @@ describe('Music Library Lifecycle & Operations (Stage 6)', () => {
         searchQuery: 'synth',
       });
 
-      expect(result.length).toBe(1);
-      expect(result[0].id).toBe('1');
+      expect(artistOnly.length).toBe(0);
     });
   });
 

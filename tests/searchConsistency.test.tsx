@@ -114,40 +114,45 @@ describe('librarySearch unit helpers', () => {
     metadata: { title: '', artist: '', album: '', duration: 0, isMetadataLoaded: false },
   });
 
-  it('handles empty, whitespace, case-insensitive, all track fields, missing metadata, order and non-mutation', () => {
+  it('handles empty, whitespace, case-insensitive display titles, missing metadata fallback, order and non-mutation', () => {
     const input = [t1, t2, tMissingMeta];
     const snapshot = [...input];
 
     expect(filterTracksByQuery(input, '')).toEqual(input);
     expect(filterTracksByQuery(input, '   ')).toEqual(input);
-    expect(filterTracksByQuery(input, 'MILES')).toEqual([t1]);
-    expect(filterTracksByQuery(input, 'night opera')).toEqual([t2]);
-    expect(filterTracksByQuery(input, '01-sunrise')).toEqual([t1]);
-    expect(filterTracksByQuery(input, 'rock/')).toEqual([t2]);
+    expect(filterTracksByQuery(input, 'SUNRISE')).toEqual([t1]);
+    expect(filterTracksByQuery(input, 'midnight express')).toEqual([t2]);
     expect(filterTracksByQuery(input, 'raw_demo')).toEqual([tMissingMeta]);
+    // Artist, album, path, and extension must not match by default
+    expect(filterTracksByQuery(input, 'MILES')).toEqual([]);
+    expect(filterTracksByQuery(input, 'night opera')).toEqual([]);
+    expect(filterTracksByQuery(input, 'rock/')).toEqual([]);
+    expect(filterTracksByQuery(input, 'wav')).toEqual([]);
     expect(filterTracksByQuery(input, 'zzz-no-match')).toEqual([]);
     expect(input).toEqual(snapshot);
   });
 
   it('preserves originalIndex in filterIndexedTracksByQuery including duplicate entries', () => {
     const entries = [t1, t2, tMissingMeta, t2];
-    const matches = filterIndexedTracksByQuery(entries, 'queen');
+    const matches = filterIndexedTracksByQuery(entries, 'midnight');
     expect(matches.map((m) => ({ id: m.track.id, idx: m.originalIndex }))).toEqual([
       { id: 't2', idx: 1 },
       { id: 't2', idx: 3 },
     ]);
   });
 
-  it('filters albums, artists, playlists, and top-level folder nodes consistently', () => {
+  it('filters albums, artists, playlists, and top-level folder nodes by displayed name only', () => {
     const albums = [
       makeAlbum('a1', 'Kind of Blue', 'Miles Davis', [t1]),
       makeAlbum('a2', 'Night Opera', 'Queen', [t2]),
     ];
-    expect(filterAlbumsByQuery(albums, 'sunrise').map((a) => a.id)).toEqual(['a1']);
-    expect(filterAlbumsByQuery(albums, 'queen').map((a) => a.id)).toEqual(['a2']);
+    expect(filterAlbumsByQuery(albums, 'blue').map((a) => a.id)).toEqual(['a1']);
+    expect(filterAlbumsByQuery(albums, 'sunrise')).toEqual([]);
+    expect(filterAlbumsByQuery(albums, 'queen')).toEqual([]);
 
     const artists = [makeArtist('ar1', 'Miles Davis', [t1]), makeArtist('ar2', 'Queen', [t2])];
-    expect(filterArtistsByQuery(artists, 'kind of blue').map((a) => a.id)).toEqual(['ar1']);
+    expect(filterArtistsByQuery(artists, 'miles').map((a) => a.id)).toEqual(['ar1']);
+    expect(filterArtistsByQuery(artists, 'kind of blue')).toEqual([]);
 
     const playlists: Playlist[] = [
       {
@@ -160,7 +165,7 @@ describe('librarySearch unit helpers', () => {
       { id: 'p2', name: 'Workout', tracks: [], createdAt: 2, updatedAt: 2 },
     ];
     expect(filterPlaylistsByQuery(playlists, 'chill', [t1, t2]).map((p) => p.id)).toEqual(['p1']);
-    expect(filterPlaylistsByQuery(playlists, 'sunrise', [t1, t2]).map((p) => p.id)).toEqual(['p1']);
+    expect(filterPlaylistsByQuery(playlists, 'sunrise', [t1, t2])).toEqual([]);
     expect(filterPlaylistsByQuery(playlists, 'work', [t1, t2]).map((p) => p.id)).toEqual(['p2']);
 
     const nodes = [
@@ -331,11 +336,16 @@ describe('Phase 5 Search Consistency DOM & Interaction Behaviour', () => {
 
     renderFolder('star');
     expect(host.querySelectorAll('[data-testid^="track-row-"]').length).toBe(1);
+    expect(host.querySelector('[data-testid="folder-subfolders-section"]')).toBeNull();
     click(host.querySelector<HTMLElement>('[data-testid="play-all-button"]'));
     expect(onPlayQueue).toHaveBeenCalledWith([t1], 0, false);
 
-    renderFolder('zzz');
+    renderFolder('Live');
     expect(host.querySelector('[data-testid="folder-subfolders-section"]')?.textContent).toContain('Live Disc');
+    expect(host.textContent).not.toContain('No tracks found matching your search.');
+
+    renderFolder('zzz');
+    expect(host.querySelector('[data-testid="folder-subfolders-section"]')).toBeNull();
     expect(host.textContent).toContain('No tracks found matching your search.');
 
     const album = makeAlbum('alb-1', 'Black Holes', 'Muse', [t1, t2]);

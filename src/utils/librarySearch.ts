@@ -1,4 +1,5 @@
 import { AlbumGroup, ArtistGroup, FolderNode, LibraryView, Playlist, TrackItem } from '../types/music';
+import { isSupportedAudioFile, stripExtension } from './audioFileTypes';
 import { resolvePlaylistTracks } from './musicTree';
 
 export interface IndexedTrackMatch {
@@ -10,20 +11,37 @@ export function normalizeSearchQuery(query: string): string {
   return query.trim().toLowerCase();
 }
 
+/**
+ * Removes only a recognized audio file extension (e.g. .mp3, .flac) from a filename.
+ * Ordinary names containing periods (e.g. "3.14", "Mr. Brightside") are preserved intact.
+ */
+export function stripSupportedAudioExtension(filename: string): string {
+  const trimmed = filename.trim();
+  return isSupportedAudioFile(trimmed) ? stripExtension(trimmed) : trimmed;
+}
+
+/**
+ * Single authoritative display & search title resolver for a track.
+ * Priority:
+ * 1. Explicit non-empty metadata.title (unless it is an unstripped verbatim copy of track.name
+ *    with a recognized audio extension, such as an unavailable playlist placeholder).
+ * 2. track.name with any recognized audio extension stripped.
+ */
+export function getTrackDisplayTitle(track: TrackItem): string {
+  const metaTitle = track.metadata?.title?.trim() || '';
+  const rawName = track.name?.trim() || '';
+  if (metaTitle) {
+    if (rawName && metaTitle === rawName && isSupportedAudioFile(metaTitle)) {
+      return stripExtension(metaTitle);
+    }
+    return metaTitle;
+  }
+  return stripSupportedAudioExtension(rawName);
+}
+
 export function matchesTrackSearch(track: TrackItem, normalizedQuery: string): boolean {
   if (!normalizedQuery) return true;
-  const title = track.metadata?.title || '';
-  const artist = track.metadata?.artist || '';
-  const album = track.metadata?.album || '';
-  const name = track.name || '';
-  const path = track.relativePath || '';
-  return (
-    name.toLowerCase().includes(normalizedQuery) ||
-    title.toLowerCase().includes(normalizedQuery) ||
-    artist.toLowerCase().includes(normalizedQuery) ||
-    album.toLowerCase().includes(normalizedQuery) ||
-    path.toLowerCase().includes(normalizedQuery)
-  );
+  return getTrackDisplayTitle(track).toLowerCase().includes(normalizedQuery);
 }
 
 export function filterTracksByQuery(tracks: readonly TrackItem[], query: string): TrackItem[] {
@@ -50,51 +68,28 @@ export function filterIndexedTracksByQuery(
 export function filterAlbumsByQuery(albums: readonly AlbumGroup[], query: string): AlbumGroup[] {
   const normalized = normalizeSearchQuery(query);
   if (!normalized) return [...albums];
-  return albums.filter(
-    (album) =>
-      album.name.toLowerCase().includes(normalized) ||
-      album.artist.toLowerCase().includes(normalized) ||
-      album.tracks.some((track) => matchesTrackSearch(track, normalized))
-  );
+  return albums.filter((album) => (album.name || '').toLowerCase().includes(normalized));
 }
 
 export function filterArtistsByQuery(artists: readonly ArtistGroup[], query: string): ArtistGroup[] {
   const normalized = normalizeSearchQuery(query);
   if (!normalized) return [...artists];
-  return artists.filter(
-    (artist) =>
-      artist.name.toLowerCase().includes(normalized) ||
-      artist.tracks.some((track) => matchesTrackSearch(track, normalized))
-  );
+  return artists.filter((artist) => (artist.name || '').toLowerCase().includes(normalized));
 }
 
 export function filterPlaylistsByQuery(
   playlists: readonly Playlist[],
   query: string,
-  libraryTracks: readonly TrackItem[] = []
+  _libraryTracks?: readonly TrackItem[]
 ): Playlist[] {
   const normalized = normalizeSearchQuery(query);
   if (!normalized) return [...playlists];
-  return playlists.filter((pl) => {
-    if (pl.name.toLowerCase().includes(normalized)) return true;
-    const matchesRef = pl.tracks.some(
-      (ref) =>
-        (ref.name || '').toLowerCase().includes(normalized) ||
-        (ref.artist || '').toLowerCase().includes(normalized) ||
-        (ref.album || '').toLowerCase().includes(normalized)
-    );
-    if (matchesRef) return true;
-    if (libraryTracks.length > 0 && pl.tracks.length > 0) {
-      const resolved = resolvePlaylistTracks(pl.tracks, libraryTracks as TrackItem[]);
-      return resolved.some((track) => matchesTrackSearch(track, normalized));
-    }
-    return false;
-  });
+  return playlists.filter((pl) => (pl.name || '').toLowerCase().includes(normalized));
 }
 
 /**
- * Filters top-level Music Folders overview collection cards by display name only
- * (physical root folder names + the Imported Files virtual collection label).
+ * Filters folder/collection cards by their display name only.
+ * Used for both Music Folders Overview (including Imported Files) and Folder Detail child folders.
  */
 export function filterFolderNodesByQuery(nodes: readonly FolderNode[], query: string): FolderNode[] {
   const normalized = normalizeSearchQuery(query);
@@ -102,11 +97,40 @@ export function filterFolderNodesByQuery(nodes: readonly FolderNode[], query: st
   return nodes.filter((node) => (node.name || '').toLowerCase().includes(normalized));
 }
 
+/**
+ * Returns an accurate contextual placeholder & accessible label for the active library view.
+ */
+export function getSearchPlaceholder(params: {
+  currentView: LibraryView;
+  isFolderOverview: boolean;
+  hasSubfolders?: boolean;
+  isPlaylistDetail?: boolean;
+  isAlbumDetail?: boolean;
+  isArtistDetail?: boolean;
+}): string {
+  if (params.currentView === 'playlists' && !params.isPlaylistDetail) {
+    return 'Search playlists...';
+  }
+  if (params.currentView === 'albums' && !params.isAlbumDetail) {
+    return 'Search albums...';
+  }
+  if (params.currentView === 'artists' && !params.isArtistDetail) {
+    return 'Search artists...';
+  }
+  if (params.currentView === 'folder') {
+    if (params.isFolderOverview) return 'Search folders...';
+    return params.hasSubfolders ? 'Search folders and song titles...' : 'Search song titles...';
+  }
+  return 'Search song titles...';
+}
+
 export interface SearchHeaderCounts {
   filteredOverviewCount?: number;
   totalOverviewCollectionsCount?: number;
   filteredDetailTracksCount?: number;
   totalDetailTracksCount?: number;
+  filteredSubfoldersCount?: number;
+  totalSubfoldersCount?: number;
 }
 
 /**
@@ -138,9 +162,12 @@ export function deriveSearchHeaderCounts(params: {
       };
     }
     const directTracks = params.currentFolderNode?.tracks ?? [];
+    const directSubfolders = params.currentFolderNode?.subfolders ?? [];
     return {
       filteredDetailTracksCount: filterTracksByQuery(directTracks, normalized).length,
       totalDetailTracksCount: directTracks.length,
+      filteredSubfoldersCount: filterFolderNodesByQuery(directSubfolders, normalized).length,
+      totalSubfoldersCount: directSubfolders.length,
     };
   }
 
@@ -176,11 +203,7 @@ export function deriveSearchHeaderCounts(params: {
       };
     }
     return {
-      filteredOverviewCount: filterPlaylistsByQuery(
-        params.playlists,
-        normalized,
-        params.libraryTracks
-      ).length,
+      filteredOverviewCount: filterPlaylistsByQuery(params.playlists, normalized).length,
     };
   }
 

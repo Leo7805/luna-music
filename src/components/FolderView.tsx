@@ -5,7 +5,6 @@ import { isSameTrack } from '../utils/trackIdentity';
 import { isTrackPlayable } from '../utils/audioFileTypes';
 import { TrackList, TrackListProps } from './TrackList';
 import { PlayAllButton, SelectModeButton } from './TrackListActions';
-import { TrackListEmptyState } from './TrackListEmptyState';
 import { isImportedFilesCollection } from '../utils/folderCollections';
 import {
   filterFolderNodesByQuery,
@@ -113,7 +112,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
   };
 
   const baseSubfolders = isFolderOverview && overviewNodes ? overviewNodes : currentNode.subfolders;
-  const subfolders = isFolderOverview && hasQuery
+  const subfolders = hasQuery
     ? filterFolderNodesByQuery(baseSubfolders, searchQuery)
     : baseSubfolders;
   const subfoldersSection =
@@ -184,15 +183,9 @@ export const FolderView: React.FC<FolderViewProps> = ({
   }
 
   if (!isFolderOverview && hasQuery && visibleTracks.length === 0 && subfoldersSection) {
-    const emptyWithSubs = (
-      <div>
-        {subfoldersSection}
-        <TrackListEmptyState emptyVariant="search" />
-      </div>
-    );
     return activeLayout
-      ? activeLayout({ actions: disabledActions, content: emptyWithSubs })
-      : emptyWithSubs;
+      ? activeLayout({ actions: disabledActions, content: subfoldersSection })
+      : subfoldersSection;
   }
 
   return (

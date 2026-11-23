@@ -18,7 +18,7 @@ import { useTheme } from './hooks/useTheme';
 import { getBreadcrumbs } from './utils/musicTree';
 import { deriveViewHeaderInfo } from './utils/libraryAggregation';
 import { deriveFolderCollections } from './utils/folderCollections';
-import { deriveSearchHeaderCounts } from './utils/librarySearch';
+import { deriveSearchHeaderCounts, getSearchPlaceholder } from './utils/librarySearch';
 import { getStoredNavigation, storeNavigation } from './utils/navigationStorage';
 import { isFavouriteTrack } from './utils/favouriteResolvers';
 import { LibraryView, TrackItem } from './types/music';
@@ -286,6 +286,15 @@ export function App() {
         }
       : handleSelectFolder;
 
+  const searchPlaceholder = getSearchPlaceholder({
+    currentView: library.currentView,
+    isFolderOverview: library.currentView === 'folder' && !library.selectedFolderPath,
+    hasSubfolders: Boolean(library.currentFolderNode?.subfolders.length),
+    isPlaylistDetail: Boolean(selectedPlaylist),
+    isAlbumDetail: Boolean(selectedAlbum),
+    isArtistDetail: Boolean(selectedArtist),
+  });
+
   // A render callback, not a component type: list state and DOM survive updates.
   const renderLibraryLayout = ({ actions, content }: Omit<TrackListLayoutSlots, 'actions'> & {
     actions?: React.ReactNode;
@@ -296,6 +305,7 @@ export function App() {
         title={viewTitle}
         subtitle={viewSubtitle}
         searchQuery={library.searchQuery}
+        searchPlaceholder={searchPlaceholder}
         breadcrumbs={headerBreadcrumbs}
         keepBreadcrumbsOnSearch={Boolean(
           selectedPlaylist ||

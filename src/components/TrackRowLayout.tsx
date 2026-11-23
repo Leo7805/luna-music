@@ -2,6 +2,7 @@ import React from 'react';
 import { TrackItem } from '../types/music';
 import { formatDuration } from '../utils/formatters';
 import { getTrackStatus } from '../utils/audioFileTypes';
+import { getTrackDisplayTitle } from '../utils/librarySearch';
 import { TrackStatusBadge } from './TrackStatusBadge';
 import { TrackThumbnail } from './TrackThumbnail';
 
@@ -50,7 +51,7 @@ export function TrackRowLayout({
   const extension = track.name.split('.').pop()?.toUpperCase() || '';
   const status = getTrackStatus(track);
   const isAbnormal = status !== 'normal';
-  const title = track.metadata.title || track.name;
+  const title = getTrackDisplayTitle(track);
   const hasLyrics = Boolean(track.lrcHandle || track.lrcFile || track.lrcContent);
 
   const rowSurfaceClass =

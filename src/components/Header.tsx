@@ -10,6 +10,7 @@ export interface HeaderProps {
   subtitle?: string;
   actions?: React.ReactNode;
   searchQuery: string;
+  searchPlaceholder?: string;
   breadcrumbs?: BreadcrumbItem[];
   keepBreadcrumbsOnSearch?: boolean;
   theme: Theme;
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   subtitle,
   actions,
   searchQuery,
+  searchPlaceholder = 'Search song titles...',
   breadcrumbs,
   keepBreadcrumbsOnSearch = false,
   theme,
@@ -79,10 +81,10 @@ export const Header: React.FC<HeaderProps> = ({
           <Search className="w-4 h-4 text-[var(--text-secondary)] dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            aria-label="Search titles, artists, albums"
+            aria-label={searchPlaceholder.replace(/\.+$/, '')}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search titles, artists, albums..."
+            placeholder={searchPlaceholder}
             className="w-full h-8 pl-9 pr-8 rounded-xl text-xs glass-input placeholder-[var(--text-secondary)] dark:placeholder-slate-500 text-[var(--text-primary)] dark:text-slate-100"
           />
           {searchQuery ? (
