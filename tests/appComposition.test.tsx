@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { LibraryContent } from '../src/components/LibraryContent';
+import { Header } from '../src/components/Header';
 import { deriveViewHeaderInfo } from '../src/utils/libraryAggregation';
 import { getBreadcrumbs } from '../src/utils/musicTree';
 import {
@@ -320,6 +321,37 @@ describe('App Composition & Component Integration (Stage 7)', () => {
       );
       expect(htmlArtists).toContain('Artist A');
     });
+  });
+
+  describe('All Tracks layout composition boundary', () => {
+    it.each(['all', 'favourites', 'folder', 'imported-files', 'albums', 'artists', 'playlists'] as const)(
+      'uses the external layout only for %s when All Tracks is active', (currentView) => {
+        const html = renderToStaticMarkup(
+          <LibraryContent library={createMockLibraryHook({ currentView })}
+            playlists={createMockPlaylistsHook()} audioPlayer={createMockAudioPlayerHook()}
+            renderAllTracksLayout={({ actions, content }) => <>
+              <Header title="All Tracks" searchQuery="" theme="light" lightStyle="warm"
+                actions={actions} onSearchChange={() => {}} onOpenShortcutsModal={() => {}}
+                onSelectTheme={() => {}} onSelectLightStyle={() => {}} />
+              <section data-testid="external-scroll">{content}</section>
+            </>} />
+        );
+        if (currentView === 'all') {
+          const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
+          expect(header).toContain('data-testid="play-all-button"');
+          expect(header).toContain('data-testid="toggle-select-mode"');
+          expect(html).not.toContain('data-testid="tracklist-toolbar"');
+          expect(html.match(/data-testid="play-all-button"/g)).toHaveLength(1);
+          expect(html.indexOf('</header>')).toBeLessThan(html.indexOf('data-testid="external-scroll"'));
+        } else {
+          expect(html).not.toContain('data-testid="external-scroll"');
+          expect(html).not.toContain('<header');
+          if (currentView === 'favourites' || currentView === 'folder') {
+            expect(html).toContain('data-testid="tracklist-toolbar"');
+          }
+        }
+      },
+    );
   });
 
   describe('3. Header Info & Breadcrumb Derivations', () => {

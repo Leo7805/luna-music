@@ -75,6 +75,21 @@ describe('Compact Library Headers (All Tracks & Folder View)', () => {
     expect(htmlSelected).toContain('4 of 339 selected');
   });
 
+  it('hides only the toolbar when a layout supplies actions, preserving table columns and beforeTable', () => {
+    const html = renderToStaticMarkup(
+      <TrackListHeader tracksCount={2} selectedCount={1} isSelectMode showCheckboxes
+        showToolbar={false} beforeTable={<div data-testid="before-table">Folders</div>}
+        onToggleSelectMode={() => {}} onToggleSelectAll={() => {}} onPlayAll={() => {}} />
+    );
+    expect(html).not.toContain('data-testid="tracklist-toolbar"');
+    expect(html).not.toContain('data-testid="play-all-button"');
+    expect(html).not.toContain('data-testid="toggle-select-mode"');
+    expect(html).toContain('Title');
+    expect(html).toContain('Album');
+    expect(html).toContain('aria-label="Select all"');
+    expect(html.indexOf('data-testid="before-table"')).toBeLessThan(html.indexOf('Title'));
+  });
+
   it('Folder Header renders inline breadcrumb Row 1 without duplicating folder title or subtitle', () => {
     const html = renderToStaticMarkup(
       <Header

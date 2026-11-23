@@ -7,6 +7,13 @@ import { TrackListHeader } from './TrackListHeader';
 import { TrackListEmptyState } from './TrackListEmptyState';
 import { BulkActionToolbar } from './BulkActionToolbar';
 import { TrackPlaylistModals } from './TrackPlaylistModals';
+import { PlayAllButton, SelectModeButton } from './TrackListActions';
+import { isTrackPlayable } from '../utils/audioFileTypes';
+
+export interface TrackListLayoutSlots {
+  actions: React.ReactNode;
+  content: React.ReactNode;
+}
 
 export interface TrackListProps {
   tracks: TrackItem[];
@@ -34,6 +41,7 @@ export interface TrackListProps {
   onPlayAll?: () => void;
   hideTrackCount?: boolean;
   beforeTable?: React.ReactNode;
+  renderLayout?: (slots: TrackListLayoutSlots) => React.ReactNode;
   emptyVariant?: 'default' | 'favourites' | 'search';
   emptyMessage?: string;
   isPlaylistView?: boolean;
@@ -66,6 +74,7 @@ export const TrackList: React.FC<TrackListProps> = ({
   onPlayAll,
   hideTrackCount = false,
   beforeTable,
+  renderLayout,
   emptyVariant = 'default',
   emptyMessage,
   isPlaylistView = false,
@@ -202,14 +211,26 @@ export const TrackList: React.FC<TrackListProps> = ({
     clearSelection();
   };
 
+  const actions = renderLayout ? (
+    <>
+      {onPlayAll && <PlayAllButton onClick={onPlayAll} disabled={!tracks.some(isTrackPlayable)} />}
+      <SelectModeButton
+        active={isSelectMode}
+        onClick={handleToggleSelectMode}
+        disabled={tracks.length === 0 && !isSelectMode}
+      />
+    </>
+  ) : null;
+
   if (tracks.length === 0) {
-    return <TrackListEmptyState emptyVariant={emptyVariant} emptyMessage={emptyMessage} />;
+    const content = <TrackListEmptyState emptyVariant={emptyVariant} emptyMessage={emptyMessage} />;
+    return renderLayout ? renderLayout({ actions, content }) : content;
   }
 
   const isPlaylistMode = Boolean(onRemoveFromPlaylist || onMoveTrackUp);
   const showCheckboxes = isSelectMode || selectedTrackIds.size > 0;
 
-  return (
+  const content = (
     <div className="w-full relative">
       {/* Feedback Toast */}
       {toastMessage && (
@@ -225,6 +246,7 @@ export const TrackList: React.FC<TrackListProps> = ({
         isSelectMode={isSelectMode}
         showCheckboxes={showCheckboxes}
         hideTrackCount={hideTrackCount}
+        showToolbar={!renderLayout}
         beforeTable={beforeTable}
         onToggleSelectMode={handleToggleSelectMode}
         onToggleSelectAll={toggleSelectAll}
@@ -304,4 +326,5 @@ export const TrackList: React.FC<TrackListProps> = ({
       />
     </div>
   );
+  return renderLayout ? renderLayout({ actions, content }) : content;
 };

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
-import { TrackList } from './TrackList';
+import { TrackList, TrackListProps } from './TrackList';
+import { PlayAllButton, SelectModeButton } from './TrackListActions';
 import { PlaylistsView } from './PlaylistsView';
 import { FolderView } from './FolderView';
 import { AlbumsView } from './AlbumsView';
@@ -17,9 +18,10 @@ export interface LibraryContentProps {
   library: ReturnType<typeof useMusicLibrary>;
   playlists: ReturnType<typeof usePlaylists>;
   audioPlayer: ReturnType<typeof useAudioPlayer>;
+  renderAllTracksLayout?: TrackListProps['renderLayout'];
 }
 
-export function LibraryContent({ library, playlists, audioPlayer }: LibraryContentProps) {
+export function LibraryContent({ library, playlists, audioPlayer, renderAllTracksLayout }: LibraryContentProps) {
   const {
     currentView,
     isLoading,
@@ -93,8 +95,22 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
     audioPlayer.playQueue(uniqueTracks, 0, false);
   }, [displayedTracks, audioPlayer]);
 
+  // Loading and source-empty states have no mounted list selection controller.
+  const wrapUnavailableContent = (content: React.ReactNode) =>
+    currentView === 'all' && renderAllTracksLayout
+      ? renderAllTracksLayout({
+          actions: (
+            <>
+              <PlayAllButton onClick={handlePlayAllDisplayed} disabled />
+              <SelectModeButton active={false} onClick={() => {}} disabled />
+            </>
+          ),
+          content,
+        })
+      : content;
+
   if (isLoading) {
-    return (
+    return wrapUnavailableContent(
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <div className="w-10 h-10 border-2 border-[var(--accent-primary)] border-t-transparent rounded-full animate-spin mb-3" />
         <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -105,7 +121,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
   }
 
   if (!hasLibrary && currentView !== 'playlists' && currentView !== 'favourites') {
-    return (
+    return wrapUnavailableContent(
       <EmptyState
         isScanning={isLoading}
         scanCount={scanProgress}
@@ -150,6 +166,7 @@ export function LibraryContent({ library, playlists, audioPlayer }: LibraryConte
         <TrackList
           {...commonTrackListProps}
           hideTrackCount={true}
+          renderLayout={renderAllTracksLayout}
           emptyVariant={searchQuery ? 'search' : 'default'}
         />
       );

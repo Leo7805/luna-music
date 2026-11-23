@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { LibraryContent } from './components/LibraryContent';
+import { TrackListLayoutSlots } from './components/TrackList';
 import { NowPlayingView } from './components/NowPlayingView';
 import { LyricsPanel } from './components/NowPlayingPanel';
 import { BottomPlayer } from './components/BottomPlayer';
@@ -158,6 +159,31 @@ export function App() {
     ]
   );
 
+  // A render callback, not a component type: list state and DOM survive updates.
+  const renderLibraryLayout = ({ actions, content }: Omit<TrackListLayoutSlots, 'actions'> & {
+    actions?: React.ReactNode;
+  }) => (
+    <>
+      <Header
+        actions={actions}
+        title={viewTitle}
+        subtitle={viewSubtitle}
+        searchQuery={library.searchQuery}
+        breadcrumbs={hasLibrary && library.currentView === 'folder' ? breadcrumbs : undefined}
+        theme={theme}
+        lightStyle={lightStyle}
+        onSearchChange={library.setSearchQuery}
+        onBreadcrumbClick={handleSelectFolder}
+        onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
+        onSelectTheme={setTheme}
+        onSelectLightStyle={setLightStyle}
+      />
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 pt-4 pb-6 custom-scrollbar">
+        {content}
+      </div>
+    </>
+  );
+
   return (
     <ArtworkRequestProvider value={library.requestTrackArtwork}>
     <div
@@ -249,33 +275,16 @@ export function App() {
               onSelectLightStyle={setLightStyle}
               onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
             />
-          ) : (
-            <>
-              {/* Header */}
-              <Header
-                title={viewTitle}
-                subtitle={viewSubtitle}
-                searchQuery={library.searchQuery}
-                breadcrumbs={hasLibrary && library.currentView === 'folder' ? breadcrumbs : undefined}
-                theme={theme}
-                lightStyle={lightStyle}
-                onSearchChange={library.setSearchQuery}
-                onBreadcrumbClick={handleSelectFolder}
-                onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
-                onSelectTheme={setTheme}
-                onSelectLightStyle={setLightStyle}
-              />
-
-              {/* Central View Container */}
-              <div className="flex-1 overflow-y-auto px-6 pt-4 pb-6 custom-scrollbar">
-                <LibraryContent
-                  library={library}
-                  playlists={playlists}
-                  audioPlayer={audioPlayer}
-                />
-              </div>
-            </>
-          )}
+          ) : library.currentView === 'all' ? (
+            <LibraryContent
+              library={library}
+              playlists={playlists}
+              audioPlayer={audioPlayer}
+              renderAllTracksLayout={renderLibraryLayout}
+            />
+          ) : renderLibraryLayout({ content: (
+            <LibraryContent library={library} playlists={playlists} audioPlayer={audioPlayer} />
+          ) })}
         </main>
 
         {/* Dedicated Right Lyrics Panel */}

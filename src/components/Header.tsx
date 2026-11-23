@@ -3,10 +3,12 @@ import { Search, X, Command, ChevronRight, SlidersHorizontal } from 'lucide-reac
 import { BreadcrumbItem } from '../utils/musicTree';
 import { Theme, LightStyle } from '../hooks/useTheme';
 import { AppearancePopover } from './AppearancePopover';
+import { ViewHeader } from './ViewHeader';
 
 export interface HeaderProps {
   title: string;
   subtitle?: string;
+  actions?: React.ReactNode;
   searchQuery: string;
   breadcrumbs?: BreadcrumbItem[];
   theme: Theme;
@@ -21,6 +23,7 @@ export interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   title,
   subtitle,
+  actions,
   searchQuery,
   breadcrumbs,
   theme,
@@ -34,70 +37,56 @@ export const Header: React.FC<HeaderProps> = ({
   const [isAppearanceOpen, setIsAppearanceOpen] = useState<boolean>(false);
 
   return (
-    <header className="relative z-30 px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-main)]/80 dark:bg-[#071427]/60 backdrop-blur-md transition-colors duration-200">
-      {/* View Title or Inline Folder Breadcrumb (Row 1) */}
-      <div className="flex-1 min-w-0">
-        {!searchQuery && breadcrumbs && breadcrumbs.length > 1 ? (
-          <nav
-            aria-label="Folder breadcrumb"
-            data-testid="folder-breadcrumb"
-            className="flex items-center gap-1.5 min-w-0 flex-wrap"
-          >
-            {breadcrumbs.map((crumb, idx) => {
-              const isLast = idx === breadcrumbs.length - 1;
-              return (
-                <div key={crumb.path || 'root'} className="flex items-center gap-1.5 min-w-0">
-                  {idx > 0 && (
-                    <ChevronRight className="w-3.5 h-3.5 text-[var(--text-secondary)]/60 dark:text-slate-600 shrink-0" />
-                  )}
-                  {isLast ? (
-                    <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
-                      {crumb.name}
-                    </h1>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onBreadcrumbClick?.(crumb.path)}
-                      className="text-sm font-medium text-[var(--text-secondary)] dark:text-slate-400 hover:text-[var(--text-primary)] dark:hover:text-white transition-colors cursor-pointer truncate"
-                    >
-                      {crumb.name}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </nav>
-        ) : (
-          <div className="flex items-baseline gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
-              {title}
-            </h1>
-            {subtitle && (
-              <span
-                data-testid="header-subtitle"
-                className="text-xs text-[var(--text-secondary)] dark:text-slate-400 font-medium shrink-0"
-              >
-                {subtitle}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Right Controls: Search & Appearance Menu */}
-      <div className="flex items-center gap-3">
-        {/* Search Bar */}
-        <div className="relative w-64 md:w-72">
+    <ViewHeader
+      title={title}
+      subtitle={subtitle}
+      actions={actions}
+      breadcrumbs={!searchQuery && breadcrumbs && breadcrumbs.length > 1 ? (
+        <nav
+          aria-label="Folder breadcrumb"
+          data-testid="folder-breadcrumb"
+          className="flex items-center gap-1.5 min-w-0 flex-wrap"
+        >
+          {breadcrumbs.map((crumb, idx) => {
+            const isLast = idx === breadcrumbs.length - 1;
+            return (
+              <div key={crumb.path || 'root'} className="flex items-center gap-1.5 min-w-0">
+                {idx > 0 && (
+                  <ChevronRight className="w-3.5 h-3.5 text-[var(--text-secondary)]/60 dark:text-slate-600 shrink-0" />
+                )}
+                {isLast ? (
+                  <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
+                    {crumb.name}
+                  </h1>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => onBreadcrumbClick?.(crumb.path)}
+                    className="text-sm font-medium text-[var(--text-secondary)] dark:text-slate-400 hover:text-[var(--text-primary)] dark:hover:text-white transition-colors cursor-pointer truncate"
+                  >
+                    {crumb.name}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </nav>
+      ) : undefined}
+      search={(
+        <div className="relative w-full">
           <Search className="w-4 h-4 text-[var(--text-secondary)] dark:text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
+            aria-label="Search titles, artists, albums"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search titles, artists, albums..."
-            className="w-full pl-9 pr-8 py-2 rounded-xl text-xs glass-input placeholder-[var(--text-secondary)] dark:placeholder-slate-500 text-[var(--text-primary)] dark:text-slate-100"
+            className="w-full h-8 pl-9 pr-8 rounded-xl text-xs glass-input placeholder-[var(--text-secondary)] dark:placeholder-slate-500 text-[var(--text-primary)] dark:text-slate-100"
           />
           {searchQuery ? (
             <button
+              type="button"
+              aria-label="Clear search"
               onClick={() => onSearchChange('')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] dark:hover:text-white cursor-pointer"
             >
@@ -109,13 +98,13 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           )}
         </div>
-
-        {/* Unified Appearance & Settings Button */}
-        <div className="relative">
+      )}
+      settings={(
+        <div className="relative shrink-0 [&_[role=dialog]]:max-w-[calc(100cqw-3rem)]">
           <button
             type="button"
             onClick={() => setIsAppearanceOpen((prev) => !prev)}
-            className="p-2 rounded-xl glass-button text-[var(--text-secondary)] dark:text-slate-200 hover:text-[var(--text-primary)] dark:hover:text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="h-8 w-8 flex items-center justify-center rounded-xl glass-button text-[var(--text-secondary)] dark:text-slate-200 hover:text-[var(--text-primary)] dark:hover:text-white cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500"
             aria-label="Appearance & Settings"
             title="Appearance & Settings"
             aria-expanded={isAppearanceOpen}
@@ -136,7 +125,7 @@ export const Header: React.FC<HeaderProps> = ({
             onOpenShortcutsModal={onOpenShortcutsModal}
           />
         </div>
-      </div>
-    </header>
+      )}
+    />
   );
 };
