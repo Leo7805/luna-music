@@ -336,7 +336,7 @@ describe('App Composition & Component Integration (Stage 7)', () => {
               <section data-testid="external-scroll">{content}</section>
             </>} />
         );
-        if (currentView === 'all' || currentView === 'imported-files') {
+        if (currentView === 'all' || currentView === 'favourites' || currentView === 'imported-files') {
           const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
           expect(header).toContain('data-testid="play-all-button"');
           expect(header).toContain('data-testid="toggle-select-mode"');
@@ -350,7 +350,7 @@ describe('App Composition & Component Integration (Stage 7)', () => {
         } else {
           expect(html).not.toContain('data-testid="external-scroll"');
           expect(html).not.toContain('<header');
-          if (currentView === 'favourites' || currentView === 'folder') {
+          if (currentView === 'folder') {
             expect(html).toContain('data-testid="tracklist-toolbar"');
           }
         }

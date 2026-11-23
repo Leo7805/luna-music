@@ -624,7 +624,7 @@ describe('Play All & Single-Click Playback Interaction Suite', () => {
         onToggleFavourite={() => {}}
       />
     );
-    expect(albumHtml).toContain('Play Album');
+    expect(albumHtml).toContain('Play All');
     expect(albumHtml).toContain('Track A');
 
     // View 4: ArtistsView
@@ -649,7 +649,7 @@ describe('Play All & Single-Click Playback Interaction Suite', () => {
         onToggleFavourite={() => {}}
       />
     );
-    expect(artistHtml).toContain('Play Artist');
+    expect(artistHtml).toContain('Play All');
     expect(artistHtml).toContain('Track A');
   });
 });

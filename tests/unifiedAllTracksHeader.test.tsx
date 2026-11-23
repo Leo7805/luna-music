@@ -263,8 +263,8 @@ describe('Unified All Tracks header', () => {
     expect(byId('appearance-popover')).toBeNull();
   });
 
-  it.each<LibraryView>(['favourites', 'folder'])('keeps %s actions in the original toolbar', (view) => {
-    mount({ view });
+  it('keeps folder overview actions outside the unified header', () => {
+    mount({ view: 'folder' });
     expect(host.querySelector('header')).toBeNull();
     expect(byId('tracklist-toolbar')).not.toBeNull();
     expect(byId('play-all-button').closest('[data-testid="tracklist-toolbar"]')).not.toBeNull();

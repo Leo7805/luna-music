@@ -1,7 +1,10 @@
 import React from 'react';
-import { Play, ArrowLeft, Disc } from 'lucide-react';
+import { Play, Disc } from 'lucide-react';
 import { AlbumGroup, Playlist, TrackItem } from '../types/music';
-import { TrackList } from './TrackList';
+import { isTrackPlayable } from '../utils/audioFileTypes';
+import { TrackList, TrackListProps } from './TrackList';
+import { PlayAllButton, SelectModeButton } from './TrackListActions';
+import { TrackListEmptyState } from './TrackListEmptyState';
 import { formatDuration } from '../utils/formatters';
 import { useLazyArtwork } from '../hooks/useLazyArtwork';
 
@@ -13,123 +16,154 @@ function AlbumArtworkProbe({ track }: { track?: TrackItem }) {
 interface AlbumsViewProps {
   albums: AlbumGroup[];
   selectedAlbumId: string | null;
+  libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
   favourites: Set<string>;
   playlists?: Playlist[];
+  renderLayout?: TrackListProps['renderLayout'];
   onSelectAlbum: (albumId: string | null) => void;
   onPlayTrack: (track: TrackItem) => void;
   onPlayQueue?: (tracks: TrackItem[], startIndex?: number, shuffle?: boolean) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
+  onPlayNextBulk?: (tracks: TrackItem[]) => { movedCount: number; addedCount: number } | void;
   onAddToQueue?: (trackOrTracks: TrackItem | TrackItem[]) => boolean | void;
   onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
+  onAddTracksToPlaylist?: (playlistId: string, tracks: TrackItem[]) => { addedCount: number };
+  onCreateAndAddToPlaylist?: (playlistName: string, trackOrTracks: TrackItem | TrackItem[]) => void;
+  onAddTracksToFavourites?: (tracks: TrackItem[]) => void;
+  onRemoveTracksFromFavourites?: (tracks: TrackItem[]) => void;
 }
 
 export const AlbumsView: React.FC<AlbumsViewProps> = ({
   albums,
   selectedAlbumId,
+  libraryTracks,
   currentTrackId,
   isPlaying,
   favourites,
   playlists,
+  renderLayout,
   onSelectAlbum,
   onPlayTrack,
   onPlayQueue,
   onTogglePlay,
   onToggleFavourite,
   onPlayNext,
+  onPlayNextBulk,
   onAddToQueue,
   onAddToPlaylist,
+  onAddTracksToPlaylist,
+  onCreateAndAddToPlaylist,
+  onAddTracksToFavourites,
+  onRemoveTracksFromFavourites,
 }) => {
-  const selectedAlbum = selectedAlbumId ? albums.find((a) => a.id === selectedAlbumId) : null;
+  const selectedAlbum =
+    selectedAlbumId !== null ? albums.find((a) => a.id === selectedAlbumId) || null : null;
 
   if (selectedAlbum) {
-    return (
-      <div className="space-y-6">
-        {/* Back Button */}
-        <button
-          onClick={() => onSelectAlbum(null)}
-          className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors cursor-pointer"
+    const handlePlayAlbum = () => {
+      const playable = selectedAlbum.tracks.filter(isTrackPlayable);
+      if (playable.length === 0) return;
+      if (onPlayQueue) {
+        onPlayQueue(playable, 0, false);
+      } else {
+        onPlayTrack(playable[0]);
+      }
+    };
+
+    const heroPanel = (
+      <div
+        data-testid="album-hero"
+        className="flex flex-col sm:flex-row items-center sm:items-end gap-5 p-5 mb-5 rounded-2xl glass-panel relative overflow-hidden"
+      >
+        <div
+          className="w-32 h-32 rounded-xl shadow-xl shrink-0 flex items-center justify-center overflow-hidden border border-[var(--border-subtle)] dark:border-white/[0.1]"
+          style={{
+            background: selectedAlbum.placeholderGradient || 'linear-gradient(135deg, #4f46e5, #7c3aed)',
+          }}
         >
-          <ArrowLeft className="w-4 h-4" />
-          <span>All Albums</span>
-        </button>
-
-        {/* Album Header Banner */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-end gap-6 p-6 rounded-2xl glass-panel relative overflow-hidden">
-          <div
-            className="w-44 h-44 rounded-xl shadow-2xl shrink-0 flex items-center justify-center overflow-hidden border border-[var(--border-subtle)] dark:border-white/[0.1]"
-            style={{
-              background: selectedAlbum.placeholderGradient || 'linear-gradient(135deg, #4f46e5, #7c3aed)',
-            }}
-          >
-            {selectedAlbum.artworkUrl ? (
-              <img
-                src={selectedAlbum.artworkUrl}
-                alt={selectedAlbum.name}
-                className="w-full h-full object-cover"
-              />
-            ) : (
-              <Disc className="w-16 h-16 text-white/50" />
-            )}
-          </div>
-
-          <div className="flex-1 text-center sm:text-left min-w-0">
-            <span className="text-[11px] uppercase tracking-widest font-bold text-[var(--accent-primary)] dark:text-indigo-400">
-              Album
-            </span>
-            <h2 className="text-3xl font-extrabold text-[var(--text-primary)] dark:text-white tracking-tight truncate mt-1">
-              {selectedAlbum.name}
-            </h2>
-            <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-xs text-[var(--text-secondary)] dark:text-slate-300">
-              <span className="font-semibold text-[var(--text-primary)] dark:text-white">{selectedAlbum.artist}</span>
-              {selectedAlbum.year && <span>• {selectedAlbum.year}</span>}
-              <span>• {selectedAlbum.tracks.length} tracks</span>
-              <span>• {formatDuration(selectedAlbum.totalDuration)}</span>
-            </div>
-
-            <div className="mt-4 flex items-center justify-center sm:justify-start gap-3">
-              <button
-                onClick={() => {
-                  if (selectedAlbum.tracks.length > 0) {
-                    if (onPlayQueue) {
-                      const playable = selectedAlbum.tracks.filter(
-                        (t) => (t.status || 'normal') === 'normal'
-                      );
-                      if (playable.length > 0) {
-                        onPlayQueue(playable, 0, false);
-                      }
-                    } else {
-                      onPlayTrack(selectedAlbum.tracks[0]);
-                    }
-                  }
-                }}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white text-xs font-bold shadow-lg shadow-[var(--accent-primary)]/30 transition-all hover:scale-105 active:scale-95 cursor-pointer"
-              >
-                <Play className="w-4 h-4 fill-white" />
-                <span>Play Album</span>
-              </button>
-            </div>
-          </div>
+          {selectedAlbum.artworkUrl ? (
+            <img
+              src={selectedAlbum.artworkUrl}
+              alt={selectedAlbum.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <Disc className="w-12 h-12 text-white/50" />
+          )}
         </div>
 
-        {/* Track List */}
-        <TrackList
-          tracks={selectedAlbum.tracks}
-          currentTrackId={currentTrackId}
-          isPlaying={isPlaying}
-          favourites={favourites}
-          playlists={playlists}
-          onPlayTrack={onPlayTrack}
-          onTogglePlay={onTogglePlay}
-          onToggleFavourite={onToggleFavourite}
-          onPlayNext={onPlayNext}
-          onAddToQueue={onAddToQueue}
-          onAddToPlaylist={onAddToPlaylist}
-        />
+        <div className="flex-1 text-center sm:text-left min-w-0">
+          <span className="text-[11px] uppercase tracking-widest font-bold text-[var(--accent-primary)] dark:text-indigo-400">
+            Album
+          </span>
+          <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--text-primary)] dark:text-white tracking-tight truncate mt-1">
+            {selectedAlbum.name}
+          </h2>
+          <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 text-xs text-[var(--text-secondary)] dark:text-slate-300 flex-wrap">
+            <span className="font-semibold text-[var(--text-primary)] dark:text-white">
+              {selectedAlbum.artist}
+            </span>
+            {selectedAlbum.year && <span>· {selectedAlbum.year}</span>}
+            <span>
+              · {selectedAlbum.tracks.length}{' '}
+              {selectedAlbum.tracks.length === 1 ? 'track' : 'tracks'}
+            </span>
+            <span>· {formatDuration(selectedAlbum.totalDuration)}</span>
+          </div>
+        </div>
       </div>
+    );
+
+    if (selectedAlbum.tracks.length === 0) {
+      const emptyContent = (
+        <div>
+          {heroPanel}
+          <TrackListEmptyState emptyVariant="default" />
+        </div>
+      );
+      if (renderLayout) {
+        return renderLayout({
+          actions: (
+            <>
+              <PlayAllButton onClick={handlePlayAlbum} disabled />
+              <SelectModeButton active={false} onClick={() => {}} disabled />
+            </>
+          ),
+          content: emptyContent,
+        });
+      }
+      return emptyContent;
+    }
+
+    return (
+      <TrackList
+        key={selectedAlbum.id}
+        tracks={selectedAlbum.tracks}
+        libraryTracks={libraryTracks}
+        currentTrackId={currentTrackId}
+        isPlaying={isPlaying}
+        favourites={favourites}
+        playlists={playlists}
+        hideTrackCount={Boolean(renderLayout)}
+        beforeTable={heroPanel}
+        renderLayout={renderLayout}
+        onPlayAll={handlePlayAlbum}
+        onPlayTrack={onPlayTrack}
+        onTogglePlay={onTogglePlay}
+        onToggleFavourite={onToggleFavourite}
+        onPlayNext={onPlayNext}
+        onPlayNextBulk={onPlayNextBulk}
+        onAddToQueue={onAddToQueue}
+        onAddToPlaylist={onAddToPlaylist}
+        onAddTracksToPlaylist={onAddTracksToPlaylist}
+        onCreateAndAddToPlaylist={onCreateAndAddToPlaylist}
+        onAddTracksToFavourites={onAddTracksToFavourites}
+        onRemoveTracksFromFavourites={onRemoveTracksFromFavourites}
+      />
     );
   }
 
@@ -143,10 +177,14 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+    <div
+      data-testid="albums-overview-grid"
+      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4"
+    >
       {albums.map((album) => (
         <div
           key={album.id}
+          data-testid={`album-card-${album.id}`}
           onClick={() => onSelectAlbum(album.id)}
           className="group p-3.5 rounded-2xl glass-panel hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] hover:border-[var(--accent-primary)]/40 transition-colors duration-150 cursor-pointer select-none flex flex-col"
         >
@@ -173,6 +211,7 @@ export const AlbumsView: React.FC<AlbumsViewProps> = ({
 
             {/* Play Button Overlay */}
             <button
+              type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 if (album.tracks.length > 0) {

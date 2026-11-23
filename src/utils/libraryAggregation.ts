@@ -344,6 +344,12 @@ export function deriveViewHeaderInfo(params: {
   playlistsTotalTracks?: number;
   isPlaylistDetail?: boolean;
   selectedPlaylistName?: string | null;
+  albumsCount?: number;
+  artistsCount?: number;
+  isAlbumDetail?: boolean;
+  selectedAlbumName?: string | null;
+  isArtistDetail?: boolean;
+  selectedArtistLabel?: string | null;
   folderOverviewTracksCount?: number;
   folderOverviewFoldersCount?: number;
 }): { title: string; subtitle: string } {
@@ -360,6 +366,12 @@ export function deriveViewHeaderInfo(params: {
     playlistsTotalTracks = 0,
     isPlaylistDetail = false,
     selectedPlaylistName = null,
+    albumsCount = 0,
+    artistsCount = 0,
+    isAlbumDetail = false,
+    selectedAlbumName = null,
+    isArtistDetail = false,
+    selectedArtistLabel = null,
     folderOverviewTracksCount = 0,
     folderOverviewFoldersCount = 0,
   } = params;
@@ -389,10 +401,10 @@ export function deriveViewHeaderInfo(params: {
           : 'Folder Browser';
         break;
       case 'albums':
-        title = selectedAlbumId ? 'Album' : 'Albums';
+        title = isAlbumDetail || selectedAlbumId ? (selectedAlbumName || 'Album') : 'Albums';
         break;
       case 'artists':
-        title = selectedArtistName ? 'Artist' : 'Artists';
+        title = isArtistDetail || selectedArtistName !== null ? (selectedArtistLabel || 'Artist') : 'Artists';
         break;
       case 'imported-files':
         title = 'Imported Files';
@@ -409,6 +421,14 @@ export function deriveViewHeaderInfo(params: {
       : `${playlistsCount} ${playlistsCount === 1 ? 'playlist' : 'playlists'} · ${playlistsTotalTracks} ${playlistsTotalTracks === 1 ? 'track' : 'tracks'}${searchQuery ? ' total' : ''}`;
   } else if (isFolderOverview) {
     subtitle = `${folderOverviewFoldersCount} ${folderOverviewFoldersCount === 1 ? 'folder' : 'folders'} · ${folderOverviewTracksCount} ${folderOverviewTracksCount === 1 ? 'track' : 'tracks'}${searchQuery ? ' total' : ''}`;
+  } else if (currentView === 'albums' && hasLibrary) {
+    subtitle = isAlbumDetail
+      ? ''
+      : `${albumsCount} ${albumsCount === 1 ? 'album' : 'albums'} · ${folderOverviewTracksCount} ${folderOverviewTracksCount === 1 ? 'track' : 'tracks'}${searchQuery ? ' total' : ''}`;
+  } else if (currentView === 'artists' && hasLibrary) {
+    subtitle = isArtistDetail
+      ? ''
+      : `${artistsCount} ${artistsCount === 1 ? 'artist' : 'artists'} · ${folderOverviewTracksCount} ${folderOverviewTracksCount === 1 ? 'track' : 'tracks'}${searchQuery ? ' total' : ''}`;
   } else if (currentView === 'favourites' || hasLibrary) {
     subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
   }

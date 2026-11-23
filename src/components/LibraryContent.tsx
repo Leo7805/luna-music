@@ -107,12 +107,23 @@ export function LibraryContent({
   }, [displayedTracks, audioPlayer]);
 
   const isFolderOverview = currentView === 'folder' && !library.selectedFolderPath;
+  const hasSelectedAlbum =
+    currentView === 'albums' &&
+    selectedAlbumId !== null &&
+    albums.some((a) => a.id === selectedAlbumId);
+  const hasSelectedArtist =
+    currentView === 'artists' &&
+    selectedArtistName !== null &&
+    artists.some((a) => a.id === selectedArtistName || a.name === selectedArtistName);
   const unifiedLayout = renderUnifiedLayout ?? renderAllTracksLayout;
   const usesUnifiedLayout =
     Boolean(unifiedLayout) &&
     (currentView === 'all' ||
+      currentView === 'favourites' ||
       currentView === 'imported-files' ||
       currentView === 'playlists' ||
+      hasSelectedAlbum ||
+      hasSelectedArtist ||
       (currentView === 'folder' && !isFolderOverview));
 
   // Loading and source-empty states have no mounted list selection controller.
@@ -196,6 +207,7 @@ export function LibraryContent({
         <TrackList
           {...commonTrackListProps}
           hideTrackCount={true}
+          renderLayout={unifiedLayout}
           emptyVariant="favourites"
         />
       );
@@ -283,18 +295,25 @@ export function LibraryContent({
         <AlbumsView
           albums={albums}
           selectedAlbumId={selectedAlbumId}
+          libraryTracks={libraryTracks}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}
           favourites={favourites}
           playlists={playlistList}
+          renderLayout={hasSelectedAlbum ? unifiedLayout : undefined}
           onSelectAlbum={selectAlbum}
           onPlayTrack={playTrack}
           onPlayQueue={playQueue}
           onTogglePlay={togglePlay}
           onToggleFavourite={toggleFavourite}
           onPlayNext={playNext}
+          onPlayNextBulk={playNextBulk}
           onAddToQueue={addToQueue}
           onAddToPlaylist={addTrackToPlaylist}
+          onAddTracksToPlaylist={addTracksToPlaylist}
+          onCreateAndAddToPlaylist={handleCreateAndAddToPlaylist}
+          onAddTracksToFavourites={addTracksToFavourites}
+          onRemoveTracksFromFavourites={removeTracksFromFavourites}
         />
       );
 
@@ -303,18 +322,25 @@ export function LibraryContent({
         <ArtistsView
           artists={artists}
           selectedArtistName={selectedArtistName}
+          libraryTracks={libraryTracks}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}
           favourites={favourites}
           playlists={playlistList}
+          renderLayout={hasSelectedArtist ? unifiedLayout : undefined}
           onSelectArtist={selectArtist}
           onPlayTrack={playTrack}
           onPlayQueue={playQueue}
           onTogglePlay={togglePlay}
           onToggleFavourite={toggleFavourite}
           onPlayNext={playNext}
+          onPlayNextBulk={playNextBulk}
           onAddToQueue={addToQueue}
           onAddToPlaylist={addTrackToPlaylist}
+          onAddTracksToPlaylist={addTracksToPlaylist}
+          onCreateAndAddToPlaylist={handleCreateAndAddToPlaylist}
+          onAddTracksToFavourites={addTracksToFavourites}
+          onRemoveTracksFromFavourites={removeTracksFromFavourites}
         />
       );
 

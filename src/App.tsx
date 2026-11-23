@@ -146,6 +146,24 @@ export function App() {
     [library.currentView, playlists.selectedPlaylistId, playlists.playlists]
   );
 
+  const selectedAlbum = useMemo(
+    () =>
+      library.currentView === 'albums' && library.selectedAlbumId !== null
+        ? library.albums.find((a) => a.id === library.selectedAlbumId) || null
+        : null,
+    [library.currentView, library.selectedAlbumId, library.albums]
+  );
+
+  const selectedArtist = useMemo(
+    () =>
+      library.currentView === 'artists' && library.selectedArtistName !== null
+        ? library.artists.find(
+            (a) => a.id === library.selectedArtistName || a.name === library.selectedArtistName
+          ) || null
+        : null,
+    [library.currentView, library.selectedArtistName, library.artists]
+  );
+
   const playlistsTotalTracks = useMemo(
     () => playlists.playlists.reduce((sum, pl) => sum + pl.tracks.length, 0),
     [playlists.playlists]
@@ -169,6 +187,12 @@ export function App() {
         playlistsTotalTracks,
         isPlaylistDetail: Boolean(selectedPlaylist),
         selectedPlaylistName: selectedPlaylist?.name ?? null,
+        albumsCount: library.albums.length,
+        artistsCount: library.artists.length,
+        isAlbumDetail: Boolean(selectedAlbum),
+        selectedAlbumName: selectedAlbum?.name ?? null,
+        isArtistDetail: Boolean(selectedArtist),
+        selectedArtistLabel: selectedArtist?.name ?? null,
       }),
     [
       hasLibrary,
@@ -184,6 +208,10 @@ export function App() {
       playlists.playlists.length,
       playlistsTotalTracks,
       selectedPlaylist,
+      library.albums.length,
+      library.artists.length,
+      selectedAlbum,
+      selectedArtist,
     ]
   );
 
@@ -195,12 +223,30 @@ export function App() {
           { name: 'Playlists', path: '' },
           { name: selectedPlaylist.name, path: selectedPlaylist.id },
         ]
+      : selectedAlbum
+      ? [
+          { name: 'Albums', path: '' },
+          { name: selectedAlbum.name, path: selectedAlbum.id },
+        ]
+      : selectedArtist
+      ? [
+          { name: 'Artists', path: '' },
+          { name: selectedArtist.name, path: selectedArtist.id },
+        ]
       : undefined;
 
   const handleHeaderBreadcrumbClick =
     library.currentView === 'playlists'
       ? (path: string) => {
           if (!path) playlists.selectPlaylist(null);
+        }
+      : library.currentView === 'albums'
+      ? (path: string) => {
+          if (!path) library.selectAlbum(null);
+        }
+      : library.currentView === 'artists'
+      ? (path: string) => {
+          if (!path) library.selectArtist(null);
         }
       : handleSelectFolder;
 
@@ -215,7 +261,7 @@ export function App() {
         subtitle={viewSubtitle}
         searchQuery={library.searchQuery}
         breadcrumbs={headerBreadcrumbs}
-        keepBreadcrumbsOnSearch={Boolean(selectedPlaylist)}
+        keepBreadcrumbsOnSearch={Boolean(selectedPlaylist || selectedAlbum || selectedArtist)}
         theme={theme}
         lightStyle={lightStyle}
         onSearchChange={library.setSearchQuery}
@@ -323,8 +369,11 @@ export function App() {
               onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
             />
           ) : library.currentView === 'all' ||
+            library.currentView === 'favourites' ||
             library.currentView === 'imported-files' ||
             library.currentView === 'playlists' ||
+            Boolean(selectedAlbum) ||
+            Boolean(selectedArtist) ||
             (library.currentView === 'folder' && library.selectedFolderPath !== '') ? (
             <LibraryContent
               library={library}
