@@ -249,6 +249,7 @@ describe('Sidebar Alignment & Consistent Open Music Placement', () => {
         activeMenuFolderId={null}
         onToggleMenu={() => {}}
         onOpenFolder={onOpenFolderMock}
+        onFallbackFolderSelect={() => {}}
         onSelectView={() => {}}
         onSelectFolder={() => {}}
         onRemoveFolderPrompt={() => {}}
@@ -256,8 +257,8 @@ describe('Sidebar Alignment & Consistent Open Music Placement', () => {
       />
     );
 
-    expect(htmlSection).toContain('title="Add Music Folder"');
-    expect(htmlSection).toContain('aria-label="Add Music Folder"');
+    expect(htmlSection).toContain('title="Add Folder"');
+    expect(htmlSection).toContain('aria-label="Add Folder"');
   });
 
   // 8. Scrollable folder list without overlap
@@ -295,6 +296,7 @@ describe('Sidebar Alignment & Consistent Open Music Placement', () => {
         activeMenuFolderId={null}
         onToggleMenu={() => {}}
         onOpenFolder={() => {}}
+        onFallbackFolderSelect={() => {}}
         onSelectView={() => {}}
         onSelectFolder={() => {}}
         onRemoveFolderPrompt={() => {}}

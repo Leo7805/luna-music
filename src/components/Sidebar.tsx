@@ -175,6 +175,7 @@ export function Sidebar({
             setActiveMenuFolderId((prev) => (prev === id ? null : id))
           }
           onOpenFolder={onOpenFolder}
+          onFallbackFolderSelect={onFallbackFolderSelect}
           onSelectView={onSelectView}
           onSelectFolder={onSelectFolder}
           onRefreshFolder={onRefreshFolder}

@@ -232,6 +232,7 @@ export function LibraryContent({ library, playlists, audioPlayer, renderAllTrack
       return (
         <FolderView
           currentNode={currentFolderNode}
+          isFolderOverview={library.selectedFolderPath === ''}
           libraryTracks={libraryTracks}
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}

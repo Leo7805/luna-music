@@ -183,6 +183,7 @@ describe('Sidebar Architecture & Component Decomposition (Stage 3)', () => {
         activeMenuFolderId={null}
         onToggleMenu={() => {}}
         onOpenFolder={() => {}}
+        onFallbackFolderSelect={() => {}}
         onSelectView={() => {}}
         onSelectFolder={() => {}}
         onRemoveFolderPrompt={() => {}}

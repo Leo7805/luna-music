@@ -412,8 +412,10 @@ describe('App Composition & Component Integration (Stage 7)', () => {
         selectedArtistName: null,
         displayedTracksCount: 10,
         playlistsCount: 0,
+        folderOverviewTracksCount: 12,
       });
       expect(folderRootInfo.title).toBe('Music Folders');
+      expect(folderRootInfo.subtitle).toBe('12 tracks');
     });
 
     it('computes breadcrumbs correctly for folder navigation', () => {

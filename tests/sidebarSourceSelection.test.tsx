@@ -133,6 +133,7 @@ function renderFolderSection(currentView: LibraryView, selectedFolderPath: strin
       activeMenuFolderId={null}
       onToggleMenu={() => {}}
       onOpenFolder={() => {}}
+      onFallbackFolderSelect={() => {}}
       onSelectView={() => {}}
       onSelectFolder={() => {}}
       onRemoveFolderPrompt={() => {}}

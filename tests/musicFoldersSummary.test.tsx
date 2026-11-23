@@ -1,0 +1,167 @@
+// @vitest-environment jsdom
+import { act, useState } from 'react';
+import { createRoot, Root } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { App } from '../src/App';
+import { FolderView } from '../src/components/FolderView';
+import { ImportedFolder, LibraryView, MusicLibrary, TrackItem } from '../src/types/music';
+import { buildFolderTree, buildUnifiedMultiFolderTree, combineFlatPlaylists, findFolderNodeByPath } from '../src/utils/musicTree';
+import { deriveDisplayedTracks } from '../src/utils/libraryAggregation';
+import { useMusicLibrary } from '../src/hooks/useMusicLibrary';
+import { useAudioPlayer } from '../src/hooks/useAudioPlayer';
+import { usePlaylists } from '../src/hooks/usePlaylists';
+
+vi.mock('../src/hooks/useMusicLibrary', () => ({ useMusicLibrary: () => useTestLibrary() }));
+vi.mock('../src/hooks/useAudioPlayer', () => ({ useAudioPlayer: () => player }));
+vi.mock('../src/hooks/usePlaylists', () => ({ usePlaylists: () => playlists }));
+
+const noop = () => {};
+const favourites = new Set<string>();
+let libraryData: MusicLibrary | null;
+const player = {
+  queue: [], currentTrack: null, isPlaying: false, volume: 0.8, currentTime: 0, duration: 0,
+  isMuted: false, shuffle: false, repeatMode: 'off', lyrics: [], ambientColors: [],
+  playQueue: vi.fn(), playTrack: vi.fn(), togglePlay: noop, clearPlaybackError: noop,
+} as unknown as ReturnType<typeof useAudioPlayer>;
+const playlists = { playlists: [], selectedPlaylistId: null, selectPlaylist: noop } as unknown as ReturnType<typeof usePlaylists>;
+
+function useTestLibrary(): ReturnType<typeof useMusicLibrary> {
+  const [currentView, setView] = useState<LibraryView>('folder');
+  const [selectedFolderPath, setPath] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const currentFolderNode = libraryData ? findFolderNodeByPath(libraryData.tree, selectedFolderPath) : null;
+  const displayedTracks = deriveDisplayedTracks({ library: libraryData, currentView, currentFolderNode,
+    searchQuery, selectedAlbumId: null, selectedArtistName: null, albums: [], favouriteTracks: [] });
+  return {
+    library: libraryData, currentView, selectedFolderPath, searchQuery, currentFolderNode, displayedTracks,
+    folders: libraryData?.folders ?? [], favourites, favouritesCount: 0, albums: [], artists: [],
+    selectedAlbumId: null, selectedArtistName: null, isLoading: false, needsPermission: false,
+    isInitialized: true, hasRegisteredSources: Boolean(libraryData?.folders.length), scanProgress: 0,
+    setSearchQuery, setCurrentView: (view: LibraryView) => { setView(view); if (view !== 'folder') setPath(''); },
+    selectFolder: (path: string) => { setPath(path); setView('folder'); }, requestTrackArtwork: noop,
+    toggleFavourite: noop, addTracksToFavourites: noop, removeTracksFromFavourites: noop,
+    openFolderPicker: noop, openFilesPicker: noop, handleFallbackFolderSelect: noop, handleOpenFilesSelect: noop,
+  } as unknown as ReturnType<typeof useMusicLibrary>;
+}
+
+const track = (id: string, name = 'Song.mp3', relativePath = name): TrackItem => ({
+  id, name, relativePath, size: 100, lastModified: 1, status: 'normal',
+  metadata: { title: name, artist: 'Artist', album: 'Album', duration: 180, isMetadataLoaded: true },
+});
+const folder = (id: string, tracks: TrackItem[]): ImportedFolder => ({
+  id, name: id, tracks, tree: buildFolderTree(id, tracks, id), trackCount: tracks.length,
+  sourceType: 'fs-access', addedAt: 1, lastScannedAt: 1, permissionStatus: 'granted',
+});
+function library(folders: ImportedFolder[]): MusicLibrary {
+  return { id: 'library', name: 'Music Library', sourceType: 'fs-access', folders,
+    tree: buildUnifiedMultiFolderTree(folders), flatPlaylist: combineFlatPlaylists(folders) };
+}
+let host: HTMLDivElement;
+let root: Root;
+const byId = (id: string) => host.querySelector<HTMLElement>(`[data-testid="${id}"]`)!;
+const click = (element: HTMLElement) => act(() => element.click());
+const mount = () => act(() => root.render(<App />));
+function search(value: string) {
+  const input = host.querySelector<HTMLInputElement>('header input')!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, value);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+}
+
+beforeEach(() => {
+  (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  // These stores belong exclusively to the isolated jsdom document.
+  sessionStorage.clear(); localStorage.clear(); vi.clearAllMocks(); libraryData = null;
+  host = document.createElement('div'); document.body.append(host); root = createRoot(host);
+});
+afterEach(() => { act(() => root.unmount()); host.remove(); });
+
+describe('Music Folders summary in the actual App composition', () => {
+  it('counts 363 canonical tracks once in the header and preserves the three card counts', () => {
+    libraryData = library([16, 319, 28].map((count, n) => folder(`Folder ${n + 1}`,
+      Array.from({ length: count }, (_, i) => track(`${n}:${i}`, `Song ${i}.mp3`)))));
+    expect(libraryData.tree.tracks).toHaveLength(0);
+    mount();
+    expect(host.querySelector('main h1')?.textContent).toBe('Music Folders');
+    expect(byId('header-subtitle').textContent).toBe('363 tracks');
+    expect(host.querySelector('main')?.textContent?.match(/363 tracks/g)).toHaveLength(1);
+    expect(byId('tracklist-toolbar')).toBeNull(); expect(byId('tracklist-count')).toBeNull();
+    const cards = byId('folder-subfolders-section').textContent;
+    for (const count of [16, 319, 28]) expect(cards).toContain(`${count} tracks`);
+  });
+
+  it('uses canonical Library length rather than overlapping card totals', () => {
+    const shared = track('parent:Shared.mp3');
+    const alias = { ...track('child:Shared.mp3'), aliases: ['parent:Shared.mp3'] };
+    libraryData = library([folder('Parent', [shared, track('parent:Other.mp3')]), folder('Child', [alias])]);
+    expect(libraryData.tree.totalTrackCount).toBe(3);
+    expect(libraryData.flatPlaylist).toHaveLength(2);
+    mount(); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+  });
+
+  it('keeps identical filenames from distinct track identities separate', () => {
+    libraryData = library([folder('A', [track('a:same.mp3')]), folder('B', [track('b:same.mp3')])]);
+    mount(); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+  });
+
+  it('shows Music Folders and zero for an empty Library', () => {
+    mount(); expect(host.querySelector('main h1')?.textContent).toBe('Music Folders');
+    expect(byId('header-subtitle').textContent).toBe('0 tracks');
+    expect(host.querySelector('main')?.textContent).toContain('Your Music');
+  });
+
+  it('refreshes the derived count and cards as Library folders are added and removed', () => {
+    const a = folder('A', [track('a:1')]); const b = folder('B', [track('b:1'), track('b:2')]);
+    libraryData = library([a]); mount(); expect(byId('header-subtitle').textContent).toBe('1 track');
+    libraryData = library([a, b]); mount(); expect(byId('header-subtitle').textContent).toBe('3 tracks');
+    expect(byId('folder-subfolders-section').textContent).toContain('B');
+    libraryData = library([b]); mount(); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+    expect(byId('folder-subfolders-section').textContent).not.toContain('A');
+  });
+
+  it('retains the search title and explicitly labels the unfiltered total', () => {
+    libraryData = library([folder('A', [track('a:1', 'Alpha.mp3')]), folder('B', [track('b:1', 'Beta.mp3')])]);
+    mount(); const cards = byId('folder-subfolders-section');
+    search('Alpha');
+    expect(host.querySelector('main h1')?.textContent).toBe('Search Results: "Alpha"');
+    expect(byId('header-subtitle').textContent).toBe('2 tracks total');
+    expect(byId('folder-subfolders-section')).toBe(cards);
+    expect(cards.textContent).toContain('A'); expect(cards.textContent).toContain('B');
+    search('no matches'); expect(byId('header-subtitle').textContent).toBe('2 tracks total');
+    search(''); expect(byId('header-subtitle').textContent).toBe('2 tracks');
+  });
+
+  it('preserves real folder detail counts, controls, descendant cards and breadcrumbs', () => {
+    libraryData = library([folder('Root', [track('a:1', 'Direct.mp3'), track('a:2', 'Child.mp3', 'Disc/Child.mp3')])]);
+    mount(); click(byId('folder-subfolders-section').querySelector<HTMLElement>('.group')!);
+    expect(byId('folder-breadcrumb').textContent).toContain('Root');
+    expect(byId('tracklist-count').textContent).toBe('1 track');
+    expect(byId('play-all-button')).not.toBeNull(); expect(byId('toggle-select-mode')).not.toBeNull();
+    expect(byId('folder-subfolders-section').textContent).toContain('Disc');
+  });
+
+  it('does not mistake an actual folder with an empty relative path for the overview', () => {
+    const realFolder = buildFolderTree('Real Folder', [track('a:1', 'Child.mp3', 'Disc/Child.mp3')]);
+    expect(realFolder.relativePath).toBe('');
+    act(() => root.render(<FolderView currentNode={realFolder} isFolderOverview={false} isPlaying={false}
+      favourites={favourites} onSelectFolder={noop} onPlayTrack={noop} onTogglePlay={noop} onToggleFavourite={noop} />));
+    expect(byId('tracklist-count').textContent).toBe('0 tracks');
+    expect(byId('folder-subfolders-section').textContent).toContain('1 track');
+  });
+
+  it('preserves All Tracks unified actions, search filtering and Favourites controls', () => {
+    libraryData = library([folder('Root', [track('a:1', 'Alpha.mp3'), track('a:2', 'Beta.mp3')])]);
+    mount();
+    click([...host.querySelectorAll<HTMLButtonElement>('aside button')].find((b) => b.textContent?.startsWith('All Tracks'))!);
+    expect(host.querySelector('header [data-testid="play-all-button"]')).not.toBeNull();
+    expect(byId('tracklist-toolbar')).toBeNull();
+    search('Alpha'); expect(byId('header-subtitle').textContent).toBe('1 track');
+    click(byId('play-all-button'));
+    expect(player.playQueue).toHaveBeenCalledExactlyOnceWith([libraryData.flatPlaylist[0]], 0, false);
+    search('');
+    click([...host.querySelectorAll<HTMLButtonElement>('aside button')].find((b) => b.textContent?.startsWith('Favourites'))!);
+    expect(host.querySelector('main h1')?.textContent).toBe('Favourites');
+    expect(host.querySelector('main')?.textContent).toContain('No favourite tracks yet');
+  });
+});

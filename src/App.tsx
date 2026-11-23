@@ -144,6 +144,7 @@ export function App() {
         selectedAlbumId: library.selectedAlbumId,
         selectedArtistName: library.selectedArtistName,
         displayedTracksCount: library.displayedTracks.length,
+        folderOverviewTracksCount: library.library?.flatPlaylist.length ?? 0,
         playlistsCount: playlists.playlists.length,
       }),
     [
@@ -155,6 +156,7 @@ export function App() {
       library.selectedAlbumId,
       library.selectedArtistName,
       library.displayedTracks.length,
+      library.library?.flatPlaylist.length,
       playlists.playlists.length,
     ]
   );

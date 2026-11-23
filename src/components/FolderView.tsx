@@ -7,6 +7,7 @@ import { TrackList } from './TrackList';
 
 interface FolderViewProps {
   currentNode: FolderNode | null;
+  isFolderOverview?: boolean;
   libraryTracks?: TrackItem[];
   currentTrackId?: string | null;
   isPlaying: boolean;
@@ -30,6 +31,7 @@ interface FolderViewProps {
 
 export const FolderView: React.FC<FolderViewProps> = ({
   currentNode,
+  isFolderOverview = false,
   libraryTracks,
   currentTrackId,
   isPlaying,
@@ -109,6 +111,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
     ) : null;
 
   if (currentNode.tracks.length === 0 && currentNode.subfolders.length > 0) {
+    if (isFolderOverview) return subfoldersSection;
     return (
       <div className="space-y-3">
         <div

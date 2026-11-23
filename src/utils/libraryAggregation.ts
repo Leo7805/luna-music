@@ -341,6 +341,7 @@ export function deriveViewHeaderInfo(params: {
   selectedArtistName: string | null;
   displayedTracksCount: number;
   playlistsCount: number;
+  folderOverviewTracksCount?: number;
 }): { title: string; subtitle: string } {
   const {
     hasLibrary,
@@ -352,7 +353,9 @@ export function deriveViewHeaderInfo(params: {
     selectedArtistName,
     displayedTracksCount,
     playlistsCount,
+    folderOverviewTracksCount = 0,
   } = params;
+  const isFolderOverview = currentView === 'folder' && !selectedFolderPath;
 
   let title = 'Music';
   if (searchQuery) {
@@ -361,6 +364,8 @@ export function deriveViewHeaderInfo(params: {
     title = 'Playlists';
   } else if (currentView === 'favourites') {
     title = 'Favourites';
+  } else if (isFolderOverview) {
+    title = 'Music Folders';
   } else if (!hasLibrary) {
     title = 'Music Library';
   } else {
@@ -392,6 +397,8 @@ export function deriveViewHeaderInfo(params: {
   let subtitle = '';
   if (currentView === 'playlists') {
     subtitle = `${playlistsCount} ${playlistsCount === 1 ? 'playlist' : 'playlists'}`;
+  } else if (isFolderOverview) {
+    subtitle = `${folderOverviewTracksCount} ${folderOverviewTracksCount === 1 ? 'track' : 'tracks'}${searchQuery ? ' total' : ''}`;
   } else if (currentView === 'favourites' || hasLibrary) {
     subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
   }

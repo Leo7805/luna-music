@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { FolderOpen, Disc, ChevronDown, Folder } from 'lucide-react';
+import { FolderOpen, Disc, ChevronDown } from 'lucide-react';
 import { getDefaultOpenMode, OpenMusicMode } from '../utils/platform';
+import { isFileSystemAccessSupported } from '../services/directoryAccess';
 
 interface OpenMusicControlProps {
   variant: 'empty-state' | 'sidebar';
@@ -21,14 +22,13 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
   onOpenFiles,
   onFallbackFolderSelect,
   onOpenFilesSelect,
-  isFsaSupported = typeof window !== 'undefined' && 'showDirectoryPicker' in window,
+  isFsaSupported = isFileSystemAccessSupported(),
 }) => {
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const menuButtonRef = useRef<HTMLButtonElement | null>(null);
   const firstMenuItemRef = useRef<HTMLButtonElement | null>(null);
   const secondMenuItemRef = useRef<HTMLButtonElement | null>(null);
-  const thirdMenuItemRef = useRef<HTMLButtonElement | null>(null);
   const openedMenuByKeyboardRef = useRef(false);
 
   const folderFallbackInputRef = useRef<HTMLInputElement | null>(null);
@@ -86,7 +86,6 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
     const items = [
       firstMenuItemRef.current,
       secondMenuItemRef.current,
-      thirdMenuItemRef.current,
     ].filter((el): el is HTMLButtonElement => el !== null);
 
     if (items.length === 0) return;
@@ -119,11 +118,6 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
     } else {
       folderFallbackInputRef.current?.click();
     }
-  };
-
-  const triggerFallbackFolder = () => {
-    setMenuOpen(false);
-    folderFallbackInputRef.current?.click();
   };
 
   const triggerOpenFiles = () => {
@@ -295,23 +289,11 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
             className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] dark:text-slate-100 hover:bg-[var(--bg-active)] hover:text-[var(--accent-primary)] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[var(--bg-active)] transition cursor-pointer text-left"
           >
             <FolderOpen className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400 shrink-0" />
-            <span>Open Folder</span>
+            <span>Add Folder</span>
           </button>
 
           <button
             ref={secondMenuItemRef}
-            type="button"
-            role="menuitem"
-            data-testid={`${variant}-menu-fallback-folder`}
-            onClick={triggerFallbackFolder}
-            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-medium text-[var(--text-primary)] dark:text-slate-100 hover:bg-[var(--bg-active)] hover:text-[var(--accent-primary)] dark:hover:text-indigo-300 focus:outline-none focus-visible:bg-[var(--bg-active)] transition cursor-pointer text-left"
-          >
-            <Folder className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-            <span>Folder Input Fallback</span>
-          </button>
-
-          <button
-            ref={thirdMenuItemRef}
             type="button"
             role="menuitem"
             data-testid={`${variant}-menu-open-files`}

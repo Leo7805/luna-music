@@ -16,7 +16,7 @@ Built with React 19, TypeScript, Vite, Tailwind CSS v4, and native Web Audio API
 - **Unified Open Music Split Button**: Single reusable control adhering to platform conventions:
   - **Desktop (Mac/PC)**: Default action opens folder (`showDirectoryPicker` or fallback).
   - **iPad / Mobile**: Default action opens multi-file picker.
-  - **Dropdown Menu**: Direct access to Open Folder, Folder Input Fallback, and Open Files.
+  - **Dropdown Menu**: Direct access to Add Folder and Open Files; folder input fallback is selected automatically when the directory-picker API is unavailable.
   - **Display Logic**: Displays prominently in the empty-state center when no music is loaded; moves into a compact split button at the bottom of the sidebar once a library is loaded.
 - **First-Class Folder Browsing**: MusicBee-style recursive folder tree navigation, breadcrumbs, subfolder drill-downs, and natural numeric sorting (`Intl.Collator`).
 - **Synchronized Local Lyrics (`.lrc`)**: Reads companion `.lrc` files (e.g. `Song.mp3` + `Song.lrc`), auto-scrolls line by line, highlights active lyrics, and allows clicking any lyric line to jump playback to that timestamp.

@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Folder, FolderPlus } from 'lucide-react';
 import {
   FolderNode,
@@ -5,6 +6,7 @@ import {
   LibraryView,
   IMPORTED_FILES_ROOT_ID,
 } from '../types/music';
+import { isFileSystemAccessSupported } from '../services/directoryAccess';
 import { RootFolderItem } from './RootFolderItem';
 import { SidebarImportedFiles } from './SidebarImportedFiles';
 import { LegacyFolderTreeNode } from './SidebarFolderTree';
@@ -17,6 +19,7 @@ export interface SidebarFolderSectionProps {
   activeMenuFolderId: string | null;
   onToggleMenu: (id: string) => void;
   onOpenFolder: () => void;
+  onFallbackFolderSelect: (files: FileList | null) => void;
   onSelectView: (view: LibraryView) => void;
   onSelectFolder: (path: string) => void;
   onRefreshFolder?: (folderId: string) => void;
@@ -33,6 +36,7 @@ export function SidebarFolderSection({
   activeMenuFolderId,
   onToggleMenu,
   onOpenFolder,
+  onFallbackFolderSelect,
   onSelectView,
   onSelectFolder,
   onRefreshFolder,
@@ -40,12 +44,34 @@ export function SidebarFolderSection({
   onRequestFolderPermission,
   onClearImportedFilesPrompt,
 }: SidebarFolderSectionProps) {
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+  const handleAddFolder = () => {
+    if (isFileSystemAccessSupported()) {
+      onOpenFolder();
+    } else {
+      folderInputRef.current?.click();
+    }
+  };
   const physicalFolders = folders.filter((f) => f.id !== IMPORTED_FILES_ROOT_ID);
   const importedFilesFolder = folders.find((f) => f.id === IMPORTED_FILES_ROOT_ID);
   const activePhysicalFolderPath = currentView === 'folder' ? selectedFolderPath : '';
 
   return (
     <div className="flex-1 flex flex-col min-h-0 border-t border-[var(--border-subtle)] dark:border-white/[0.08] mt-2">
+      <input
+        ref={folderInputRef}
+        type="file"
+        // @ts-expect-error webkitdirectory is standard for folder inputs
+        webkitdirectory="true"
+        directory=""
+        multiple
+        className="hidden"
+        data-testid="sidebar-add-folder-input"
+        onChange={(e) => {
+          onFallbackFolderSelect(e.target.files);
+          e.target.value = '';
+        }}
+      />
       {/* Section Header */}
       <div className="px-4 py-3 flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-secondary)] dark:text-slate-400">
@@ -53,9 +79,9 @@ export function SidebarFolderSection({
         </span>
         <button
           type="button"
-          onClick={onOpenFolder}
-          title="Add Music Folder"
-          aria-label="Add Music Folder"
+          onClick={handleAddFolder}
+          title="Add Folder"
+          aria-label="Add Folder"
           className="p-1 rounded-lg hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.08] text-[var(--text-secondary)] hover:text-[var(--accent-primary)] dark:text-slate-400 dark:hover:text-indigo-400 transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30"
         >
           <FolderPlus className="w-4 h-4" />
