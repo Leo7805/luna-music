@@ -258,7 +258,6 @@ export function TrackRow({
       isCurrent={isCurrent}
       isSelected={isSelected}
       isMenuOpen={isMenuOpen}
-      currentHighlight="tinted"
       leadingSlot={leadingSlot}
       actionsSlot={actionsSlot}
       testId={`track-row-${track.id}`}

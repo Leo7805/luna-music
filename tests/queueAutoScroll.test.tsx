@@ -67,16 +67,16 @@ describe('Queue Auto-Scroll, Text-Emphasis Styling & Direct Queue Navigation', (
     expect(htmlPlaying).toContain('Track 2');
     expect(htmlPlaying).toContain('Track 3');
     expect(htmlPlaying).toContain('data-current="true"');
+    expect(htmlPlaying).toContain('data-row-state="current"');
+    expect(htmlPlaying).toContain('track-row-current');
+    expect(htmlPlaying).toContain('track-playing-badge');
     expect(htmlPlaying).toContain('data-testid="queue-playing-indicator" data-playing="true"');
     expect(htmlPlaying).toContain('animate-bar-1');
     expect(htmlPlaying).toContain('animate-bar-2');
     expect(htmlPlaying).toContain('animate-bar-3');
-    expect(htmlPlaying).toContain('font-semibold text-[var(--accent-primary)] dark:text-white');
+    expect(htmlPlaying).toContain('font-semibold text-[var(--text-primary)] dark:text-white');
     expect(htmlPlaying).toContain('>1</span>');
     expect(htmlPlaying).toContain('>3</span>');
-    expect(htmlPlaying).not.toContain('bg-[var(--bg-active)]');
-    expect(htmlPlaying).not.toContain('dark:bg-indigo-600/25');
-    expect(htmlPlaying).not.toContain('shadow-sm');
     expect(htmlPlaying).toContain('focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50');
 
     const htmlPaused = renderToStaticMarkup(

@@ -3,6 +3,13 @@ import { TrackItem } from '../types/music';
 import { formatDuration } from '../utils/formatters';
 import { getTrackStatus } from '../utils/audioFileTypes';
 import { getTrackDisplayTitle } from '../utils/librarySearch';
+import {
+  getTrackRowDurationClass,
+  getTrackRowSubtitleClass,
+  getTrackRowSurfaceClass,
+  getTrackRowTitleClass,
+  resolveTrackRowVisualState,
+} from '../utils/trackRowStyles';
 import { TrackStatusBadge } from './TrackStatusBadge';
 import { TrackThumbnail } from './TrackThumbnail';
 
@@ -14,7 +21,6 @@ export interface TrackRowLayoutProps {
   isCurrent: boolean;
   isSelected?: boolean;
   isMenuOpen?: boolean;
-  currentHighlight?: 'tinted' | 'text-only';
   leadingSlot: React.ReactNode;
   actionsSlot: React.ReactNode;
   rowRef?: React.Ref<HTMLDivElement>;
@@ -34,7 +40,6 @@ export function TrackRowLayout({
   isCurrent,
   isSelected = false,
   isMenuOpen = false,
-  currentHighlight = 'tinted',
   leadingSlot,
   actionsSlot,
   rowRef,
@@ -54,18 +59,15 @@ export function TrackRowLayout({
   const title = getTrackDisplayTitle(track);
   const hasLyrics = Boolean(track.lrcHandle || track.lrcFile || track.lrcContent);
 
-  const rowSurfaceClass =
-    currentHighlight === 'tinted' && isSelected
-      ? 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-indigo-600/25 border-indigo-500/40 border-[var(--accent-primary)]/40 shadow-sm'
-      : currentHighlight === 'tinted' && isCurrent
-      ? 'bg-indigo-600/15 bg-[var(--bg-active)]/70 dark:bg-indigo-600/20 border-indigo-500/25 border-[var(--accent-primary)]/25 shadow-sm'
-      : 'border-transparent hover:bg-[var(--bg-hover)]/70 dark:hover:bg-white/[0.04]';
+  const rowVisualState = resolveTrackRowVisualState({ isCurrent, isSelected });
+  const rowSurfaceClass = getTrackRowSurfaceClass(rowVisualState);
 
   return (
     <div
       ref={rowRef}
       data-testid={testId}
       data-current={isCurrent ? 'true' : undefined}
+      data-row-state={rowVisualState}
       tabIndex={tabIndex}
       role={role}
       onClick={onClick}
@@ -88,13 +90,7 @@ export function TrackRowLayout({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span
-              className={`truncate ${
-                isCurrent
-                  ? currentHighlight === 'text-only'
-                    ? 'font-semibold text-[var(--accent-primary)] dark:text-white'
-                    : 'font-semibold text-[var(--accent-primary)] dark:text-indigo-300'
-                  : 'font-medium text-[var(--text-primary)] dark:text-slate-100 group-hover:text-[var(--text-primary)] dark:group-hover:text-white'
-              }`}
+              className={`truncate ${getTrackRowTitleClass(isCurrent)}`}
               title={title}
             >
               {title}
@@ -114,13 +110,7 @@ export function TrackRowLayout({
               </span>
             )}
           </div>
-          <p
-            className={`text-[11px] truncate mt-0.5 ${
-              isCurrent
-                ? 'text-[var(--text-primary)]/75 dark:text-slate-300'
-                : 'text-[var(--text-secondary)] dark:text-slate-400'
-            }`}
-          >
+          <p className={`text-[11px] truncate mt-0.5 ${getTrackRowSubtitleClass(isCurrent)}`}>
             {track.metadata.artist || 'Unknown Artist'}
           </p>
         </div>
@@ -132,13 +122,7 @@ export function TrackRowLayout({
       </div>
 
       {/* Col 4: Duration */}
-      <div
-        className={`text-right text-[11px] font-mono tabular-nums ${
-          isCurrent
-            ? 'text-[var(--accent-primary)] dark:text-slate-200 font-medium'
-            : 'text-[var(--text-secondary)] dark:text-slate-400'
-        }`}
-      >
+      <div className={`text-right text-[11px] font-mono tabular-nums ${getTrackRowDurationClass(isCurrent)}`}>
         {formatDuration(track.metadata.duration)}
       </div>
 

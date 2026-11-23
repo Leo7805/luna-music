@@ -213,7 +213,7 @@ describe('Shared Track Row UI & Now Playing Favourites', () => {
       expect(queueUnavailHtml).toContain('Cannot access file');
     });
 
-    it('preserves tinted current styling for Library rows and text-only current styling for Queue rows', () => {
+    it('applies unified Option 3 currently-playing highlight to BOTH Library rows and Queue rows', () => {
       const libCurrentHtml = renderToStaticMarkup(
         <TrackRow {...baseTrackRowProps} isCurrent={true} isPlaying={true} />
       );
@@ -221,9 +221,13 @@ describe('Shared Track Row UI & Now Playing Favourites', () => {
         <NowPlayingQueueRow {...baseQueueRowProps} isCurrent={true} isPlaying={true} />
       );
 
-      expect(libCurrentHtml).toContain('bg-[var(--bg-active)]/70');
-      expect(queueCurrentHtml).not.toContain('bg-[var(--bg-active)]');
-      expect(queueCurrentHtml).toContain('font-semibold text-[var(--accent-primary)] dark:text-white');
+      for (const html of [libCurrentHtml, queueCurrentHtml]) {
+        expect(html).toContain('data-current="true"');
+        expect(html).toContain('data-row-state="current"');
+        expect(html).toContain('track-row-current');
+        expect(html).toContain('track-playing-badge');
+        expect(html).toContain('font-semibold text-[var(--text-primary)] dark:text-white');
+      }
     });
   });
 

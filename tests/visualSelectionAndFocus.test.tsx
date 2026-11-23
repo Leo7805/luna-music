@@ -263,7 +263,8 @@ describe('Visual Selection and Focus States Consistency', () => {
           showToast={() => {}}
         />
       );
-      expect(htmlSelected).toContain('border-indigo-500/40');
+      expect(htmlSelected).toContain('data-row-state="selected"');
+      expect(htmlSelected).toContain('border-[var(--accent-primary)]/40');
       expect(htmlSelected).toContain('transition-colors');
 
       // Currently playing track state
@@ -291,7 +292,8 @@ describe('Visual Selection and Focus States Consistency', () => {
           showToast={() => {}}
         />
       );
-      expect(htmlPlaying).toContain('border-indigo-500/25');
+      expect(htmlPlaying).toContain('data-row-state="current"');
+      expect(htmlPlaying).toContain('track-row-current');
       expect(htmlPlaying).toContain('transition-colors');
 
       // Inactive track row has border-transparent

@@ -229,7 +229,6 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
       isCurrent={isCurrent}
       isSelected={isSelected}
       isMenuOpen={isMenuOpen}
-      currentHighlight="text-only"
       leadingSlot={leadingSlot}
       actionsSlot={actionsSlot}
       rowRef={rowRef}
