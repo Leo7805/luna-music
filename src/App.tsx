@@ -138,6 +138,19 @@ export function App() {
     [library.folders]
   );
 
+  const selectedPlaylist = useMemo(
+    () =>
+      library.currentView === 'playlists' && playlists.selectedPlaylistId
+        ? playlists.playlists.find((p) => p.id === playlists.selectedPlaylistId) || null
+        : null,
+    [library.currentView, playlists.selectedPlaylistId, playlists.playlists]
+  );
+
+  const playlistsTotalTracks = useMemo(
+    () => playlists.playlists.reduce((sum, pl) => sum + pl.tracks.length, 0),
+    [playlists.playlists]
+  );
+
   // Compute view title & subtitle
   const { title: viewTitle, subtitle: viewSubtitle } = useMemo(
     () =>
@@ -153,6 +166,9 @@ export function App() {
         folderOverviewFoldersCount: folderCollections.physicalFoldersCount,
         folderOverviewTracksCount: library.library?.flatPlaylist.length ?? 0,
         playlistsCount: playlists.playlists.length,
+        playlistsTotalTracks,
+        isPlaylistDetail: Boolean(selectedPlaylist),
+        selectedPlaylistName: selectedPlaylist?.name ?? null,
       }),
     [
       hasLibrary,
@@ -166,8 +182,27 @@ export function App() {
       library.library?.flatPlaylist.length,
       folderCollections.physicalFoldersCount,
       playlists.playlists.length,
+      playlistsTotalTracks,
+      selectedPlaylist,
     ]
   );
+
+  const headerBreadcrumbs =
+    hasLibrary && library.currentView === 'folder'
+      ? breadcrumbs
+      : selectedPlaylist
+      ? [
+          { name: 'Playlists', path: '' },
+          { name: selectedPlaylist.name, path: selectedPlaylist.id },
+        ]
+      : undefined;
+
+  const handleHeaderBreadcrumbClick =
+    library.currentView === 'playlists'
+      ? (path: string) => {
+          if (!path) playlists.selectPlaylist(null);
+        }
+      : handleSelectFolder;
 
   // A render callback, not a component type: list state and DOM survive updates.
   const renderLibraryLayout = ({ actions, content }: Omit<TrackListLayoutSlots, 'actions'> & {
@@ -179,11 +214,12 @@ export function App() {
         title={viewTitle}
         subtitle={viewSubtitle}
         searchQuery={library.searchQuery}
-        breadcrumbs={hasLibrary && library.currentView === 'folder' ? breadcrumbs : undefined}
+        breadcrumbs={headerBreadcrumbs}
+        keepBreadcrumbsOnSearch={Boolean(selectedPlaylist)}
         theme={theme}
         lightStyle={lightStyle}
         onSearchChange={library.setSearchQuery}
-        onBreadcrumbClick={handleSelectFolder}
+        onBreadcrumbClick={handleHeaderBreadcrumbClick}
         onOpenShortcutsModal={() => setIsShortcutsOpen(true)}
         onSelectTheme={setTheme}
         onSelectLightStyle={setLightStyle}
@@ -288,6 +324,7 @@ export function App() {
             />
           ) : library.currentView === 'all' ||
             library.currentView === 'imported-files' ||
+            library.currentView === 'playlists' ||
             (library.currentView === 'folder' && library.selectedFolderPath !== '') ? (
             <LibraryContent
               library={library}

@@ -343,6 +343,10 @@ describe('App Composition & Component Integration (Stage 7)', () => {
           expect(html).not.toContain('data-testid="tracklist-toolbar"');
           expect(html.match(/data-testid="play-all-button"/g)).toHaveLength(1);
           expect(html.indexOf('</header>')).toBeLessThan(html.indexOf('data-testid="external-scroll"'));
+        } else if (currentView === 'playlists') {
+          const header = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
+          expect(header).toContain('data-testid="create-playlist-header-button"');
+          expect(html.indexOf('</header>')).toBeLessThan(html.indexOf('data-testid="external-scroll"'));
         } else {
           expect(html).not.toContain('data-testid="external-scroll"');
           expect(html).not.toContain('<header');
@@ -397,9 +401,10 @@ describe('App Composition & Component Integration (Stage 7)', () => {
         selectedArtistName: null,
         displayedTracksCount: 0,
         playlistsCount: 3,
+        playlistsTotalTracks: 12,
       });
       expect(plInfo.title).toBe('Playlists');
-      expect(plInfo.subtitle).toBe('3 playlists');
+      expect(plInfo.subtitle).toBe('3 playlists · 12 tracks');
 
       // Folder view root
       const folderRootInfo = deriveViewHeaderInfo({

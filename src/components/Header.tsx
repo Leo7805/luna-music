@@ -11,6 +11,7 @@ export interface HeaderProps {
   actions?: React.ReactNode;
   searchQuery: string;
   breadcrumbs?: BreadcrumbItem[];
+  keepBreadcrumbsOnSearch?: boolean;
   theme: Theme;
   lightStyle: LightStyle;
   onSearchChange: (query: string) => void;
@@ -26,6 +27,7 @@ export const Header: React.FC<HeaderProps> = ({
   actions,
   searchQuery,
   breadcrumbs,
+  keepBreadcrumbsOnSearch = false,
   theme,
   lightStyle,
   onSearchChange,
@@ -41,7 +43,7 @@ export const Header: React.FC<HeaderProps> = ({
       title={title}
       subtitle={subtitle}
       actions={actions}
-      breadcrumbs={!searchQuery && breadcrumbs && breadcrumbs.length > 1 ? (
+      breadcrumbs={(keepBreadcrumbsOnSearch || !searchQuery) && breadcrumbs && breadcrumbs.length > 1 ? (
         <nav
           aria-label="Folder breadcrumb"
           data-testid="folder-breadcrumb"

@@ -265,12 +265,12 @@ describe('Screenshot B — Playlist Visibility & Unavailable Entries with Empty 
       />
     );
 
-    // Play All, Shuffle, and Add to Queue buttons all have disabled=""
+    // Play All is disabled when all playlist entries are unavailable; dedicated Shuffle/Add to Queue hero buttons are removed
     expect(html).toMatch(/disabled=""[^>]*>.*?Play All/s);
-    expect(html).toMatch(/disabled=""[^>]*>.*?Shuffle/s);
-    expect(html).toMatch(/disabled=""[^>]*>.*?Add to Queue/s);
+    expect(html).not.toContain('>Shuffle<');
+    expect(html).not.toContain('>Add to Queue<');
 
-    // Header shows "Playlists" and "1 playlist" even when hasLibrary is false
+    // Header shows "Playlists" and "1 playlist · 3 tracks" even when hasLibrary is false
     const header = deriveViewHeaderInfo({
       hasLibrary: false,
       currentView: 'playlists',
@@ -281,9 +281,10 @@ describe('Screenshot B — Playlist Visibility & Unavailable Entries with Empty 
       selectedArtistName: null,
       displayedTracksCount: 0,
       playlistsCount: 1,
+      playlistsTotalTracks: 3,
     });
     expect(header.title).toBe('Playlists');
-    expect(header.subtitle).toBe('1 playlist');
+    expect(header.subtitle).toBe('1 playlist · 3 tracks');
 
     // Re-importing a verified matching track restores availability in original order
     const reimported = makeTrack('f1:s2.mp3', '晴天');

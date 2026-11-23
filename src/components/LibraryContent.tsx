@@ -112,6 +112,7 @@ export function LibraryContent({
     Boolean(unifiedLayout) &&
     (currentView === 'all' ||
       currentView === 'imported-files' ||
+      currentView === 'playlists' ||
       (currentView === 'folder' && !isFolderOverview));
 
   // Loading and source-empty states have no mounted list selection controller.
@@ -221,6 +222,7 @@ export function LibraryContent({
           currentTrackId={currentTrack?.id}
           isPlaying={isPlaying}
           favourites={favourites}
+          renderLayout={unifiedLayout}
           onSelectPlaylist={selectPlaylist}
           onCreatePlaylist={createPlaylist}
           onRenamePlaylist={renamePlaylist}

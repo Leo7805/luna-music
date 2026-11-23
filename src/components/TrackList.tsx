@@ -251,6 +251,7 @@ export const TrackList: React.FC<TrackListProps> = ({
         onToggleSelectMode={handleToggleSelectMode}
         onToggleSelectAll={toggleSelectAll}
         onPlayAll={onPlayAll}
+        isPlayAllDisabled={!tracks.some(isTrackPlayable)}
       />
 
       {/* Track Rows */}
