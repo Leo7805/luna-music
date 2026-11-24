@@ -11,7 +11,15 @@ export const SUPPORTED_AUDIO_EXTENSIONS = new Set([
   'flac',
   'opus',
   'weba',
+  'webm',
 ]);
+
+export const SUPPORTED_AUDIO_PICKER_EXTENSIONS = Array.from(
+  SUPPORTED_AUDIO_EXTENSIONS,
+  (ext) => `.${ext}`
+);
+
+export const AUDIO_FILE_INPUT_ACCEPT = `audio/*,${SUPPORTED_AUDIO_PICKER_EXTENSIONS.join(',')},.lrc`;
 
 export function isSupportedAudioFile(filename: string): boolean {
   const parts = filename.split('.');
@@ -48,6 +56,7 @@ export function getMimeTypeForFilename(filename: string): string | null {
     case 'opus':
       return 'audio/ogg; codecs="opus"';
     case 'weba':
+    case 'webm':
       return 'audio/webm';
     default:
       return null;

@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { FolderOpen, Disc, ChevronDown } from 'lucide-react';
 import { getDefaultOpenMode, OpenMusicMode } from '../utils/platform';
 import { isFileSystemAccessSupported } from '../services/directoryAccess';
+import { AUDIO_FILE_INPUT_ACCEPT } from '../utils/audioFileTypes';
 
 interface OpenMusicControlProps {
   variant: 'empty-state' | 'sidebar';
@@ -165,7 +166,7 @@ export const OpenMusicControl: React.FC<OpenMusicControlProps> = ({
         ref={filesInputRef}
         type="file"
         multiple
-        accept="audio/*,.lrc"
+        accept={AUDIO_FILE_INPUT_ACCEPT}
         className="hidden"
         data-testid={`${variant}-files-input`}
         onChange={(e) => {

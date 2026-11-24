@@ -5,6 +5,7 @@ import {
   stripExtension,
   buildFolderTree,
 } from '../utils/musicTree';
+import { SUPPORTED_AUDIO_PICKER_EXTENSIONS } from '../utils/audioFileTypes';
 import { createFallbackMetadata } from '../utils/metadata';
 
 export function isFileSystemAccessSupported(): boolean {
@@ -37,7 +38,7 @@ export async function promptOpenFiles(): Promise<FileSystemFileHandle[] | null> 
         {
           description: 'Audio & Lyrics Files',
           accept: {
-            'audio/*': ['.mp3', '.m4a', '.aac', '.wav', '.flac', '.ogg', '.opus', '.weba'],
+            'audio/*': SUPPORTED_AUDIO_PICKER_EXTENSIONS,
             'text/plain': ['.lrc'],
           },
         },
