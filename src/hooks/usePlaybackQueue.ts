@@ -348,22 +348,21 @@ export function usePlaybackQueue({
       const currentList = queueRef.current;
       if (currentList.length === 0) return null;
 
-      // 1. Explicit Play Next / Bulk Play Next sequence always takes priority over Shuffle & forward history
-      if (pendingPlayNextIdsRef.current.length > 0) {
-        const { nextTrack: priorityTrack, remainingIds } = consumeNextPendingPlayNext(
-          pendingPlayNextIdsRef.current,
-          currentList,
-          currentTrack
-        );
-        pendingPlayNextIdsRef.current = remainingIds;
-        if (priorityTrack) {
-          recordPlayedTrack(priorityTrack, true);
-          return priorityTrack;
-        }
-      }
-
-      // 2. Shuffle ON: follow forward history or pick random unplayed track without reordering Queue
+      // 1. Shuffle ON: explicit Play Next / Bulk Play Next sequence takes priority over Shuffle & forward history
       if (shuffle) {
+        if (pendingPlayNextIdsRef.current.length > 0) {
+          const { nextTrack: priorityTrack, remainingIds } = consumeNextPendingPlayNext(
+            pendingPlayNextIdsRef.current,
+            currentList,
+            currentTrack
+          );
+          pendingPlayNextIdsRef.current = remainingIds;
+          if (priorityTrack) {
+            recordPlayedTrack(priorityTrack, true);
+            return priorityTrack;
+          }
+        }
+
         const { nextTrack, nextState } = pickNextShuffledTrack(
           shuffleStateRef.current,
           currentList,
@@ -374,7 +373,7 @@ export function usePlaybackQueue({
         return nextTrack;
       }
 
-      // 3. Shuffle OFF: normal sequential Queue order
+      // 2. Shuffle OFF: visible Queue order is authoritative; keep pending Play Next list synced in case Shuffle is toggled ON mid-batch
       const { nextTrack: seqTrack } = getNextTrackToPlay(
         currentList,
         currentTrack,
@@ -383,6 +382,13 @@ export function usePlaybackQueue({
         null
       );
       if (seqTrack) {
+        if (pendingPlayNextIdsRef.current.length > 0) {
+          pendingPlayNextIdsRef.current = removeTrackFromPendingPlayNext(
+            pendingPlayNextIdsRef.current,
+            seqTrack,
+            currentList
+          );
+        }
         recordPlayedTrack(seqTrack, true);
       }
       return seqTrack;

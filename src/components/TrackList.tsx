@@ -148,8 +148,8 @@ export const TrackList: React.FC<TrackListProps> = ({
         showToast(`${selectedTracks.length} tracks set to play next`);
       }
     } else if (onPlayNext) {
-      for (const t of selectedTracks) {
-        onPlayNext(t);
+      for (let i = selectedTracks.length - 1; i >= 0; i--) {
+        onPlayNext(selectedTracks[i]);
       }
       showToast(`${selectedTracks.length} tracks added to play next`);
     }
