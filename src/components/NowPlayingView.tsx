@@ -8,11 +8,10 @@ import {
   CheckSquare,
   Square,
   SlidersHorizontal,
-  Disc3,
+  Music2,
 } from 'lucide-react';
 import { TrackItem, Playlist } from '../types/music';
 import { isSameTrack } from '../utils/musicTree';
-import { getVinylSpinClass } from '../utils/vinylSpin';
 import { Theme, LightStyle } from '../hooks/useTheme';
 import { useNowPlayingSelection } from '../hooks/useNowPlayingSelection';
 import { AppearancePopover } from './AppearancePopover';
@@ -203,15 +202,11 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span
-                  data-testid="now-playing-header-vinyl"
-                  data-spinning={Boolean(currentTrack) && isPlaying ? 'true' : 'false'}
+                  data-testid="now-playing-header-icon"
                   aria-hidden="true"
-                  className={`inline-flex items-center justify-center shrink-0 text-[var(--track-current-accent)] ${getVinylSpinClass(
-                    Boolean(currentTrack),
-                    isPlaying
-                  )}`}
+                  className="inline-flex items-center justify-center shrink-0 text-[var(--accent-primary)] dark:text-slate-300"
                 >
-                  <Disc3 className="w-6 h-6" />
+                  <Music2 className="w-[22px] h-[22px]" strokeWidth={1.75} />
                 </span>
                 <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
                   Now Playing

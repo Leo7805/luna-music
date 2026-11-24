@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { X, Music2, Disc3 } from 'lucide-react';
+import { X, Music2 } from 'lucide-react';
 import { TrackItem, LrcLine } from '../types/music';
 import { findCurrentLyricIndex } from '../utils/lrcParser';
 import { getTrackStatus } from '../utils/musicTree';
@@ -118,7 +118,28 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
                     />
                   </>
                 ) : (
-                  <Disc3 className="w-10 h-10 text-white/70" aria-hidden="true" />
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-10 h-10 text-white/60"
+                    aria-hidden="true"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <circle cx="12" cy="12" r="2" />
+                    <circle
+                      data-testid="lyrics-vinyl-marker"
+                      cx="15.5"
+                      cy="8.5"
+                      r="0.9"
+                      fill="currentColor"
+                      stroke="none"
+                      opacity="0.85"
+                    />
+                  </svg>
                 )}
               </div>
             </div>
