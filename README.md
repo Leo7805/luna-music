@@ -2,7 +2,7 @@
 
 Luna Music is a browser-based local music player for desktop audio libraries. It runs entirely client-side with no backend, accounts, or file uploads, combining folder-based library management with playlists, synchronized local lyrics, and a persistent playback queue.
 
-![Luna Music — All Tracks](docs/all-tracks.png)
+![Luna Music — All Tracks](docs/screenshots/all-tracks.png)
 
 ## Key Features
 
@@ -31,21 +31,21 @@ Luna Music is a browser-based local music player for desktop audio libraries. It
 <table>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/music-folders.png" alt="Luna Music — Music Folders and Local Lyrics" /><br />
+      <img src="docs/screenshots/music-folders.png" alt="Luna Music — Music Folders and Local Lyrics" /><br />
       <sub><strong>Music Folders &amp; Local Lyrics</strong> — Recursive folder browsing with synced <code>.lrc</code> panel</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/now-playing.png" alt="Luna Music — Now Playing Queue" /><br />
+      <img src="docs/screenshots/now-playing.png" alt="Luna Music — Now Playing Queue" /><br />
       <sub><strong>Now Playing</strong> — Active queue, unified playing-row highlight, and queue actions</sub>
     </td>
   </tr>
   <tr>
     <td align="center" width="50%">
-      <img src="docs/playlists.png" alt="Luna Music — Playlists" /><br />
+      <img src="docs/screenshots/playlists.png" alt="Luna Music — Playlists" /><br />
       <sub><strong>Playlists</strong> — Custom playlist management, track actions, and reordering</sub>
     </td>
     <td align="center" width="50%">
-      <img src="docs/albums.png" alt="Luna Music — Albums" /><br />
+      <img src="docs/screenshots/albums.png" alt="Luna Music — Albums" /><br />
       <sub><strong>Albums</strong> — Grouped album overview with contextual search</sub>
     </td>
   </tr>
