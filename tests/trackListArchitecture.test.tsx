@@ -265,7 +265,7 @@ describe('TrackList Architecture & Component Decomposition (Stage 4)', () => {
         />
       );
 
-      expect(html).toContain('bg-indigo-600/20');
+      expect(html).toContain('track-row-selected');
       expect(html).toContain('lucide-check-square'); // Checked checkbox icon
     });
 

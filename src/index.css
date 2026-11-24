@@ -22,16 +22,22 @@
   --accent-primary: #756878;
   --accent-hover: #655868;
 
-  /* Unified Currently-Playing Track Row Tokens (Option 3) */
-  --track-current-bg: linear-gradient(90deg, rgba(139, 92, 246, 0.13) 0%, rgba(168, 85, 247, 0.09) 55%, rgba(139, 92, 246, 0.12) 100%);
-  --track-current-bg-hover: linear-gradient(90deg, rgba(139, 92, 246, 0.18) 0%, rgba(168, 85, 247, 0.13) 55%, rgba(139, 92, 246, 0.16) 100%);
-  --track-current-border: rgba(139, 92, 246, 0.34);
-  --track-current-border-hover: rgba(139, 92, 246, 0.48);
-  --track-current-glow: rgba(139, 92, 246, 0.18);
+  /* Unified Currently-Playing Track Row Tokens (Option 3 — subtle purple accent + neutral-tinted fill) */
+  --track-current-bg: linear-gradient(90deg, rgba(139, 92, 246, 0.07) 0%, rgba(168, 85, 247, 0.03) 55%, rgba(139, 92, 246, 0.05) 100%);
+  --track-current-bg-hover: linear-gradient(90deg, rgba(139, 92, 246, 0.11) 0%, rgba(168, 85, 247, 0.06) 55%, rgba(139, 92, 246, 0.08) 100%);
+  --track-current-border: rgba(139, 92, 246, 0.30);
+  --track-current-border-hover: rgba(139, 92, 246, 0.44);
+  --track-current-glow: rgba(139, 92, 246, 0.10);
   --track-current-accent: #6d4aff;
   --track-playing-badge-bg: rgba(255, 255, 255, 0.78);
   --track-playing-badge-border: rgba(139, 92, 246, 0.18);
   --track-playing-badge-shadow: 0 2px 6px -1px rgba(109, 40, 217, 0.14);
+
+  /* Distinct Blue-Tinted Selected Track Row Tokens */
+  --track-selected-bg: rgba(37, 99, 235, 0.09);
+  --track-selected-bg-hover: rgba(37, 99, 235, 0.14);
+  --track-selected-border: rgba(37, 99, 235, 0.34);
+  --track-selected-accent: #2563eb;
 }
 
 [data-light-style="warm"] {
@@ -48,16 +54,22 @@
   --accent-primary: #756878;
   --accent-hover: #655868;
 
-  /* Unified Currently-Playing Track Row Tokens (Option 3) */
-  --track-current-bg: linear-gradient(90deg, rgba(139, 92, 246, 0.13) 0%, rgba(168, 85, 247, 0.09) 55%, rgba(139, 92, 246, 0.12) 100%);
-  --track-current-bg-hover: linear-gradient(90deg, rgba(139, 92, 246, 0.18) 0%, rgba(168, 85, 247, 0.13) 55%, rgba(139, 92, 246, 0.16) 100%);
-  --track-current-border: rgba(139, 92, 246, 0.34);
-  --track-current-border-hover: rgba(139, 92, 246, 0.48);
-  --track-current-glow: rgba(139, 92, 246, 0.18);
+  /* Unified Currently-Playing Track Row Tokens (Option 3 — subtle purple accent + neutral-tinted fill) */
+  --track-current-bg: linear-gradient(90deg, rgba(139, 92, 246, 0.07) 0%, rgba(168, 85, 247, 0.03) 55%, rgba(139, 92, 246, 0.05) 100%);
+  --track-current-bg-hover: linear-gradient(90deg, rgba(139, 92, 246, 0.11) 0%, rgba(168, 85, 247, 0.06) 55%, rgba(139, 92, 246, 0.08) 100%);
+  --track-current-border: rgba(139, 92, 246, 0.30);
+  --track-current-border-hover: rgba(139, 92, 246, 0.44);
+  --track-current-glow: rgba(139, 92, 246, 0.10);
   --track-current-accent: #6d4aff;
   --track-playing-badge-bg: rgba(255, 255, 255, 0.78);
   --track-playing-badge-border: rgba(139, 92, 246, 0.18);
   --track-playing-badge-shadow: 0 2px 6px -1px rgba(109, 40, 217, 0.14);
+
+  /* Distinct Blue-Tinted Selected Track Row Tokens */
+  --track-selected-bg: rgba(37, 99, 235, 0.09);
+  --track-selected-bg-hover: rgba(37, 99, 235, 0.14);
+  --track-selected-border: rgba(37, 99, 235, 0.34);
+  --track-selected-accent: #2563eb;
 }
 
 [data-light-style="neutral"] {
@@ -73,12 +85,16 @@
   --text-secondary: #686C78;
   --accent-primary: #666B80;
   --accent-hover: #565B70;
-  --track-current-bg: linear-gradient(90deg, rgba(99, 102, 241, 0.12) 0%, rgba(139, 92, 246, 0.09) 55%, rgba(99, 102, 241, 0.11) 100%);
-  --track-current-bg-hover: linear-gradient(90deg, rgba(99, 102, 241, 0.17) 0%, rgba(139, 92, 246, 0.13) 55%, rgba(99, 102, 241, 0.15) 100%);
-  --track-current-border: rgba(99, 102, 241, 0.32);
-  --track-current-border-hover: rgba(99, 102, 241, 0.46);
-  --track-current-glow: rgba(99, 102, 241, 0.16);
+  --track-current-bg: linear-gradient(90deg, rgba(99, 102, 241, 0.06) 0%, rgba(139, 92, 246, 0.03) 55%, rgba(99, 102, 241, 0.05) 100%);
+  --track-current-bg-hover: linear-gradient(90deg, rgba(99, 102, 241, 0.10) 0%, rgba(139, 92, 246, 0.06) 55%, rgba(99, 102, 241, 0.08) 100%);
+  --track-current-border: rgba(99, 102, 241, 0.28);
+  --track-current-border-hover: rgba(99, 102, 241, 0.42);
+  --track-current-glow: rgba(99, 102, 241, 0.09);
   --track-current-accent: #5b50ec;
+  --track-selected-bg: rgba(37, 99, 235, 0.09);
+  --track-selected-bg-hover: rgba(37, 99, 235, 0.14);
+  --track-selected-border: rgba(37, 99, 235, 0.34);
+  --track-selected-accent: #2563eb;
 }
 
 [data-light-style="mist"] {
@@ -94,24 +110,32 @@
   --text-secondary: #706B7A;
   --accent-primary: #716B82;
   --accent-hover: #605A71;
-  --track-current-bg: linear-gradient(90deg, rgba(124, 58, 237, 0.13) 0%, rgba(168, 85, 247, 0.10) 55%, rgba(124, 58, 237, 0.12) 100%);
-  --track-current-bg-hover: linear-gradient(90deg, rgba(124, 58, 237, 0.18) 0%, rgba(168, 85, 247, 0.14) 55%, rgba(124, 58, 237, 0.16) 100%);
-  --track-current-border: rgba(124, 58, 237, 0.34);
-  --track-current-border-hover: rgba(124, 58, 237, 0.48);
-  --track-current-glow: rgba(124, 58, 237, 0.18);
+  --track-current-bg: linear-gradient(90deg, rgba(124, 58, 237, 0.07) 0%, rgba(168, 85, 247, 0.03) 55%, rgba(124, 58, 237, 0.05) 100%);
+  --track-current-bg-hover: linear-gradient(90deg, rgba(124, 58, 237, 0.11) 0%, rgba(168, 85, 247, 0.06) 55%, rgba(124, 58, 237, 0.08) 100%);
+  --track-current-border: rgba(124, 58, 237, 0.30);
+  --track-current-border-hover: rgba(124, 58, 237, 0.44);
+  --track-current-glow: rgba(124, 58, 237, 0.10);
   --track-current-accent: #6d4aff;
+  --track-selected-bg: rgba(37, 99, 235, 0.09);
+  --track-selected-bg-hover: rgba(37, 99, 235, 0.14);
+  --track-selected-border: rgba(37, 99, 235, 0.34);
+  --track-selected-accent: #2563eb;
 }
 
 .dark {
-  --track-current-bg: linear-gradient(90deg, rgba(99, 102, 241, 0.24) 0%, rgba(139, 92, 246, 0.16) 55%, rgba(99, 102, 241, 0.20) 100%);
-  --track-current-bg-hover: linear-gradient(90deg, rgba(99, 102, 241, 0.30) 0%, rgba(139, 92, 246, 0.21) 55%, rgba(99, 102, 241, 0.26) 100%);
-  --track-current-border: rgba(129, 140, 248, 0.42);
-  --track-current-border-hover: rgba(165, 180, 252, 0.56);
-  --track-current-glow: rgba(99, 102, 241, 0.28);
-  --track-current-accent: #a5b4fc;
-  --track-playing-badge-bg: rgba(99, 102, 241, 0.24);
-  --track-playing-badge-border: rgba(165, 180, 252, 0.28);
+  --track-current-bg: linear-gradient(90deg, rgba(129, 140, 248, 0.12) 0%, rgba(139, 92, 246, 0.06) 55%, rgba(129, 140, 248, 0.08) 100%);
+  --track-current-bg-hover: linear-gradient(90deg, rgba(129, 140, 248, 0.17) 0%, rgba(139, 92, 246, 0.10) 55%, rgba(129, 140, 248, 0.12) 100%);
+  --track-current-border: rgba(139, 92, 246, 0.38);
+  --track-current-border-hover: rgba(167, 139, 250, 0.52);
+  --track-current-glow: rgba(129, 140, 248, 0.16);
+  --track-current-accent: #a78bfa;
+  --track-playing-badge-bg: rgba(139, 92, 246, 0.20);
+  --track-playing-badge-border: rgba(167, 139, 250, 0.30);
   --track-playing-badge-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.35);
+  --track-selected-bg: rgba(56, 189, 248, 0.14);
+  --track-selected-bg-hover: rgba(56, 189, 248, 0.20);
+  --track-selected-border: rgba(56, 189, 248, 0.42);
+  --track-selected-accent: #38bdf8;
 }
 
 body {
@@ -239,12 +263,22 @@ body {
   .track-row-current {
     background: var(--track-current-bg);
     border-color: var(--track-current-border);
-    box-shadow: 0 6px 20px -4px var(--track-current-glow), 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: inset 3px 0 0 0 var(--track-current-accent), 0 4px 14px -4px var(--track-current-glow);
   }
 
   .track-row-current:hover {
     background: var(--track-current-bg-hover);
     border-color: var(--track-current-border-hover);
+  }
+
+  /* Distinct Blue-Tinted Selected Track Row */
+  .track-row-selected {
+    background: var(--track-selected-bg);
+    border-color: var(--track-selected-border);
+  }
+
+  .track-row-selected:hover {
+    background: var(--track-selected-bg-hover);
   }
 
   .track-playing-badge {

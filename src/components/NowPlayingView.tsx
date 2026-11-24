@@ -1,11 +1,10 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
   X,
   ListMusic,
   Clock,
   Save,
-  Trash2,
   CheckSquare,
   Square,
   SlidersHorizontal,
@@ -13,12 +12,14 @@ import {
 import { TrackItem, Playlist } from '../types/music';
 import { isSameTrack } from '../utils/musicTree';
 import { Theme, LightStyle } from '../hooks/useTheme';
+import { useNowPlayingSelection } from '../hooks/useNowPlayingSelection';
 import { AppearancePopover } from './AppearancePopover';
 import { ConfirmModal } from './ConfirmModal';
 import { PlaylistModal } from './PlaylistModal';
 import { TrackPlaylistModals } from './TrackPlaylistModals';
 import { TrackInfoModal } from './TrackInfoModal';
 import { NowPlayingQueueRow } from './NowPlayingQueueRow';
+import { NowPlayingContextMenu } from './NowPlayingContextMenu';
 import { TRACK_ROW_GRID_CLASS } from './TrackRowLayout';
 import { calculateQueueScrollOffset } from '../utils/queueScroll';
 import { isFavouriteTrack } from '../utils/favouriteResolvers';
@@ -38,10 +39,12 @@ export interface NowPlayingViewProps {
   onPlayQueueTrack: (track: TrackItem) => void;
   onToggleFavourite?: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => void;
+  onPlayNextBulk?: (tracks: TrackItem[]) => { movedCount: number; addedCount: number } | void;
   onRemoveFromQueue: (index: number) => void;
   onRemoveTracksFromQueue: (indices: number[]) => number;
   onSaveQueueAsPlaylist: (name: string) => void;
   onAddToPlaylist?: (playlistId: string, track: TrackItem) => boolean;
+  onAddTracksToPlaylist?: (playlistId: string, tracks: TrackItem[]) => { addedCount: number };
   onCreateAndAddToPlaylist?: (playlistName: string, trackOrTracks: TrackItem | TrackItem[]) => void;
   onSelectTheme: (theme: Theme) => void;
   onSelectLightStyle: (style: LightStyle) => void;
@@ -60,22 +63,22 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
   onPlayQueueTrack,
   onToggleFavourite,
   onPlayNext,
+  onPlayNextBulk,
   onRemoveFromQueue,
   onRemoveTracksFromQueue,
   onSaveQueueAsPlaylist,
   onAddToPlaylist,
+  onAddTracksToPlaylist,
   onCreateAndAddToPlaylist,
   onSelectTheme,
   onSelectLightStyle,
   onOpenShortcutsModal,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isSelectMode, setIsSelectMode] = useState<boolean>(false);
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const [activeMenuIndex, setActiveMenuIndex] = useState<number | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState<boolean>(false);
   const [isBulkRemoveConfirmOpen, setIsBulkRemoveConfirmOpen] = useState<boolean>(false);
   const [playlistModalTrack, setPlaylistModalTrack] = useState<TrackItem | null>(null);
+  const [isBulkPlaylistModalOpen, setIsBulkPlaylistModalOpen] = useState<boolean>(false);
   const [infoModalTrack, setInfoModalTrack] = useState<TrackItem | null>(null);
   const [isAppearanceOpen, setIsAppearanceOpen] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -84,29 +87,10 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
   const activeRowRef = useRef<HTMLDivElement | null>(null);
   const lastScrolledTrackIdRef = useRef<string | null>(null);
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage((prev) => (prev === msg ? null : prev)), 2500);
-  };
-
-  // Close row context menu on outside click or Escape
-  useEffect(() => {
-    if (activeMenuIndex === null) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-queue-row-menu]')) {
-        setActiveMenuIndex(null);
-      }
-    };
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setActiveMenuIndex(null);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [activeMenuIndex]);
+  }, []);
 
   // Filter queue entries without mutating underlying Queue; retain originalIndex
   const filteredEntries = useMemo(() => {
@@ -123,6 +107,29 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
         );
       });
   }, [queue, searchQuery]);
+
+  const selectableVisibleIndices = useMemo(
+    () =>
+      filteredEntries
+        .filter(({ track }) => !(currentTrack && isSameTrack(track, currentTrack)))
+        .map(({ originalIndex }) => originalIndex),
+    [filteredEntries, currentTrack]
+  );
+
+  const {
+    isSelectMode,
+    selectedIndices,
+    sortedSelectedIndices,
+    selectedQueueTracks,
+    contextMenu,
+    setContextMenu,
+    exitSelectionMode,
+    toggleSelectIndex,
+    toggleSelectAllVisible,
+    handleToggleSelectMode,
+    handleCloseMenu,
+    handleOpenRowMenu,
+  } = useNowPlayingSelection({ queue, currentTrack, selectableVisibleIndices });
 
   // Auto-scroll to currently playing track when entering Now Playing or changing track
   useEffect(() => {
@@ -155,46 +162,24 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
     return () => cancelAnimationFrame(frameId);
   }, [currentTrack, queue, searchQuery]);
 
-  const selectableVisibleIndices = useMemo(
-    () =>
-      filteredEntries
-        .filter(({ track }) => !(currentTrack && isSameTrack(track, currentTrack)))
-        .map(({ originalIndex }) => originalIndex),
-    [filteredEntries, currentTrack]
-  );
-
-  const toggleSelectIndex = (idx: number) => {
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) next.delete(idx);
-      else next.add(idx);
-      return next;
-    });
-  };
-
-  const toggleSelectAllVisible = () => {
-    if (
-      selectableVisibleIndices.length > 0 &&
-      selectableVisibleIndices.every((idx) => selectedIndices.has(idx))
-    ) {
-      setSelectedIndices(new Set());
-    } else {
-      setSelectedIndices(new Set(selectableVisibleIndices));
+  const handleBulkPlayNext = useCallback(() => {
+    if (selectedQueueTracks.length === 0) return;
+    if (onPlayNextBulk) {
+      onPlayNextBulk(selectedQueueTracks);
+    } else if (onPlayNext) {
+      for (let i = selectedQueueTracks.length - 1; i >= 0; i--) {
+        onPlayNext(selectedQueueTracks[i]);
+      }
     }
-  };
-
-  const handleToggleSelectMode = () => {
-    setIsSelectMode((prev) => {
-      if (prev) setSelectedIndices(new Set());
-      return !prev;
-    });
-  };
+    exitSelectionMode();
+    showToast(
+      `${selectedQueueTracks.length} ${selectedQueueTracks.length === 1 ? 'track' : 'tracks'} moved to play next`
+    );
+  }, [selectedQueueTracks, onPlayNextBulk, onPlayNext, exitSelectionMode, showToast]);
 
   const handleConfirmBulkRemove = () => {
-    const indices = Array.from(selectedIndices);
-    const removed = onRemoveTracksFromQueue(indices);
-    setSelectedIndices(new Set());
-    setIsSelectMode(false);
+    const removed = onRemoveTracksFromQueue(sortedSelectedIndices);
+    exitSelectionMode();
     setIsBulkRemoveConfirmOpen(false);
     if (removed > 0) {
       showToast(`Removed ${removed} ${removed === 1 ? 'track' : 'tracks'} from Queue`);
@@ -299,27 +284,18 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
           </div>
         </div>
 
-        {/* Bulk Selection Bar (only visible in Select mode) */}
+        {/* Simplified Selection Status Row (actions live in shared context menu) */}
         {isSelectMode && (
           <div
             data-testid="queue-bulk-bar"
             className="flex items-center justify-between pt-2 border-t border-[var(--border-subtle)]/70 dark:border-white/[0.06] text-xs"
           >
-            <span className="text-[var(--text-secondary)] dark:text-slate-400 font-medium">
-              {selectedIndices.size} selected
+            <span
+              data-testid="queue-selection-count"
+              className="text-[var(--text-secondary)] dark:text-slate-400 font-medium"
+            >
+              {sortedSelectedIndices.length} selected
             </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={selectedIndices.size === 0}
-                onClick={() => setIsBulkRemoveConfirmOpen(true)}
-                data-testid="queue-remove-selected-button"
-                className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-40 text-white font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Remove Selected ({selectedIndices.size})</span>
-              </button>
-            </div>
           </div>
         )}
       </header>
@@ -327,6 +303,9 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
       {/* Queue Table Container */}
       <div
         ref={listContainerRef}
+        onScroll={() => {
+          if (contextMenu) setContextMenu(null);
+        }}
         className="flex-1 overflow-y-auto px-6 pt-3 pb-6 custom-scrollbar"
         data-testid="now-playing-queue-list"
       >
@@ -350,11 +329,11 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                     type="button"
                     onClick={toggleSelectAllVisible}
                     aria-label="Select all removable queue tracks"
-                    className="p-1 rounded text-slate-400 hover:text-[var(--accent-primary)] dark:hover:text-indigo-400 cursor-pointer"
+                    className="p-1 rounded text-slate-400 hover:text-[var(--track-selected-accent)] cursor-pointer"
                   >
                     {selectableVisibleIndices.length > 0 &&
                     selectableVisibleIndices.every((idx) => selectedIndices.has(idx)) ? (
-                      <CheckSquare className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
+                      <CheckSquare className="w-4 h-4 text-[var(--track-selected-accent)]" />
                     ) : (
                       <Square className="w-4 h-4" />
                     )}
@@ -390,22 +369,12 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
                       isFavourite={isFavourite}
                       isSelectMode={isSelectMode}
                       isSelected={selectedIndices.has(originalIndex)}
-                      isMenuOpen={activeMenuIndex === originalIndex}
+                      isMenuOpen={contextMenu?.targetIndex === originalIndex}
                       rowRef={isCurrent ? activeRowRef : undefined}
                       onPlayQueueTrack={onPlayQueueTrack}
                       onToggleFavourite={onToggleFavourite}
                       onToggleSelect={toggleSelectIndex}
-                      onToggleMenu={setActiveMenuIndex}
-                      onPlayNext={(t) => {
-                        onPlayNext?.(t);
-                        showToast('Moved to play next');
-                      }}
-                      onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
-                      onOpenTrackInfo={(t) => setInfoModalTrack(t)}
-                      onRemoveFromQueue={(idx) => {
-                        onRemoveFromQueue(idx);
-                        showToast('Removed from Queue');
-                      }}
+                      onOpenMenu={handleOpenRowMenu}
                     />
                   );
                 })}
@@ -414,6 +383,31 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
           </>
         )}
       </div>
+
+      {/* Shared Context Menu for Single-Track and Multi-Track Queue Actions */}
+      <NowPlayingContextMenu
+        menu={contextMenu}
+        selectedCount={sortedSelectedIndices.length}
+        onClose={handleCloseMenu}
+        onPlayQueueTrack={onPlayQueueTrack}
+        onPlayNext={
+          onPlayNext
+            ? (t) => {
+                onPlayNext(t);
+                showToast('Moved to play next');
+              }
+            : undefined
+        }
+        onBulkPlayNext={onPlayNextBulk || onPlayNext ? handleBulkPlayNext : undefined}
+        onAddToPlaylist={(t) => setPlaylistModalTrack(t)}
+        onBulkAddToPlaylist={() => setIsBulkPlaylistModalOpen(true)}
+        onOpenTrackInfo={(t) => setInfoModalTrack(t)}
+        onRemoveFromQueue={(idx) => {
+          onRemoveFromQueue(idx);
+          showToast('Removed from Queue');
+        }}
+        onRequestBulkRemove={() => setIsBulkRemoveConfirmOpen(true)}
+      />
 
       {/* Save Queue as Playlist Modal */}
       <PlaylistModal
@@ -432,7 +426,7 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
       <ConfirmModal
         isOpen={isBulkRemoveConfirmOpen}
         title="Remove Selected from Queue"
-        message={`Remove ${selectedIndices.size} selected ${selectedIndices.size === 1 ? 'track' : 'tracks'} from the playback queue? Your library, playlists, and favourites will not be affected.`}
+        message={`Remove ${sortedSelectedIndices.length} selected ${sortedSelectedIndices.length === 1 ? 'track' : 'tracks'} from the playback queue? Your library, playlists, and favourites will not be affected.`}
         confirmLabel="Remove from Queue"
         cancelLabel="Cancel"
         isDanger={true}
@@ -440,17 +434,18 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
         onCancel={() => setIsBulkRemoveConfirmOpen(false)}
       />
 
-      {/* Add Single Queue Track to Playlist Modal */}
+      {/* Single & Bulk Add to Playlist Modals */}
       <TrackPlaylistModals
         playlists={playlists}
         playlistModalTrack={playlistModalTrack}
-        bulkPlaylistModalOpen={false}
-        selectedTracks={[]}
+        bulkPlaylistModalOpen={isBulkPlaylistModalOpen}
+        selectedTracks={selectedQueueTracks}
         onCloseSingleModal={() => setPlaylistModalTrack(null)}
-        onCloseBulkModal={() => {}}
+        onCloseBulkModal={() => setIsBulkPlaylistModalOpen(false)}
         onAddToPlaylist={onAddToPlaylist}
+        onAddTracksToPlaylist={onAddTracksToPlaylist}
         onCreateAndAddToPlaylist={onCreateAndAddToPlaylist}
-        onClearSelection={() => {}}
+        onClearSelection={exitSelectionMode}
         showToast={showToast}
       />
 

@@ -412,10 +412,12 @@ export function App() {
               onPlayQueueTrack={audioPlayer.playQueueTrack}
               onToggleFavourite={library.toggleFavourite}
               onPlayNext={audioPlayer.playNext}
+              onPlayNextBulk={audioPlayer.playNextBulk}
               onRemoveFromQueue={audioPlayer.removeFromQueue}
               onRemoveTracksFromQueue={audioPlayer.removeTracksFromQueue}
               onSaveQueueAsPlaylist={(name) => playlists.saveQueueAsPlaylist(name, audioPlayer.queue)}
               onAddToPlaylist={playlists.addTrackToPlaylist}
+              onAddTracksToPlaylist={playlists.addTracksToPlaylist}
               onCreateAndAddToPlaylist={handleCreateAndAddToPlaylist}
               onSelectTheme={setTheme}
               onSelectLightStyle={setLightStyle}

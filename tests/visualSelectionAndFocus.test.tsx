@@ -264,7 +264,7 @@ describe('Visual Selection and Focus States Consistency', () => {
         />
       );
       expect(htmlSelected).toContain('data-row-state="selected"');
-      expect(htmlSelected).toContain('border-[var(--accent-primary)]/40');
+      expect(htmlSelected).toContain('track-row-selected');
       expect(htmlSelected).toContain('transition-colors');
 
       // Currently playing track state

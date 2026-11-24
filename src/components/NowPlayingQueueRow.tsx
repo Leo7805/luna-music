@@ -1,18 +1,18 @@
 import React from 'react';
-import {
-  Play,
-  ListEnd,
-  ListPlus,
-  Info,
-  Trash2,
-  CheckSquare,
-  Square,
-} from 'lucide-react';
+import { CheckSquare, Square } from 'lucide-react';
 import { TrackItem } from '../types/music';
 import { TrackRowLayout } from './TrackRowLayout';
 import { TrackPlayingIndicator } from './TrackPlayingIndicator';
 import { TrackFavouriteButton } from './TrackFavouriteButton';
 import { TrackActionMenuTrigger } from './TrackActionMenuTrigger';
+
+export interface QueueRowMenuAnchor {
+  type: 'cursor' | 'button';
+  x: number;
+  y: number;
+  rect?: { left: number; right: number; top: number; bottom: number };
+  triggerElement?: HTMLElement | null;
+}
 
 export interface NowPlayingQueueRowProps {
   track: TrackItem;
@@ -27,11 +27,17 @@ export interface NowPlayingQueueRowProps {
   onPlayQueueTrack: (track: TrackItem) => void;
   onToggleFavourite?: (trackId: string) => void;
   onToggleSelect: (index: number) => void;
-  onToggleMenu: (index: number | null) => void;
+  onOpenMenu?: (index: number, anchor: QueueRowMenuAnchor) => void;
+  /** @deprecated Prefer onOpenMenu */
+  onToggleMenu?: (index: number | null) => void;
+  /** @deprecated Handled via shared NowPlayingContextMenu */
   onPlayNext?: (track: TrackItem) => void;
-  onAddToPlaylist: (track: TrackItem) => void;
-  onOpenTrackInfo: (track: TrackItem) => void;
-  onRemoveFromQueue: (index: number) => void;
+  /** @deprecated Handled via shared NowPlayingContextMenu */
+  onAddToPlaylist?: (track: TrackItem) => void;
+  /** @deprecated Handled via shared NowPlayingContextMenu */
+  onOpenTrackInfo?: (track: TrackItem) => void;
+  /** @deprecated Handled via shared NowPlayingContextMenu */
+  onRemoveFromQueue?: (index: number) => void;
 }
 
 export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
@@ -47,11 +53,8 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
   onPlayQueueTrack,
   onToggleFavourite,
   onToggleSelect,
+  onOpenMenu,
   onToggleMenu,
-  onPlayNext,
-  onAddToPlaylist,
-  onOpenTrackInfo,
-  onRemoveFromQueue,
 }) => {
   const handleRowClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
@@ -65,7 +68,17 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
-    onToggleMenu(isMenuOpen ? null : originalIndex);
+    e.stopPropagation();
+    if (onOpenMenu) {
+      onOpenMenu(originalIndex, {
+        type: 'cursor',
+        x: e.clientX,
+        y: e.clientY,
+        triggerElement: e.currentTarget as HTMLElement,
+      });
+    } else {
+      onToggleMenu?.(isMenuOpen ? null : originalIndex);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -102,15 +115,16 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
       }}
       aria-label={
         isCurrent
-          ? 'Currently playing track cannot be bulk removed'
+          ? 'Currently playing track cannot be bulk selected'
           : `Select ${track.metadata.title || track.name}`
       }
+      aria-pressed={isSelected}
       title={isCurrent ? 'Currently playing track is protected' : undefined}
       data-testid={`queue-checkbox-${originalIndex}`}
-      className="p-1 rounded text-slate-400 hover:text-[var(--accent-primary)] dark:hover:text-indigo-400 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50"
+      className="p-1 rounded text-slate-400 hover:text-[var(--track-selected-accent)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--track-selected-accent)]/60"
     >
       {isSelected ? (
-        <CheckSquare className="w-4 h-4 text-[var(--accent-primary)] dark:text-indigo-400" />
+        <CheckSquare className="w-4 h-4 text-[var(--track-selected-accent)]" />
       ) : (
         <Square className="w-4 h-4" />
       )}
@@ -137,88 +151,28 @@ export const NowPlayingQueueRow: React.FC<NowPlayingQueueRowProps> = ({
       <div className="relative flex justify-end" data-queue-row-menu>
         <TrackActionMenuTrigger
           isOpen={isMenuOpen}
-          onToggle={() => onToggleMenu(isMenuOpen ? null : originalIndex)}
+          onToggle={(e) => {
+            if (onOpenMenu && e?.currentTarget) {
+              const rect = e.currentTarget.getBoundingClientRect();
+              onOpenMenu(originalIndex, {
+                type: 'button',
+                x: rect.right,
+                y: rect.bottom,
+                rect: {
+                  left: rect.left,
+                  right: rect.right,
+                  top: rect.top,
+                  bottom: rect.bottom,
+                },
+                triggerElement: e.currentTarget,
+              });
+            } else {
+              onToggleMenu?.(isMenuOpen ? null : originalIndex);
+            }
+          }}
           ariaLabel={`Queue actions for ${track.metadata.title || track.name}`}
           testId={`queue-menu-button-${originalIndex}`}
         />
-
-        {isMenuOpen && (
-          <div
-            data-testid={`queue-menu-dropdown-${originalIndex}`}
-            className="absolute right-0 top-full mt-1 w-48 py-1.5 rounded-xl bg-[var(--bg-panel)] dark:bg-[#0c192c] border border-[var(--border-subtle)] dark:border-white/[0.1] shadow-xl z-40 text-xs"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            {!isCurrent && (
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleMenu(null);
-                  onPlayQueueTrack(track);
-                }}
-                data-testid={`queue-play-now-action-${originalIndex}`}
-                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text-primary)] dark:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] cursor-pointer"
-              >
-                <Play className="w-3.5 h-3.5 text-[var(--accent-primary)] dark:text-indigo-400" />
-                <span>Play Now</span>
-              </button>
-            )}
-
-            {!isCurrent && onPlayNext && (
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleMenu(null);
-                  onPlayNext(track);
-                }}
-                data-testid={`queue-play-next-action-${originalIndex}`}
-                className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text-primary)] dark:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] cursor-pointer"
-              >
-                <ListEnd className="w-3.5 h-3.5 text-[var(--text-secondary)] dark:text-slate-400" />
-                <span>Play Next</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                onToggleMenu(null);
-                onAddToPlaylist(track);
-              }}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text-primary)] dark:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] cursor-pointer"
-            >
-              <ListPlus className="w-3.5 h-3.5 text-[var(--text-secondary)] dark:text-slate-400" />
-              <span>Add to Playlist</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                onToggleMenu(null);
-                onOpenTrackInfo(track);
-              }}
-              data-testid={`queue-track-info-action-${originalIndex}`}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[var(--text-primary)] dark:text-slate-200 hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] cursor-pointer"
-            >
-              <Info className="w-3.5 h-3.5 text-[var(--text-secondary)] dark:text-slate-400" />
-              <span>Track Info</span>
-            </button>
-
-            <div className="my-1 border-t border-[var(--border-subtle)] dark:border-white/[0.06]" />
-            <button
-              type="button"
-              onClick={() => {
-                onToggleMenu(null);
-                onRemoveFromQueue(originalIndex);
-              }}
-              data-testid={`queue-remove-action-${originalIndex}`}
-              className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>Remove from Queue</span>
-            </button>
-          </div>
-        )}
       </div>
     </>
   );

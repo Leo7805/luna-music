@@ -79,7 +79,8 @@ describe('Unified Currently-Playing Highlight (Option 3)', () => {
     expect(getTrackRowSurfaceClass('current')).toBe('track-row-current');
     expect(getTrackRowSurfaceClass('current-selected')).toContain('track-row-current');
     expect(getTrackRowSurfaceClass('current-selected')).toContain('ring-1');
-    expect(getTrackRowSurfaceClass('selected')).toContain('bg-[var(--bg-active)]');
+    expect(getTrackRowSurfaceClass('selected')).toBe('track-row-selected');
+    expect(getTrackRowSurfaceClass('selected')).not.toBe(getTrackRowSurfaceClass('current'));
     expect(getTrackRowSurfaceClass('default')).toContain('hover:bg-[var(--bg-hover)]/75');
     expect(TRACK_PLAYING_BADGE_CLASS).toContain('track-playing-badge');
   });

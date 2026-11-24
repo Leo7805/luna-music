@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { NowPlayingView } from '../src/components/NowPlayingView';
-import { NowPlayingQueueRow } from '../src/components/NowPlayingQueueRow';
+import { NowPlayingContextMenu } from '../src/components/NowPlayingContextMenu';
 import { LyricsPanel } from '../src/components/NowPlayingPanel';
 import { TrackInfoModal } from '../src/components/TrackInfoModal';
 import { usePlaybackQueue } from '../src/hooks/usePlaybackQueue';
@@ -224,21 +224,25 @@ describe('Now Playing Workspace & Dedicated Lyrics Panel', () => {
 
   it('renders clean context menus: Play Now + Play Next for non-current; Add to Playlist + Track Info + Remove from Queue (no Playing) for current', () => {
     const htmlNonCurrent = renderToStaticMarkup(
-      <NowPlayingQueueRow
-        track={t3}
-        originalIndex={2}
-        isCurrent={false}
-        isPlaying={true}
-        isSelectMode={false}
-        isSelected={false}
-        isMenuOpen={true}
+      <NowPlayingContextMenu
+        menu={{
+          targetIndex: 2,
+          targetTrack: t3,
+          isCurrent: false,
+          mode: 'single',
+          anchorType: 'button',
+          x: 100,
+          y: 100,
+        }}
+        selectedCount={0}
+        onClose={() => {}}
         onPlayQueueTrack={() => {}}
-        onToggleSelect={() => {}}
-        onToggleMenu={() => {}}
         onPlayNext={() => {}}
         onAddToPlaylist={() => {}}
+        onBulkAddToPlaylist={() => {}}
         onOpenTrackInfo={() => {}}
         onRemoveFromQueue={() => {}}
+        onRequestBulkRemove={() => {}}
       />
     );
     expect(htmlNonCurrent).toContain('Play Now');
@@ -249,21 +253,25 @@ describe('Now Playing Workspace & Dedicated Lyrics Panel', () => {
     expect(htmlNonCurrent).not.toContain('Jump to Track');
 
     const htmlCurrent = renderToStaticMarkup(
-      <NowPlayingQueueRow
-        track={t2}
-        originalIndex={1}
-        isCurrent={true}
-        isPlaying={true}
-        isSelectMode={false}
-        isSelected={false}
-        isMenuOpen={true}
+      <NowPlayingContextMenu
+        menu={{
+          targetIndex: 1,
+          targetTrack: t2,
+          isCurrent: true,
+          mode: 'single',
+          anchorType: 'button',
+          x: 100,
+          y: 100,
+        }}
+        selectedCount={0}
+        onClose={() => {}}
         onPlayQueueTrack={() => {}}
-        onToggleSelect={() => {}}
-        onToggleMenu={() => {}}
         onPlayNext={() => {}}
         onAddToPlaylist={() => {}}
+        onBulkAddToPlaylist={() => {}}
         onOpenTrackInfo={() => {}}
         onRemoveFromQueue={() => {}}
+        onRequestBulkRemove={() => {}}
       />
     );
     expect(htmlCurrent).not.toContain('>Playing<');

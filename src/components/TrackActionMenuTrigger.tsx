@@ -2,7 +2,7 @@ import { MoreHorizontal } from 'lucide-react';
 
 export interface TrackActionMenuTriggerProps {
   isOpen: boolean;
-  onToggle: () => void;
+  onToggle: (e?: React.MouseEvent<HTMLButtonElement>) => void;
   ariaLabel?: string;
   testId?: string;
 }
@@ -19,7 +19,7 @@ export function TrackActionMenuTrigger({
       onMouseDown={(e) => e.stopPropagation()}
       onClick={(e) => {
         e.stopPropagation();
-        onToggle();
+        onToggle(e);
       }}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {

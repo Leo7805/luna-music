@@ -32,7 +32,7 @@ export function getTrackRowSurfaceClass(state: TrackRowVisualState): string {
     case 'current':
       return 'track-row-current';
     case 'selected':
-      return 'bg-indigo-600/20 bg-[var(--bg-active)] dark:bg-indigo-600/25 border-[var(--accent-primary)]/40 dark:border-indigo-400/40 shadow-sm';
+      return 'track-row-selected';
     case 'default':
     default:
       return 'border-transparent hover:bg-[var(--bg-hover)]/75 dark:hover:bg-white/[0.05]';
