@@ -2,6 +2,8 @@
 
 Luna Music is a browser-based local music player for desktop audio libraries. It runs entirely client-side with no backend, accounts, or file uploads, combining folder-based library management with playlists, synchronized local lyrics, and a persistent playback queue.
 
+**Live Demo:** https://music.jinleo.dev/
+
 ![Luna Music — All Tracks](docs/screenshots/all-tracks.png)
 
 ## Key Features
