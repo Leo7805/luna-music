@@ -271,7 +271,7 @@ describe('Music Folders summary in the actual App composition', () => {
     search('');
     expect(byId('header-subtitle').textContent).toBe('1 folder · 3 tracks');
     click(byId('folder-card-physical/A/Nested'));
-    expect(byId('header-subtitle').textContent).toBe('0 folders · 2 tracks');
+    expect(byId('header-subtitle').textContent).toBe('2 tracks');
   });
 
   it('renders the reported six-child 433-track folder total from the canonical tree', () => {

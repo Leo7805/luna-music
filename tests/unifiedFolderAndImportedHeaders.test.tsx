@@ -300,7 +300,7 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
       // Navigate to Folder B via Sidebar -> selection and Select mode reset cleanly
       click(host.querySelector('[data-testid="root-folder-f2"] [role="button"]'));
       expect(byId('folder-breadcrumb')?.textContent).toContain('mp3');
-      expect(byId('header-subtitle')?.textContent).toBe('0 folders · 1 track');
+      expect(byId('header-subtitle')?.textContent).toBe('1 track');
       expect(byId('toggle-select-mode')?.textContent).toContain('Select');
       expect(byId('bulk-action-toolbar')).toBeNull();
 
@@ -334,12 +334,12 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
       click(byId('folder-card-f1/Sub'));
       expect(byId('folder-breadcrumb')?.textContent).toContain('ParentOnly');
       expect(byId('folder-breadcrumb')?.textContent).toContain('Sub');
-      expect(byId('header-subtitle')?.textContent).toBe('0 folders · 1 track');
+      expect(byId('header-subtitle')?.textContent).toBe('1 track');
       expect((byId('play-all-button') as HTMLButtonElement).disabled).toBe(false);
 
       // Navigate to completely empty folder -> unified header + disabled actions + empty state
       click(host.querySelector('[data-testid="root-folder-f2"] [role="button"]'));
-      expect(byId('header-subtitle')?.textContent).toBe('0 folders · 0 tracks');
+      expect(byId('header-subtitle')?.textContent).toBe('0 tracks');
       expect((byId('play-all-button') as HTMLButtonElement).disabled).toBe(true);
       expect((byId('toggle-select-mode') as HTMLButtonElement).disabled).toBe(true);
       expect(byId('tracklist-toolbar')).toBeNull();

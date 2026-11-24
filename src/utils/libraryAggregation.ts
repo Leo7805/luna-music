@@ -476,7 +476,8 @@ export function deriveViewHeaderInfo(params: {
   } else if (currentView === 'folder' && !isFolderOverview && currentFolderNode && !hasQuery) {
     const folders = currentFolderNode.subfolders.length;
     const tracks = currentFolderNode.totalTrackCount;
-    subtitle = `${folders} ${folders === 1 ? 'folder' : 'folders'} · ${tracks} ${tracks === 1 ? 'track' : 'tracks'}`;
+    const folderSummary = folders > 0 ? `${folders} ${folders === 1 ? 'folder' : 'folders'} · ` : '';
+    subtitle = `${folderSummary}${tracks} ${tracks === 1 ? 'track' : 'tracks'}`;
   } else if (currentView === 'favourites' || hasLibrary) {
     subtitle = `${displayedTracksCount} ${displayedTracksCount === 1 ? 'track' : 'tracks'}`;
   }
