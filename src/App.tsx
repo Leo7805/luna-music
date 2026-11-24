@@ -59,7 +59,7 @@ export function App() {
     needsPermission: library.needsPermission,
   });
 
-  useDocumentTitle(audioPlayer.currentTrack, audioPlayer.isPlaying);
+  useDocumentTitle(audioPlayer.currentTrack);
   // Priority 1: Restore embedded artwork on demand for the currently playing track
   useEffect(() => {
     const cur = audioPlayer.currentTrack;

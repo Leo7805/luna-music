@@ -233,11 +233,12 @@ describe('Music Folders summary in the actual App composition', () => {
       mount();
       expect(document.title).toBe('Those Days With A Very Long Song Title');
       act(() => vi.advanceTimersByTime(1200));
-      expect(document.title).not.toBe('Those Days With A Very Long Song Title');
+      expect(document.title).toBe('Those Days With A Very Long Song Title');
       Object.assign(player, { isPlaying: false }); mount();
       expect(document.title).toBe('Those Days With A Very Long Song Title');
       Object.assign(player, { isPlaying: true }); mount();
-      act(() => vi.advanceTimersByTime(1200));
+      act(() => vi.advanceTimersByTime(10000));
+      expect(document.title).toBe('Those Days With A Very Long Song Title');
       Object.assign(player, { currentTrack: track('next', '《七年的爱》.mp3') }); mount();
       expect(document.title).toBe('《七年的爱》');
       act(() => vi.advanceTimersByTime(10000));
