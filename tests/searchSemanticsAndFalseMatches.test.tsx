@@ -233,7 +233,7 @@ describe('Phase 5.1 Folder Detail Mixed Search, Header Counts & TrackRow Renderi
     expect(host.querySelector('[data-testid="folder-subfolders-section"]')).toBeNull();
     expect(host.querySelectorAll('[data-testid^="track-row-"]').length).toBe(1);
     act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
-    expect(onPlayQueue).toHaveBeenCalledWith([tSun], 0);
+    expect(onPlayQueue).toHaveBeenCalledWith([tSun]);
 
     // 3. Query matches neither -> shows single search empty state
     renderMixed('zzz');

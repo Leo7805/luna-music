@@ -27,7 +27,7 @@ interface FolderViewProps {
   onSelectFolder: (path: string) => void;
   onPlayTrack: (track: TrackItem) => void;
   onPlayAll?: (tracks: TrackItem[]) => void;
-  onPlayQueue?: (tracks: TrackItem[], startIndex?: number, shuffle?: boolean) => void;
+  onPlayQueue?: (tracks: TrackItem[], startIndex?: number) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
@@ -103,7 +103,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
     if (uniqueTracks.length === 0) return;
 
     if (onPlayQueue) {
-      onPlayQueue(uniqueTracks, 0);
+      onPlayQueue(uniqueTracks);
     } else if (onPlayAll) {
       onPlayAll(uniqueTracks);
     } else {

@@ -5,26 +5,25 @@ import { isTrackPlayable } from './audioFileTypes';
 export const MAX_SHUFFLE_HISTORY = 1000;
 
 /**
- * Resolves the starting index when starting a Queue (e.g. Play All).
- * - When `explicitShuffle` is provided (true/false), honors that explicit override.
- * - Otherwise (ordinary Play All), follows the user's active `currentShuffle` state.
+ * Resolves the starting index when starting a Queue.
+ * - When `startIndex` is explicitly provided, honors that exact user-selected index.
+ * - Otherwise (ordinary Play All), follows the authoritative `currentShuffle` mode:
+ *   Shuffle OFF -> 0, Shuffle ON -> uniformly random index in [0, trackCount - 1].
  */
 export function resolvePlayQueueStartIndex(params: {
   trackCount: number;
-  startIndex: number;
-  explicitShuffle?: boolean;
+  startIndex?: number;
   currentShuffle: boolean;
   randomFn?: () => number;
 }): number {
   if (params.trackCount <= 0) return 0;
-  const useShuffle =
-    params.explicitShuffle !== undefined
-      ? params.explicitShuffle
-      : params.currentShuffle;
-  if (useShuffle) {
+  if (params.startIndex !== undefined) {
+    return Math.min(Math.max(0, params.startIndex), params.trackCount - 1);
+  }
+  if (params.currentShuffle) {
     return Math.floor((params.randomFn ?? Math.random)() * params.trackCount);
   }
-  return Math.min(Math.max(0, params.startIndex), params.trackCount - 1);
+  return 0;
 }
 
 export interface ShufflePlaybackState {

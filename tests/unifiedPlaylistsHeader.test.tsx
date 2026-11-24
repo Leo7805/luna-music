@@ -343,7 +343,7 @@ describe('Phase 3: Unified Playlists Overview, Detail & Track Actions', () => {
 
       // Play All invokes playQueue with ONLY playable tracks in playlist order
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1, t2], 0);
+      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1, t2]);
 
       // Select mode activates in p1, then resets cleanly when switching to p2 via Sidebar
       click(byId('toggle-select-mode'));

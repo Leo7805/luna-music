@@ -165,7 +165,7 @@ describe('Music Folders summary in the actual App composition', () => {
     expect(byId('tracklist-toolbar')).toBeNull();
     search('Alpha'); expect(byId('header-subtitle').textContent).toBe('1 track');
     click(byId('play-all-button'));
-    expect(player.playQueue).toHaveBeenCalledExactlyOnceWith([libraryData.flatPlaylist[0]], 0);
+    expect(player.playQueue).toHaveBeenCalledExactlyOnceWith([libraryData.flatPlaylist[0]]);
     search('');
     click([...host.querySelectorAll<HTMLButtonElement>('aside button')].find((b) => b.textContent?.startsWith('Favourites'))!);
     expect(host.querySelector('main h1')?.textContent).toBe('Favourites');

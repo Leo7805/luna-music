@@ -188,10 +188,10 @@ describe('Unified All Tracks header', () => {
       track('alias', 'Keep Alias', { aliases: ['a'] }), track('other', 'Other')] });
     search('Keep');
     click(byId('play-all-button'));
-    expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([beta, alpha], 0);
+    expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([beta, alpha]);
     search('Beta');
     click(byId('play-all-button'));
-    expect(calls.playQueue).toHaveBeenLastCalledWith([beta], 0);
+    expect(calls.playQueue).toHaveBeenLastCalledWith([beta]);
     search('Bad');
     click(byId('play-all-button'));
     expect(calls.playQueue).toHaveBeenCalledTimes(2);

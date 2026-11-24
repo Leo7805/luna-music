@@ -266,16 +266,17 @@ export function useAudioPlayer({
     [clearPlayNextOverride, queueControls, audioEngine, loadAudioSource, setQueueImmediate]
   );
 
-  // Play an entire queue starting from startIndex or random when Shuffle is active (Play All)
+  // Play an entire queue: ordinary Play All (startIndex omitted) follows active Shuffle mode;
+  // explicit startIndex plays that track first, then follows active Shuffle mode.
   const playQueue = useCallback(
     (
       tracks: TrackItem[],
-      startIndex = 0,
-      optionsOrShuffle?: boolean | { shuffle?: boolean; autoPlay?: boolean }
+      startIndex?: number,
+      options?: { autoPlay?: boolean }
     ) => {
       // Rapid repeated clicks duplicate protection
       const now = Date.now();
-      const firstTarget = tracks[startIndex] || tracks[0];
+      const firstTarget = (startIndex !== undefined ? tracks[startIndex] : undefined) || tracks[0];
       if (
         firstTarget &&
         lastPlayRequestRef.current.id === `queue:${firstTarget.id}` &&
@@ -290,14 +291,7 @@ export function useAudioPlayer({
       clearPlayNextOverride();
       if (tracks.length === 0) return;
 
-      const explicitShuffle =
-        typeof optionsOrShuffle === 'boolean'
-          ? optionsOrShuffle
-          : optionsOrShuffle?.shuffle;
-      const autoPlay =
-        typeof optionsOrShuffle === 'object' && typeof optionsOrShuffle.autoPlay === 'boolean'
-          ? optionsOrShuffle.autoPlay
-          : true;
+      const autoPlay = typeof options?.autoPlay === 'boolean' ? options.autoPlay : true;
 
       // Filter playable tracks
       const playable = tracks.filter(isTrackPlayable);
@@ -315,7 +309,6 @@ export function useAudioPlayer({
       const targetIndex = resolvePlayQueueStartIndex({
         trackCount: uniqueTracks.length,
         startIndex,
-        explicitShuffle,
         currentShuffle: prefs.shuffleRef.current,
       });
 

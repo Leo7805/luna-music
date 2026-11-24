@@ -166,7 +166,7 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
   it('Fix 2: playTrack(track, newQueue) replaces Queue and resets Shuffle state without carrying stale playedIds', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const p = mountPlayer({ initialShuffle: true, initialRepeatMode: 'off' });
-    act(() => p.get().playQueue([t1, t2], 0, false));
+    act(() => p.get().playQueue([t1, t2], 0));
 
     // Exhaust old queue [t1, t2]
     act(() => p.get().nextTrack());
@@ -233,7 +233,7 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
   it('Fix 4 (player): removing current track records replacement track; removing unrelated track preserves active cycle; adding track mid-cycle makes it playable', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     const p = mountPlayer({ initialShuffle: true, initialRepeatMode: 'off' });
-    act(() => p.get().playQueue([t1, t2, t3], 0, false));
+    act(() => p.get().playQueue([t1, t2, t3], 0));
 
     // Remove unrelated track t3 -> active cycle continues with t2
     act(() => p.get().removeFromQueue(2));
@@ -295,34 +295,35 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
     expect(seq.get().getNextTrack(t3, false, 'off')).toBeNull();
   });
 
-  it('Play All respects active Shuffle state, preserves explicit overrides, keeps Queue order fixed, and resets Shuffle cycle on re-click', () => {
-    // Pure helper contract: Shuffle OFF -> 0, Shuffle ON -> random (including index 0), explicit overrides win
-    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, currentShuffle: false })).toBe(0);
-    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, currentShuffle: true, randomFn: () => 0.75 })).toBe(3);
-    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, currentShuffle: true, randomFn: () => 0 })).toBe(0);
-    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 2, explicitShuffle: false, currentShuffle: true, randomFn: () => 0 })).toBe(2);
-    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, explicitShuffle: true, currentShuffle: false, randomFn: () => 0.5 })).toBe(2);
+  it('Play All follows authoritative Shuffle mode, explicit startIndex starts deterministically, and mode toggles never interrupt playback', () => {
+    // Pure helper contract: ordinary Play All (startIndex omitted) follows currentShuffle; explicit startIndex always wins
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, currentShuffle: false })).toBe(0);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, currentShuffle: true, randomFn: () => 0.75 })).toBe(3);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, currentShuffle: true, randomFn: () => 0 })).toBe(0);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 2, currentShuffle: true, randomFn: () => 0 })).toBe(2);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 2, currentShuffle: false })).toBe(2);
 
-    // 1. Shuffle OFF + ordinary Play All -> starts at index 0
+    // 1. Shuffle OFF + ordinary Play All -> always starts at index 0 (no hidden random override)
     let nowMs = 1000;
     vi.spyOn(Date, 'now').mockImplementation(() => nowMs);
     const pOff = mountPlayer({ initialShuffle: false, initialRepeatMode: 'off' });
     vi.spyOn(Math, 'random').mockReturnValue(0.75);
-    act(() => pOff.get().playQueue([t1, t2, t3, t4], 0));
+    act(() => pOff.get().playQueue([t1, t2, t3, t4]));
     expect(pOff.get().currentTrack?.id).toBe('t1');
     expect(pOff.get().shuffle).toBe(false);
 
-    // Explicit Shuffle Play with Shuffle OFF -> random start, Shuffle toggle stays OFF
+    // Explicit startIndex while Shuffle OFF -> plays requested track then continues sequentially
     nowMs += 1000;
-    act(() => pOff.get().playQueue([t1, t2, t3, t4], 0, true));
+    act(() => pOff.get().playQueue([t1, t2, t3, t4], 2));
+    expect(pOff.get().currentTrack?.id).toBe('t3');
+    act(() => pOff.get().nextTrack());
     expect(pOff.get().currentTrack?.id).toBe('t4');
-    expect(pOff.get().shuffle).toBe(false);
 
     // 2. Shuffle ON + ordinary Play All -> picks random eligible track (t3), keeps Queue order, records in cycle
     const pOn = mountPlayer({ initialShuffle: true, initialRepeatMode: 'off' });
     const rngSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5); // index 2 -> t3
     nowMs += 1000;
-    act(() => pOn.get().playQueue([t1, t2, t3, t4], 0));
+    act(() => pOn.get().playQueue([t1, t2, t3, t4]));
     expect(pOn.get().currentTrack?.id).toBe('t3');
     expect(pOn.get().queue.map((t) => t.id)).toEqual(['t1', 't2', 't3', 't4']);
     expect(pOn.get().shuffle).toBe(true);
@@ -341,16 +342,78 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
     // Clicking Play All again (>350ms later) starts a fresh cycle with a new random start (including index 0 candidate)
     rngSpy.mockReturnValue(0); // index 0 -> t1
     nowMs += 1000;
-    act(() => pOn.get().playQueue([t1, t2, t3, t4], 0));
+    act(() => pOn.get().playQueue([t1, t2, t3, t4]));
     expect(pOn.get().currentTrack?.id).toBe('t1');
     expect(pOn.get().shuffle).toBe(true);
     // Previous at start of fresh cycle must NOT jump to stale t4 from previous cycle
     fakeAudio.currentTime = 1;
     act(() => pOn.get().prevTrack());
     expect(pOn.get().currentTrack?.id).toBe('t1');
+
+    // Explicit startIndex while Shuffle ON -> starts at requested index (t2), then continues via Shuffle
+    nowMs += 1000;
+    rngSpy.mockReturnValue(0.99);
+    act(() => pOn.get().playQueue([t1, t2, t3, t4], 1));
+    expect(pOn.get().currentTrack?.id).toBe('t2');
+    act(() => pOn.get().nextTrack());
+    expect(pOn.get().currentTrack?.id).toBe('t4');
   });
 
-  it('all Library view Play All entry points (Folder, Album, Artist, Playlist) defer Shuffle state to playQueue without forcing false', () => {
+  it('toggling Shuffle ON -> OFF and OFF -> ON during playback never interrupts or reloads current track and immediately switches navigation mode', () => {
+    let nowMs = 1000;
+    vi.spyOn(Date, 'now').mockImplementation(() => nowMs);
+    const p = mountPlayer({ initialShuffle: true, initialRepeatMode: 'off' });
+    const rngSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const loadSpy = vi.spyOn(fakeAudio, 'load');
+
+    // Start Queue [t1, t2, t3, t4, t5] anchored at t3 (index 2)
+    act(() => p.get().playQueue([t1, t2, t3, t4, t5], 2));
+    // Play t4 and t5 in Shuffle cycle, then return to t3 so t4/t5 were previously played in Shuffle
+    nowMs += 1000;
+    act(() => p.get().playQueueTrack(t4));
+    nowMs += 1000;
+    act(() => p.get().playQueueTrack(t3));
+    fakeAudio.currentTime = 42;
+    const loadsBefore = loadSpy.mock.calls.length;
+
+    // Shuffle ON -> OFF: t3 stays playing at 42s with zero reload; Next follows visible Queue (t4 -> t5)
+    act(() => p.get().toggleShuffle());
+    expect(p.get().shuffle).toBe(false);
+    expect(p.get().repeatMode).toBe('off');
+    expect(p.get().currentTrack?.id).toBe('t3');
+    expect(fakeAudio.currentTime).toBe(42);
+    expect(loadSpy.mock.calls.length).toBe(loadsBefore);
+
+    act(() => p.get().nextTrack());
+    expect(p.get().currentTrack?.id).toBe('t4');
+    act(() => p.get().nextTrack());
+    expect(p.get().currentTrack?.id).toBe('t5');
+
+    // Move back to t3 and toggle Shuffle OFF -> ON: t3 stays at 55s with zero reload, fresh cycle anchored at t3
+    nowMs += 1000;
+    act(() => p.get().playQueueTrack(t3));
+    fakeAudio.currentTime = 55;
+    const loadsBeforeOn = loadSpy.mock.calls.length;
+
+    act(() => p.get().toggleShuffle());
+    expect(p.get().shuffle).toBe(true);
+    expect(p.get().repeatMode).toBe('off');
+    expect(p.get().currentTrack?.id).toBe('t3');
+    expect(fakeAudio.currentTime).toBe(55);
+    expect(loadSpy.mock.calls.length).toBe(loadsBeforeOn);
+
+    // Next picks randomly from {t1, t2, t4, t5} (never t3) and visits all 4 remaining tracks without repeating
+    rngSpy.mockReturnValue(0);
+    const visited = new Set<string>(['t3']);
+    for (let i = 0; i < 4; i++) {
+      act(() => p.get().nextTrack());
+      expect(visited.has(p.get().currentTrack!.id)).toBe(false);
+      visited.add(p.get().currentTrack!.id);
+    }
+    expect(visited.size).toBe(5);
+  });
+
+  it('all Library view Play All entry points (Folder, Album, Artist, Playlist) omit startIndex so playQueue follows active Shuffle', () => {
     const onPlayQueue = vi.fn();
     const onPlayPlaylist = vi.fn();
     const noop = () => {};
@@ -367,7 +430,7 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
       />
     ));
     act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
-    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2], 0);
+    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2]);
 
     // AlbumsView Play All
     act(() => root.render(
@@ -378,7 +441,7 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
       />
     ));
     act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
-    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2], 0);
+    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2]);
 
     // ArtistsView Play All
     act(() => root.render(
@@ -389,9 +452,9 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
       />
     ));
     act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
-    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2], 0);
+    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2]);
 
-    // PlaylistsView Play All (unfiltered -> onPlayPlaylist without forced false)
+    // PlaylistsView Play All (unfiltered -> onPlayPlaylist without startIndex)
     const pl = { id: 'p1', name: 'PL', tracks: [{ trackId: 't1', name: 'One.mp3', addedAt: 1 }, { trackId: 't2', name: 'Two.mp3', addedAt: 2 }], createdAt: 1, updatedAt: 1 };
     act(() => root.render(
       <PlaylistsView
@@ -402,6 +465,6 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
       />
     ));
     act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
-    expect(onPlayPlaylist).toHaveBeenLastCalledWith(pl, 0);
+    expect(onPlayPlaylist).toHaveBeenLastCalledWith(pl);
   });
 });

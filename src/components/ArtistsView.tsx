@@ -30,7 +30,7 @@ interface ArtistsViewProps {
   renderLayout?: TrackListProps['renderLayout'];
   onSelectArtist: (artistName: string | null) => void;
   onPlayTrack: (track: TrackItem) => void;
-  onPlayQueue?: (tracks: TrackItem[], startIndex?: number, shuffle?: boolean) => void;
+  onPlayQueue?: (tracks: TrackItem[], startIndex?: number) => void;
   onTogglePlay: () => void;
   onToggleFavourite: (trackId: string) => void;
   onPlayNext?: (track: TrackItem) => 'added' | 'moved' | void;
@@ -83,7 +83,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
       const playable = visibleTracks.filter(isTrackPlayable);
       if (playable.length === 0) return;
       if (onPlayQueue) {
-        onPlayQueue(playable, 0);
+        onPlayQueue(playable);
       } else {
         onPlayTrack(playable[0]);
       }
