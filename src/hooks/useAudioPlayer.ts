@@ -238,6 +238,7 @@ export function useAudioPlayer({
 
       if (newQueue && newQueue.length > 0) {
         setQueueImmediate(newQueue);
+        queueControls.resetShuffleCycle(track);
         setCurrentTrack(track);
         loadAudioSource(track, autoPlay);
         return;
@@ -403,20 +404,24 @@ export function useAudioPlayer({
         );
       setQueueImmediate(nextQueue);
       if (nextQueue.length === 0) {
+        clearPlayNextOverride();
+        queueControls.resetShuffleCycle(null);
         storePlaybackState({ queueTrackIds: [], queueIndex: 0, lastTrackId: null, lastPosition: 0, wasPlaying: false });
       }
       if (wasCurrent) {
         clearPlayNextOverride();
         if (shouldStop || !target) {
+          queueControls.resetShuffleCycle(null);
           audioEngine.stopPlayback();
           setCurrentTrack(null);
         } else {
+          queueControls.recordPlayedTrack(target, true);
           setCurrentTrack(target);
           loadAudioSource(target, true);
         }
       }
     },
-    [queueControls.queueRef, prefs.repeatModeRef, setQueueImmediate, clearPlayNextOverride, audioEngine, loadAudioSource]
+    [queueControls.queueRef, queueControls.resetShuffleCycle, queueControls.recordPlayedTrack, prefs.repeatModeRef, setQueueImmediate, clearPlayNextOverride, audioEngine, loadAudioSource]
   );
 
   const toggleShuffle = useCallback(() => {

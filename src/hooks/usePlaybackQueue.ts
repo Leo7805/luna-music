@@ -103,15 +103,7 @@ export function usePlaybackQueue({
   );
 
   const resetShuffleCycle = useCallback((currentTrack: TrackItem | null) => {
-    const prev = shuffleStateRef.current;
-    if (prev.history.length === 0 && currentTrack) {
-      shuffleStateRef.current = createShuffleState(currentTrack.id);
-    } else {
-      shuffleStateRef.current = {
-        ...prev,
-        playedIds: new Set(currentTrack ? [currentTrack.id] : []),
-      };
-    }
+    shuffleStateRef.current = createShuffleState(currentTrack?.id ?? null);
   }, []);
 
   const setQueueImmediate = useCallback((newQueue: TrackItem[]) => {
@@ -289,6 +281,8 @@ export function usePlaybackQueue({
 
   // Clear upcoming items in queue (preserving current track)
   const clearQueue = useCallback((currentTrack: TrackItem | null) => {
+    playNextTrackIdRef.current = null;
+    shuffleStateRef.current = createShuffleState(currentTrack?.id ?? null);
     if (currentTrack) {
       const nextQueue = [currentTrack];
       queueRef.current = nextQueue;
@@ -392,6 +386,7 @@ export function usePlaybackQueue({
           shuffleStateRef.current = nextState;
           return { targetTrack: track, shouldRestartCurrent: false };
         }
+        return { targetTrack: null, shouldRestartCurrent: Boolean(currentTrack) };
       }
       const prevRes = getPrevTrackToPlay(queueRef.current, currentTrack, repeatMode);
       if (prevRes.targetTrack) {
