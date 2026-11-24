@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { EqualizerIcon } from './EqualizerIcon';
 import {
   Play,
   Pause,
@@ -74,6 +75,16 @@ export function BottomPlayer({
   const lyricsOpen = isLyricsOpen !== undefined ? isLyricsOpen : Boolean(isNowPlayingOpen);
   const handleToggleLyrics = onToggleLyrics || onToggleNowPlaying || (() => {});
   const handleToggleNowPlayingView = onToggleNowPlayingView || (() => {});
+  const nowPlayingAction = isNowPlayingViewOpen ? 'Back to Library' : 'Open Now Playing';
+  const startedOnControl = useRef(false);
+  const isControl = (target: EventTarget | null) => target instanceof Element && Boolean(target.closest(
+    'button, a, input, select, textarea, label, [role="button"], [role="slider"], [role="menu"], [tabindex], [contenteditable="true"], [data-player-control]'
+  ));
+  const handleBackgroundClick = (event: React.MouseEvent<HTMLElement>) => {
+    const blocked = startedOnControl.current || isControl(event.target);
+    startedOnControl.current = false;
+    if (!blocked) handleToggleNowPlayingView();
+  };
   const currentDuration = duration || currentTrack?.metadata.duration || 0;
   const progressPercent = currentDuration > 0 ? (currentTime / currentDuration) * 100 : 0;
 
@@ -88,9 +99,14 @@ export function BottomPlayer({
   };
 
   return (
-    <footer className="h-24 bg-[var(--bg-player)]/95 dark:bg-[#071427]/95 backdrop-blur-xl border-t border-[var(--border-subtle)] dark:border-white/[0.08] px-4 md:px-6 flex items-center justify-between gap-4 z-40 select-none text-[var(--text-primary)] dark:text-slate-100 transition-colors duration-200">
+    <footer
+      data-testid="bottom-player"
+      onPointerDownCapture={event => { startedOnControl.current = isControl(event.target); }}
+      onPointerCancel={() => { startedOnControl.current = false; }}
+      onClick={handleBackgroundClick}
+      className="cursor-pointer h-24 bg-[var(--bg-player)]/95 dark:bg-[#071427]/95 backdrop-blur-xl border-t border-[var(--border-subtle)] dark:border-white/[0.08] px-2 sm:px-4 md:px-6 flex items-center justify-between gap-2 md:gap-4 z-40 select-none text-[var(--text-primary)] dark:text-slate-100 transition-colors duration-200">
       {/* Left: Track Details */}
-      <div className="w-1/4 min-w-[180px] max-w-[280px] flex items-center gap-2">
+      <div className="w-[22%] min-w-0 max-w-[280px] flex items-center gap-1 md:gap-2">
         {currentTrack ? (
           <>
             {/* Clickable Track Info Area -> Opens/Toggles Central Now Playing */}
@@ -98,9 +114,9 @@ export function BottomPlayer({
               type="button"
               onClick={handleToggleNowPlayingView}
               data-testid="bottom-track-info-button"
-              aria-label={isNowPlayingViewOpen ? 'Close Now Playing' : 'Open Now Playing'}
+              aria-label={nowPlayingAction}
               aria-pressed={isNowPlayingViewOpen}
-              title="Open Now Playing"
+              title={nowPlayingAction}
               className={`flex items-center gap-3 min-w-0 flex-1 text-left p-1.5 -ml-1.5 rounded-xl transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 ${
                 isNowPlayingViewOpen
                   ? 'bg-[var(--bg-active)]/80 dark:bg-white/[0.08]'
@@ -109,7 +125,7 @@ export function BottomPlayer({
             >
               {/* Thumbnail */}
               <div
-                className="w-13 h-13 rounded-xl shrink-0 flex items-center justify-center overflow-hidden shadow-md border border-[var(--border-subtle)] dark:border-white/[0.08]"
+                className="hidden sm:flex w-9 h-9 md:w-13 md:h-13 rounded-xl shrink-0 flex items-center justify-center overflow-hidden shadow-md border border-[var(--border-subtle)] dark:border-white/[0.08]"
                 style={{
                   background:
                     currentTrack.metadata.placeholderGradient ||
@@ -170,9 +186,9 @@ export function BottomPlayer({
       </div>
 
       {/* Center: Playback Controls & Progress Slider */}
-      <div className="flex-1 max-w-2xl flex flex-col items-center gap-1.5">
+      <div className="min-w-[176px] sm:min-w-0 flex-1 max-w-2xl flex flex-col items-center gap-1.5">
         {/* Buttons Row */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-1 sm:gap-4">
           {/* Shuffle */}
           <button
             onClick={onToggleShuffle}
@@ -245,11 +261,12 @@ export function BottomPlayer({
         </div>
 
         {/* Seek Bar & Timers */}
-        <div className="w-full flex items-center gap-3 text-[11px] font-mono text-[var(--text-secondary)] dark:text-slate-400">
+        <div data-player-control className="cursor-default w-full flex items-center gap-1 sm:gap-3 text-[11px] font-mono text-[var(--text-secondary)] dark:text-slate-400">
           <span className="w-10 text-right">{formatDuration(currentTime)}</span>
 
           <div className="relative flex-1 flex items-center group py-1 cursor-pointer">
             <input
+              aria-label="Seek"
               type="range"
               min={0}
               max={currentDuration || 100}
@@ -269,7 +286,7 @@ export function BottomPlayer({
       </div>
 
       {/* Right: Volume & Side Panels */}
-      <div className="w-1/4 min-w-[180px] max-w-[280px] flex items-center justify-end gap-3">
+      <div className="shrink-0 flex items-center justify-end gap-1 md:gap-2">
         {/* Volume Mute/Unmute */}
         <button
           type="button"
@@ -287,8 +304,9 @@ export function BottomPlayer({
         </button>
 
         {/* Volume Slider */}
-        <div className="w-20 md:w-24 flex items-center">
+        <div data-player-control className="cursor-default w-10 md:w-16 lg:w-20 flex items-center">
           <input
+            aria-label="Volume"
             type="range"
             min={0}
             max={1}
@@ -301,6 +319,21 @@ export function BottomPlayer({
             }}
           />
         </div>
+
+        <button
+          type="button"
+          onClick={handleToggleNowPlayingView}
+          data-testid="now-playing-toggle-button"
+          aria-label={nowPlayingAction}
+          aria-pressed={isNowPlayingViewOpen}
+          title={nowPlayingAction}
+          className={`shrink-0 inline-flex items-center justify-center gap-2 p-2 lg:px-3 rounded-xl border text-xs font-semibold transition-colors duration-150 cursor-pointer active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--track-current-accent)]/60 text-[var(--track-current-accent)] bg-[var(--track-current-accent)]/10 hover:bg-[var(--track-current-accent)]/15 ${
+            isNowPlayingViewOpen ? 'border-[var(--track-current-accent)]/60' : 'border-[var(--track-current-border)]'
+          }`}
+        >
+          <EqualizerIcon isPlaying={Boolean(currentTrack) && isPlaying} />
+          <span className="hidden lg:inline whitespace-nowrap">Now Playing</span>
+        </button>
 
         {/* Dedicated Right-Side Lyrics Panel Toggle */}
         <button

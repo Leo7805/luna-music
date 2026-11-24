@@ -135,9 +135,9 @@ describe('BottomPlayer Right-Sidebar Toggle Consolidation', () => {
         return (rightSection.match(/<button/g) || []).length;
       };
 
-      // Both must have exactly 2 buttons: Mute/Unmute and NowPlaying toggle
-      expect(getRightSectionButtons(htmlNoTrack)).toBe(2);
-      expect(getRightSectionButtons(htmlWithTrack)).toBe(2);
+      // Both have Mute/Unmute, Now Playing, and Lyrics buttons
+      expect(getRightSectionButtons(htmlNoTrack)).toBe(3);
+      expect(getRightSectionButtons(htmlWithTrack)).toBe(3);
     });
   });
 });

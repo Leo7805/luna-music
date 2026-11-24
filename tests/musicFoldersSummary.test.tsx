@@ -284,4 +284,29 @@ describe('Music Folders summary in the actual App composition', () => {
     expect(byId('nav-badge-all').textContent).toBe('433');
   });
 
+  it('toggles Now Playing from the button and empty space while preserving Library and playback state', () => {
+    const current = track('current');
+    libraryData = library([folder('physical', [current])]);
+    Object.assign(player, { currentTrack: current, queue: [current], currentTime: 45, isPlaying: true });
+    try {
+      mount(); click(byId('folder-card-physical')); search('Song');
+      click(byId('now-playing-toggle-button'));
+      expect(byId('now-playing-toggle-button').getAttribute('aria-label')).toBe('Back to Library');
+      click(byId('bottom-player'));
+      expect(byId('folder-breadcrumb').textContent).toContain('physical');
+      expect(host.querySelector<HTMLInputElement>('header input')?.value).toBe('Song');
+      expect(player.currentTrack).toBe(current);
+      expect(player.queue).toEqual([current]);
+      expect(player.currentTime).toBe(45);
+      expect(player.isPlaying).toBe(true);
+      click(byId('bottom-player'));
+      click(byId('now-playing-toggle-button'));
+      expect(byId('folder-breadcrumb').textContent).toContain('physical');
+      expect(player.playQueue).not.toHaveBeenCalled();
+      expect(player.playTrack).not.toHaveBeenCalled();
+    } finally {
+      Object.assign(player, { currentTrack: null, queue: [], currentTime: 0, isPlaying: false });
+    }
+  });
+
 });
