@@ -83,6 +83,8 @@ describe('Unified Currently-Playing Highlight (Option 3)', () => {
     expect(getTrackRowSurfaceClass('selected')).not.toBe(getTrackRowSurfaceClass('current'));
     expect(getTrackRowSurfaceClass('default')).toContain('hover:bg-[var(--bg-hover)]/75');
     expect(TRACK_PLAYING_BADGE_CLASS).toContain('track-playing-badge');
+    expect(TRACK_PLAYING_BADGE_CLASS).toContain('w-7 h-7');
+    expect(TRACK_PLAYING_BADGE_CLASS).not.toContain('rounded-lg');
   });
 
   it('renders identical Option 3 highlight surface, badge, and actions in Library TrackRow and NowPlayingQueueRow', () => {
@@ -124,13 +126,33 @@ describe('Unified Currently-Playing Highlight (Option 3)', () => {
     expect(css).toContain('--track-current-bg:');
     expect(css).toContain('--track-current-border:');
     expect(css).toContain('--track-current-glow:');
-    expect(css).toContain('--track-playing-badge-bg:');
     expect(css).toContain('.track-row-current');
     expect(css).toContain('.track-row-current:hover');
-    expect(css).toContain('.track-playing-badge');
+    expect(css).toMatch(/\.track-playing-badge\s*\{[\s\S]*background:\s*transparent;[\s\S]*border:\s*none;[\s\S]*box-shadow:\s*none;/);
+    expect(css).not.toContain('--track-playing-badge-bg:');
+    expect(css).not.toContain('--track-playing-badge-border:');
+    expect(css).not.toContain('--track-playing-badge-shadow:');
     // Verify overrides exist for neutral, mist, and dark themes
     expect(css).toMatch(/\[data-light-style="neutral"\][\s\S]*--track-current-bg:/);
     expect(css).toMatch(/\[data-light-style="mist"\][\s\S]*--track-current-bg:/);
     expect(css).toMatch(/\.dark\s*\{[\s\S]*--track-current-bg:/);
+  });
+
+  it('renders transparent playing indicator with animated equalizer bars when playing and static bars when paused', () => {
+    const playingHtml = renderToStaticMarkup(
+      <TrackRow {...baseLibraryProps} isCurrent={true} isPlaying={true} />
+    );
+    const pausedHtml = renderToStaticMarkup(
+      <TrackRow {...baseLibraryProps} isCurrent={true} isPlaying={false} />
+    );
+
+    expect(playingHtml).toContain('track-playing-badge');
+    expect(playingHtml).toContain('animate-bar-1');
+    expect(playingHtml).toContain('animate-bar-2');
+    expect(playingHtml).toContain('animate-bar-3');
+
+    expect(pausedHtml).toContain('track-playing-badge');
+    expect(pausedHtml).not.toContain('animate-bar-1');
+    expect(pausedHtml).toContain('h-[45%]');
   });
 });

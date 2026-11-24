@@ -58,7 +58,7 @@ export function getTrackRowDurationClass(isCurrent: boolean): string {
 }
 
 export const TRACK_PLAYING_BADGE_CLASS =
-  'w-7 h-7 rounded-lg inline-flex items-center justify-center track-playing-badge';
+  'w-7 h-7 inline-flex items-center justify-center track-playing-badge';
 
 export const TRACK_PLAYING_BAR_CLASS =
   'w-[2.5px] rounded-full bg-[var(--track-current-accent)]';

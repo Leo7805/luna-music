@@ -29,9 +29,6 @@
   --track-current-border-hover: rgba(139, 92, 246, 0.44);
   --track-current-glow: rgba(139, 92, 246, 0.10);
   --track-current-accent: #6d4aff;
-  --track-playing-badge-bg: rgba(255, 255, 255, 0.78);
-  --track-playing-badge-border: rgba(139, 92, 246, 0.18);
-  --track-playing-badge-shadow: 0 2px 6px -1px rgba(109, 40, 217, 0.14);
 
   /* Distinct Blue-Tinted Selected Track Row Tokens */
   --track-selected-bg: rgba(37, 99, 235, 0.09);
@@ -61,9 +58,6 @@
   --track-current-border-hover: rgba(139, 92, 246, 0.44);
   --track-current-glow: rgba(139, 92, 246, 0.10);
   --track-current-accent: #6d4aff;
-  --track-playing-badge-bg: rgba(255, 255, 255, 0.78);
-  --track-playing-badge-border: rgba(139, 92, 246, 0.18);
-  --track-playing-badge-shadow: 0 2px 6px -1px rgba(109, 40, 217, 0.14);
 
   /* Distinct Blue-Tinted Selected Track Row Tokens */
   --track-selected-bg: rgba(37, 99, 235, 0.09);
@@ -129,9 +123,6 @@
   --track-current-border-hover: rgba(167, 139, 250, 0.52);
   --track-current-glow: rgba(129, 140, 248, 0.16);
   --track-current-accent: #a78bfa;
-  --track-playing-badge-bg: rgba(139, 92, 246, 0.20);
-  --track-playing-badge-border: rgba(167, 139, 250, 0.30);
-  --track-playing-badge-shadow: 0 2px 8px -1px rgba(0, 0, 0, 0.35);
   --track-selected-bg: rgba(56, 189, 248, 0.14);
   --track-selected-bg-hover: rgba(56, 189, 248, 0.20);
   --track-selected-border: rgba(56, 189, 248, 0.42);
@@ -282,9 +273,9 @@ body {
   }
 
   .track-playing-badge {
-    background: var(--track-playing-badge-bg);
-    border: 1px solid var(--track-playing-badge-border);
-    box-shadow: var(--track-playing-badge-shadow);
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }
 
   /* Ambient background glow for dark mode */
