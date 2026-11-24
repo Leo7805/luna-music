@@ -1,12 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { X, Music2, Disc } from 'lucide-react';
+import { X, Music2, Disc3 } from 'lucide-react';
 import { TrackItem, LrcLine } from '../types/music';
 import { findCurrentLyricIndex } from '../utils/lrcParser';
 import { getTrackStatus } from '../utils/musicTree';
+import { getVinylSpinClass } from '../utils/vinylSpin';
 import { TrackStatusBadge } from './TrackStatusBadge';
 
 export interface LyricsPanelProps {
   currentTrack: TrackItem | null;
+  isPlaying?: boolean;
   currentTime: number;
   lyrics: LrcLine[];
   ambientColors: { primary: string; glow: string };
@@ -17,6 +19,7 @@ export interface LyricsPanelProps {
 
 export const LyricsPanel: React.FC<LyricsPanelProps> = ({
   currentTrack,
+  isPlaying = false,
   currentTime,
   lyrics,
   ambientColors,
@@ -81,10 +84,11 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
 
       {/* Main Content */}
       <div className="relative z-10 flex-1 flex flex-col min-h-0 overflow-hidden">
-        {/* Static Album Artwork & Track Identity */}
+        {/* Album Artwork Vinyl Disc & Track Identity */}
         {currentTrack && (
           <div className="px-6 pt-1 pb-4 shrink-0 flex flex-col items-center text-center border-b border-[var(--border-subtle)]/70 dark:border-white/[0.06]">
             <div
+              data-testid="lyrics-artwork-container"
               className="w-24 h-24 rounded-2xl shrink-0 shadow-md border border-[var(--border-subtle)] dark:border-white/[0.1] overflow-hidden flex items-center justify-center mb-3"
               style={{
                 background:
@@ -92,15 +96,31 @@ export const LyricsPanel: React.FC<LyricsPanelProps> = ({
                   'linear-gradient(135deg, #4338ca, #6d28d9)',
               }}
             >
-              {currentTrack.metadata.artworkUrl ? (
-                <img
-                  src={currentTrack.metadata.artworkUrl}
-                  alt={currentTrack.metadata.title || currentTrack.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <Disc className="w-10 h-10 text-white/60" />
-              )}
+              <div
+                data-testid="lyrics-vinyl-disc"
+                data-spinning={isPlaying ? 'true' : 'false'}
+                className={`relative flex items-center justify-center rounded-full overflow-hidden ${
+                  currentTrack.metadata.artworkUrl
+                    ? 'w-20 h-20 ring-2 ring-black/20 dark:ring-white/15 shadow-sm'
+                    : 'w-12 h-12'
+                } ${getVinylSpinClass(true, isPlaying)}`}
+              >
+                {currentTrack.metadata.artworkUrl ? (
+                  <>
+                    <img
+                      src={currentTrack.metadata.artworkUrl}
+                      alt={currentTrack.metadata.title || currentTrack.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="absolute w-3.5 h-3.5 rounded-full bg-[var(--bg-panel)]/90 dark:bg-[#071427]/90 border-2 border-white/60 dark:border-white/40 shadow-inner"
+                    />
+                  </>
+                ) : (
+                  <Disc3 className="w-10 h-10 text-white/70" aria-hidden="true" />
+                )}
+              </div>
             </div>
 
             <div className="w-full min-w-0 flex items-center justify-center gap-1.5">

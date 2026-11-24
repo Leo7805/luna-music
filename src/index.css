@@ -5,6 +5,7 @@
 :root {
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
+  --vinyl-spin-duration: 12s;
   --ambient-color: rgba(56, 189, 248, 0.15);
   --ambient-glow: rgba(99, 102, 241, 0.12);
 
@@ -314,7 +315,33 @@ body {
   animation: barBounce3 0.9s ease-in-out infinite;
 }
 
+/* Shared rotating vinyl disc animation (Now Playing header & Lyrics artwork) */
+@keyframes vinyl-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.vinyl-disc-spin {
+  animation: vinyl-spin var(--vinyl-spin-duration, 12s) linear infinite;
+  will-change: transform;
+}
+
+.vinyl-disc-running {
+  animation-play-state: running;
+}
+
+.vinyl-disc-paused {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .vinyl-disc-spin {
+    animation: none;
+  }
   .animate-bar-1 {
     animation: none;
     height: 45%;

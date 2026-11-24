@@ -8,9 +8,11 @@ import {
   CheckSquare,
   Square,
   SlidersHorizontal,
+  Disc3,
 } from 'lucide-react';
 import { TrackItem, Playlist } from '../types/music';
 import { isSameTrack } from '../utils/musicTree';
+import { getVinylSpinClass } from '../utils/vinylSpin';
 import { Theme, LightStyle } from '../hooks/useTheme';
 import { useNowPlayingSelection } from '../hooks/useNowPlayingSelection';
 import { AppearancePopover } from './AppearancePopover';
@@ -198,10 +200,23 @@ export const NowPlayingView: React.FC<NowPlayingViewProps> = ({
       <header className="relative z-30 px-6 py-4 flex flex-col gap-3 border-b border-[var(--border-subtle)] dark:border-white/[0.08] bg-[var(--bg-main)]/80 dark:bg-[#071427]/60 backdrop-blur-md">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <div className="flex items-baseline gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
-                Now Playing
-              </h1>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span
+                  data-testid="now-playing-header-vinyl"
+                  data-spinning={Boolean(currentTrack) && isPlaying ? 'true' : 'false'}
+                  aria-hidden="true"
+                  className={`inline-flex items-center justify-center shrink-0 text-[var(--track-current-accent)] ${getVinylSpinClass(
+                    Boolean(currentTrack),
+                    isPlaying
+                  )}`}
+                >
+                  <Disc3 className="w-6 h-6" />
+                </span>
+                <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)] dark:text-white truncate">
+                  Now Playing
+                </h1>
+              </div>
               <span
                 data-testid="now-playing-subtitle"
                 className="text-xs text-[var(--text-secondary)] dark:text-slate-400 font-medium shrink-0"

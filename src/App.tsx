@@ -445,6 +445,7 @@ export function App() {
         {/* Dedicated Right Lyrics Panel */}
         <LyricsPanel
           currentTrack={audioPlayer.currentTrack}
+          isPlaying={audioPlayer.isPlaying}
           currentTime={audioPlayer.currentTime}
           lyrics={audioPlayer.lyrics}
           ambientColors={audioPlayer.ambientColors}
