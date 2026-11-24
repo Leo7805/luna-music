@@ -103,7 +103,7 @@ export const FolderView: React.FC<FolderViewProps> = ({
     if (uniqueTracks.length === 0) return;
 
     if (onPlayQueue) {
-      onPlayQueue(uniqueTracks, 0, false);
+      onPlayQueue(uniqueTracks, 0);
     } else if (onPlayAll) {
       onPlayAll(uniqueTracks);
     } else {

@@ -3,9 +3,13 @@ import { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TrackItem } from '../src/types/music';
-import { createShuffleState, pickNextShuffledTrack } from '../src/utils/shufflePlayback';
+import { createShuffleState, pickNextShuffledTrack, resolvePlayQueueStartIndex } from '../src/utils/shufflePlayback';
 import { usePlaybackQueue } from '../src/hooks/usePlaybackQueue';
 import { useAudioPlayer } from '../src/hooks/useAudioPlayer';
+import { FolderView } from '../src/components/FolderView';
+import { AlbumsView } from '../src/components/AlbumsView';
+import { ArtistsView } from '../src/components/ArtistsView';
+import { PlaylistsView } from '../src/components/PlaylistsView';
 
 function makeTrack(id: string, title = id, overrides: Partial<TrackItem> = {}): TrackItem {
   return {
@@ -289,5 +293,115 @@ describe('Shuffle Cycle & Queue History Bug Fixes (Deterministic)', () => {
     expect(seq.get().getNextTrack(t1, false, 'off')?.id).toBe('t2');
     expect(seq.get().getNextTrack(t2, false, 'off')?.id).toBe('t3');
     expect(seq.get().getNextTrack(t3, false, 'off')).toBeNull();
+  });
+
+  it('Play All respects active Shuffle state, preserves explicit overrides, keeps Queue order fixed, and resets Shuffle cycle on re-click', () => {
+    // Pure helper contract: Shuffle OFF -> 0, Shuffle ON -> random (including index 0), explicit overrides win
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, currentShuffle: false })).toBe(0);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, currentShuffle: true, randomFn: () => 0.75 })).toBe(3);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, currentShuffle: true, randomFn: () => 0 })).toBe(0);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 2, explicitShuffle: false, currentShuffle: true, randomFn: () => 0 })).toBe(2);
+    expect(resolvePlayQueueStartIndex({ trackCount: 4, startIndex: 0, explicitShuffle: true, currentShuffle: false, randomFn: () => 0.5 })).toBe(2);
+
+    // 1. Shuffle OFF + ordinary Play All -> starts at index 0
+    let nowMs = 1000;
+    vi.spyOn(Date, 'now').mockImplementation(() => nowMs);
+    const pOff = mountPlayer({ initialShuffle: false, initialRepeatMode: 'off' });
+    vi.spyOn(Math, 'random').mockReturnValue(0.75);
+    act(() => pOff.get().playQueue([t1, t2, t3, t4], 0));
+    expect(pOff.get().currentTrack?.id).toBe('t1');
+    expect(pOff.get().shuffle).toBe(false);
+
+    // Explicit Shuffle Play with Shuffle OFF -> random start, Shuffle toggle stays OFF
+    nowMs += 1000;
+    act(() => pOff.get().playQueue([t1, t2, t3, t4], 0, true));
+    expect(pOff.get().currentTrack?.id).toBe('t4');
+    expect(pOff.get().shuffle).toBe(false);
+
+    // 2. Shuffle ON + ordinary Play All -> picks random eligible track (t3), keeps Queue order, records in cycle
+    const pOn = mountPlayer({ initialShuffle: true, initialRepeatMode: 'off' });
+    const rngSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5); // index 2 -> t3
+    nowMs += 1000;
+    act(() => pOn.get().playQueue([t1, t2, t3, t4], 0));
+    expect(pOn.get().currentTrack?.id).toBe('t3');
+    expect(pOn.get().queue.map((t) => t.id)).toEqual(['t1', 't2', 't3', 't4']);
+    expect(pOn.get().shuffle).toBe(true);
+
+    // Subsequent Next visits remaining unplayed tracks (t1, t2, t4) without repeating t3, then stops (Repeat Off)
+    rngSpy.mockReturnValue(0);
+    act(() => pOn.get().nextTrack());
+    expect(pOn.get().currentTrack?.id).toBe('t1');
+    act(() => pOn.get().nextTrack());
+    expect(pOn.get().currentTrack?.id).toBe('t2');
+    act(() => pOn.get().nextTrack());
+    expect(pOn.get().currentTrack?.id).toBe('t4');
+    act(() => pOn.get().nextTrack());
+    expect(pOn.get().currentTrack?.id).toBe('t4'); // cycle exhausted
+
+    // Clicking Play All again (>350ms later) starts a fresh cycle with a new random start (including index 0 candidate)
+    rngSpy.mockReturnValue(0); // index 0 -> t1
+    nowMs += 1000;
+    act(() => pOn.get().playQueue([t1, t2, t3, t4], 0));
+    expect(pOn.get().currentTrack?.id).toBe('t1');
+    expect(pOn.get().shuffle).toBe(true);
+    // Previous at start of fresh cycle must NOT jump to stale t4 from previous cycle
+    fakeAudio.currentTime = 1;
+    act(() => pOn.get().prevTrack());
+    expect(pOn.get().currentTrack?.id).toBe('t1');
+  });
+
+  it('all Library view Play All entry points (Folder, Album, Artist, Playlist) defer Shuffle state to playQueue without forcing false', () => {
+    const onPlayQueue = vi.fn();
+    const onPlayPlaylist = vi.fn();
+    const noop = () => {};
+    const layout = ({ actions, content }: { actions: React.ReactNode; content: React.ReactNode }) => (
+      <div><header>{actions}</header><section>{content}</section></div>
+    );
+
+    // FolderView Play All
+    act(() => root.render(
+      <FolderView
+        currentNode={{ id: 'f1', name: 'F1', relativePath: 'f1', tracks: [t1, t2], subfolders: [], totalTrackCount: 2 }}
+        isFolderOverview={false} isPlaying={false} favourites={new Set()} renderLayout={layout}
+        onSelectFolder={noop} onPlayTrack={noop} onPlayQueue={onPlayQueue} onTogglePlay={noop} onToggleFavourite={noop}
+      />
+    ));
+    act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
+    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2], 0);
+
+    // AlbumsView Play All
+    act(() => root.render(
+      <AlbumsView
+        albums={[{ id: 'a1', name: 'Alb', artist: 'Art', tracks: [t1, t2], totalDuration: 360 }]}
+        selectedAlbumId="a1" isPlaying={false} favourites={new Set()} renderLayout={layout}
+        onSelectAlbum={noop} onPlayTrack={noop} onPlayQueue={onPlayQueue} onTogglePlay={noop} onToggleFavourite={noop}
+      />
+    ));
+    act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
+    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2], 0);
+
+    // ArtistsView Play All
+    act(() => root.render(
+      <ArtistsView
+        artists={[{ id: 'ar1', name: 'Art', tracks: [t1, t2], albumCount: 1, totalDuration: 360 }]}
+        selectedArtistName="ar1" isPlaying={false} favourites={new Set()} renderLayout={layout}
+        onSelectArtist={noop} onPlayTrack={noop} onPlayQueue={onPlayQueue} onTogglePlay={noop} onToggleFavourite={noop}
+      />
+    ));
+    act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
+    expect(onPlayQueue).toHaveBeenLastCalledWith([t1, t2], 0);
+
+    // PlaylistsView Play All (unfiltered -> onPlayPlaylist without forced false)
+    const pl = { id: 'p1', name: 'PL', tracks: [{ trackId: 't1', name: 'One.mp3', addedAt: 1 }, { trackId: 't2', name: 'Two.mp3', addedAt: 2 }], createdAt: 1, updatedAt: 1 };
+    act(() => root.render(
+      <PlaylistsView
+        playlists={[pl]} selectedPlaylistId="p1" libraryTracks={[t1, t2]} isPlaying={false} favourites={new Set()}
+        renderLayout={layout} onSelectPlaylist={noop} onCreatePlaylist={() => pl} onRenamePlaylist={noop}
+        onDeletePlaylist={noop} onPlayPlaylist={onPlayPlaylist} onPlayQueue={onPlayQueue} onPlayTrack={noop}
+        onTogglePlay={noop} onToggleFavourite={noop} onRemoveTrackFromPlaylist={noop} onReorderPlaylistTracks={noop}
+      />
+    ));
+    act(() => host.querySelector<HTMLElement>('[data-testid="play-all-button"]')!.click());
+    expect(onPlayPlaylist).toHaveBeenLastCalledWith(pl, 0);
   });
 });

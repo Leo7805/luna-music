@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { TrackItem, RepeatMode, FileStatus } from '../types/music';
 import { isSameTrack } from '../utils/musicTree';
 import { isTrackPlayable } from '../utils/audioFileTypes';
+import { resolvePlayQueueStartIndex } from '../utils/shufflePlayback';
 import {
   resolveInitialQueue,
   resolveInitialTrack,
@@ -265,12 +266,12 @@ export function useAudioPlayer({
     [clearPlayNextOverride, queueControls, audioEngine, loadAudioSource, setQueueImmediate]
   );
 
-  // Play an entire queue starting from startIndex or 0 (Play All)
+  // Play an entire queue starting from startIndex or random when Shuffle is active (Play All)
   const playQueue = useCallback(
     (
       tracks: TrackItem[],
       startIndex = 0,
-      optionsOrShuffle: boolean | { shuffle?: boolean; autoPlay?: boolean } = false
+      optionsOrShuffle?: boolean | { shuffle?: boolean; autoPlay?: boolean }
     ) => {
       // Rapid repeated clicks duplicate protection
       const now = Date.now();
@@ -292,7 +293,7 @@ export function useAudioPlayer({
       const explicitShuffle =
         typeof optionsOrShuffle === 'boolean'
           ? optionsOrShuffle
-          : Boolean(optionsOrShuffle?.shuffle);
+          : optionsOrShuffle?.shuffle;
       const autoPlay =
         typeof optionsOrShuffle === 'object' && typeof optionsOrShuffle.autoPlay === 'boolean'
           ? optionsOrShuffle.autoPlay
@@ -311,9 +312,12 @@ export function useAudioPlayer({
       }
       if (uniqueTracks.length === 0) return;
 
-      const targetIndex = explicitShuffle
-        ? Math.floor(Math.random() * uniqueTracks.length)
-        : Math.min(Math.max(0, startIndex), uniqueTracks.length - 1);
+      const targetIndex = resolvePlayQueueStartIndex({
+        trackCount: uniqueTracks.length,
+        startIndex,
+        explicitShuffle,
+        currentShuffle: prefs.shuffleRef.current,
+      });
 
       setQueueImmediate(uniqueTracks);
       const target = uniqueTracks[targetIndex] || uniqueTracks[0];
@@ -321,7 +325,7 @@ export function useAudioPlayer({
       setCurrentTrack(target);
       loadAudioSource(target, autoPlay);
     },
-    [clearPlayNextOverride, setQueueImmediate, queueControls, loadAudioSource]
+    [clearPlayNextOverride, setQueueImmediate, queueControls, loadAudioSource, prefs.shuffleRef]
   );
 
   // Advance to next track in queue (respects Play Next, Shuffle history/cycle, and Repeat)

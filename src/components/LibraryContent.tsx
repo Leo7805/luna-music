@@ -103,7 +103,7 @@ export function LibraryContent({
     }
     if (uniqueTracks.length === 0) return;
 
-    audioPlayer.playQueue(uniqueTracks, 0, false);
+    audioPlayer.playQueue(uniqueTracks, 0);
   }, [displayedTracks, audioPlayer]);
 
   const isFolderOverview = currentView === 'folder' && !library.selectedFolderPath;
@@ -243,11 +243,15 @@ export function LibraryContent({
           onCreatePlaylist={createPlaylist}
           onRenamePlaylist={renamePlaylist}
           onDeletePlaylist={deletePlaylist}
-          onPlayPlaylist={(pl, startIndex = 0, shuffle = false) => {
+          onPlayPlaylist={(pl, startIndex = 0, shuffle) => {
             const resolved = resolvePlaylistTracks(pl.tracks, libraryTracks);
             const playable = resolved.filter(isTrackPlayable);
             if (playable.length === 0) return;
-            playQueue(playable, startIndex, shuffle);
+            if (shuffle !== undefined) {
+              playQueue(playable, startIndex, shuffle);
+            } else {
+              playQueue(playable, startIndex);
+            }
           }}
           onPlayQueue={playQueue}
           onPlayTrack={playTrack}

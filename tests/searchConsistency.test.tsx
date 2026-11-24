@@ -268,7 +268,7 @@ describe('Phase 5 Search Consistency DOM & Interaction Behaviour', () => {
 
     // Play All while filtered queues only visible matching tracks
     click(host.querySelector<HTMLElement>('[data-testid="play-all-button"]'));
-    expect(onPlayQueue).toHaveBeenCalledWith([tB, tB], 0, false);
+    expect(onPlayQueue).toHaveBeenCalledWith([tB, tB], 0);
     expect(onPlayPlaylist).not.toHaveBeenCalled();
 
     // Remove 1st visible match -> originalIndex 1 (NOT 0!)
@@ -338,7 +338,7 @@ describe('Phase 5 Search Consistency DOM & Interaction Behaviour', () => {
     expect(host.querySelectorAll('[data-testid^="track-row-"]').length).toBe(1);
     expect(host.querySelector('[data-testid="folder-subfolders-section"]')).toBeNull();
     click(host.querySelector<HTMLElement>('[data-testid="play-all-button"]'));
-    expect(onPlayQueue).toHaveBeenCalledWith([t1], 0, false);
+    expect(onPlayQueue).toHaveBeenCalledWith([t1], 0);
 
     renderFolder('Live');
     expect(host.querySelector('[data-testid="folder-subfolders-section"]')?.textContent).toContain('Live Disc');

@@ -289,7 +289,7 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
 
       // Folder Detail Play All plays ONLY playable direct tracks (excludes unreadable & child subfolder track)
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1, t2], 0, false);
+      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1, t2], 0);
 
       // Select mode works inside Folder A, then resets when navigating to Folder B
       click(byId('toggle-select-mode'));
@@ -408,13 +408,13 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
 
       // Play All operates ONLY on Imported Files tracks (not physical folder tracks)
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([imp1, imp2], 0, false);
+      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([imp1, imp2], 0);
 
       // Search filters Imported Files and updates header count
       typeSearch('Lemon');
       expect(byId('header-subtitle')?.textContent).toBe('1 track');
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenLastCalledWith([imp1], 0, false);
+      expect(calls.playQueue).toHaveBeenLastCalledWith([imp1], 0);
       typeSearch('');
 
       // Select & Bulk Remove invokes removeImportedFiles with selected track IDs

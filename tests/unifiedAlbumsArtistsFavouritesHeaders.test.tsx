@@ -304,7 +304,7 @@ describe('Phase 4: Unified Albums, Artists & Favourites Headers', () => {
 
       // Play All plays ONLY playable tracks of this album
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1], 0, false);
+      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1], 0);
 
       // Select & Bulk action parity (Play Next Bulk)
       click(byId('toggle-select-mode'));
@@ -409,14 +409,14 @@ describe('Phase 4: Unified Albums, Artists & Favourites Headers', () => {
 
       // Play All plays artist tracks
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t3], 0, false);
+      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t3], 0);
 
       // Navigate back to Overview via Artists breadcrumb, then into 张信哲
       click(host.querySelector('[data-testid="folder-breadcrumb"] button'));
       expect(byId('artists-overview-grid')).not.toBeNull();
       click(byId('artist-card-张信哲'));
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenLastCalledWith([t1], 0, false);
+      expect(calls.playQueue).toHaveBeenLastCalledWith([t1], 0);
 
       // Standalone empty Artist Detail preserves Hero + unified Header with disabled actions
       const renderLayout = ({ actions, content }: TrackListLayoutSlots) => (
@@ -467,7 +467,7 @@ describe('Phase 4: Unified Albums, Artists & Favourites Headers', () => {
 
       // Play All plays only playable favourites
       click(byId('play-all-button'));
-      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1], 0, false);
+      expect(calls.playQueue).toHaveBeenCalledExactlyOnceWith([t1], 0);
 
       // Unfavourite t1 -> count drops to 1 track; remaining track is unreadable so Play All disables
       click(byId('track-favourite-t1'));

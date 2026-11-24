@@ -184,13 +184,13 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
 
       const handlePlayAll = () => {
         if (!hasQuery) {
-          onPlayPlaylist(selectedPlaylist, 0, false);
+          onPlayPlaylist(selectedPlaylist, 0);
           return;
         }
         const playable = visibleTracks.filter(isTrackPlayable);
         if (playable.length === 0) return;
         if (onPlayQueue) {
-          onPlayQueue(playable, 0, false);
+          onPlayQueue(playable, 0);
         } else {
           onPlayTrack(playable[0]);
         }
@@ -350,7 +350,7 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
                   disabled={pl.tracks.length === 0}
                   onClick={(e) => {
                     e.stopPropagation();
-                    onPlayPlaylist(pl, 0, false);
+                    onPlayPlaylist(pl, 0);
                   }}
                   className="absolute right-2.5 bottom-2.5 w-9 h-9 rounded-full bg-[var(--accent-primary)] hover:bg-[var(--accent-hover)] text-white shadow-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:scale-105 active:scale-95 disabled:hidden cursor-pointer"
                   title="Play playlist"

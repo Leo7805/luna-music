@@ -83,7 +83,7 @@ export const ArtistsView: React.FC<ArtistsViewProps> = ({
       const playable = visibleTracks.filter(isTrackPlayable);
       if (playable.length === 0) return;
       if (onPlayQueue) {
-        onPlayQueue(playable, 0, false);
+        onPlayQueue(playable, 0);
       } else {
         onPlayTrack(playable[0]);
       }
