@@ -18,6 +18,9 @@ import {
   recordShuffleTrack,
   pickNextShuffledTrack,
   stepBackwardInHistory,
+  prependPendingPlayNextIds,
+  consumeNextPendingPlayNext,
+  removeTrackFromPendingPlayNext,
 } from '../utils/shufflePlayback';
 
 export interface UsePlaybackQueueProps {
@@ -66,6 +69,7 @@ export interface UsePlaybackQueueReturn {
     shuffle?: boolean
   ) => { targetTrack: TrackItem | null; shouldRestartCurrent: boolean };
   clearPlayNextOverride: () => void;
+  consumePendingPlayNextTrack: (track: TrackItem) => void;
   recordPlayedTrack: (track: TrackItem | null, truncateForward?: boolean) => void;
   resetShuffleCycle: (currentTrack: TrackItem | null) => void;
 }
@@ -81,11 +85,19 @@ export function usePlaybackQueue({
   const queueRef = useRef<TrackItem[]>(queue);
   queueRef.current = queue;
 
-  const playNextTrackIdRef = useRef<string | null>(null);
+  const pendingPlayNextIdsRef = useRef<string[]>([]);
   const shuffleStateRef = useRef<ShufflePlaybackState>(createShuffleState());
 
   const clearPlayNextOverride = useCallback(() => {
-    playNextTrackIdRef.current = null;
+    pendingPlayNextIdsRef.current = [];
+  }, []);
+
+  const consumePendingPlayNextTrack = useCallback((track: TrackItem) => {
+    pendingPlayNextIdsRef.current = removeTrackFromPendingPlayNext(
+      pendingPlayNextIdsRef.current,
+      track,
+      queueRef.current
+    );
   }, []);
 
   const recordPlayedTrack = useCallback(
@@ -154,7 +166,7 @@ export function usePlaybackQueue({
 
       if (!currentTrack && queueRef.current.length === 0) {
         onFallbackPlayTrack(track, [track]);
-        playNextTrackIdRef.current = null;
+        pendingPlayNextIdsRef.current = [];
         return 'added';
       }
 
@@ -171,8 +183,13 @@ export function usePlaybackQueue({
       queueRef.current = nextQueue;
       setQueue(nextQueue);
 
-      // Override shuffle for the very next track
-      playNextTrackIdRef.current = track.id;
+      // Prepend explicit Play Next ahead of any earlier pending items (matches visible Queue order)
+      pendingPlayNextIdsRef.current = prependPendingPlayNextIds(
+        pendingPlayNextIdsRef.current,
+        [track],
+        currentTrack,
+        nextQueue
+      );
       return outcome;
     },
     []
@@ -190,7 +207,12 @@ export function usePlaybackQueue({
 
       if (!currentTrack && queueRef.current.length === 0) {
         onFallbackPlayTrack(playable[0], playable);
-        playNextTrackIdRef.current = null;
+        pendingPlayNextIdsRef.current = prependPendingPlayNextIds(
+          [],
+          playable.slice(1),
+          playable[0],
+          playable
+        );
         return { movedCount: 0, addedCount: playable.length };
       }
 
@@ -203,9 +225,12 @@ export function usePlaybackQueue({
       queueRef.current = nextQueue;
       setQueue(nextQueue);
 
-      if (playable.length > 0) {
-        playNextTrackIdRef.current = playable[0].id;
-      }
+      pendingPlayNextIdsRef.current = prependPendingPlayNextIds(
+        pendingPlayNextIdsRef.current,
+        playable,
+        currentTrack,
+        nextQueue
+      );
 
       return { movedCount, addedCount };
     },
@@ -281,7 +306,7 @@ export function usePlaybackQueue({
 
   // Clear upcoming items in queue (preserving current track)
   const clearQueue = useCallback((currentTrack: TrackItem | null) => {
-    playNextTrackIdRef.current = null;
+    pendingPlayNextIdsRef.current = [];
     shuffleStateRef.current = createShuffleState(currentTrack?.id ?? null);
     if (currentTrack) {
       const nextQueue = [currentTrack];
@@ -323,21 +348,17 @@ export function usePlaybackQueue({
       const currentList = queueRef.current;
       if (currentList.length === 0) return null;
 
-      // 1. Manual Play Next override always takes priority over Shuffle & forward history
-      if (playNextTrackIdRef.current) {
-        const { nextTrack: overrideTrack, shouldClearOverride } = getNextTrackToPlay(
+      // 1. Explicit Play Next / Bulk Play Next sequence always takes priority over Shuffle & forward history
+      if (pendingPlayNextIdsRef.current.length > 0) {
+        const { nextTrack: priorityTrack, remainingIds } = consumeNextPendingPlayNext(
+          pendingPlayNextIdsRef.current,
           currentList,
-          currentTrack,
-          false,
-          repeatMode,
-          playNextTrackIdRef.current
+          currentTrack
         );
-        if (shouldClearOverride) {
-          playNextTrackIdRef.current = null;
-        }
-        if (overrideTrack) {
-          recordPlayedTrack(overrideTrack, true);
-          return overrideTrack;
+        pendingPlayNextIdsRef.current = remainingIds;
+        if (priorityTrack) {
+          recordPlayedTrack(priorityTrack, true);
+          return priorityTrack;
         }
       }
 
@@ -414,6 +435,7 @@ export function usePlaybackQueue({
     getNextTrack,
     getPrevTrack,
     clearPlayNextOverride,
+    consumePendingPlayNextTrack,
     recordPlayedTrack,
     resetShuffleCycle,
   };

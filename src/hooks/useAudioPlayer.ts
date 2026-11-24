@@ -173,8 +173,10 @@ export function useAudioPlayer({
 
   // Navigate to track without reordering or mutating the queue
   const navigateToTrack = useCallback(
-    (track: TrackItem, autoPlay = true, recordHistory = true) => {
-      clearPlayNextOverride();
+    (track: TrackItem, autoPlay = true, recordHistory = true, clearPendingPlayNext = true) => {
+      if (clearPendingPlayNext) {
+        clearPlayNextOverride();
+      }
       if (recordHistory) {
         if (currentTrackRef.current) {
           queueControls.recordPlayedTrack(currentTrackRef.current, false);
@@ -330,7 +332,7 @@ export function useAudioPlayer({
     );
 
     if (targetTrack) {
-      navigateToTrack(targetTrack, true, false);
+      navigateToTrack(targetTrack, true, false, false);
     } else {
       audioEngine.setIsPlaying(false);
     }
@@ -353,7 +355,7 @@ export function useAudioPlayer({
     );
 
     if (targetTrack) {
-      navigateToTrack(targetTrack, true, false);
+      navigateToTrack(targetTrack, true, false, false);
     } else if (shouldRestartCurrent) {
       audioEngine.seekTo(0);
     }
@@ -406,19 +408,20 @@ export function useAudioPlayer({
         storePlaybackState({ queueTrackIds: [], queueIndex: 0, lastTrackId: null, lastPosition: 0, wasPlaying: false });
       }
       if (wasCurrent) {
-        clearPlayNextOverride();
         if (shouldStop || !target) {
+          clearPlayNextOverride();
           queueControls.resetShuffleCycle(null);
           audioEngine.stopPlayback();
           setCurrentTrack(null);
         } else {
+          queueControls.consumePendingPlayNextTrack(target);
           queueControls.recordPlayedTrack(target, true);
           setCurrentTrack(target);
           loadAudioSource(target, true);
         }
       }
     },
-    [queueControls.queueRef, queueControls.resetShuffleCycle, queueControls.recordPlayedTrack, prefs.repeatModeRef, setQueueImmediate, clearPlayNextOverride, audioEngine, loadAudioSource]
+    [queueControls.queueRef, queueControls.resetShuffleCycle, queueControls.recordPlayedTrack, queueControls.consumePendingPlayNextTrack, prefs.repeatModeRef, setQueueImmediate, clearPlayNextOverride, audioEngine, loadAudioSource]
   );
 
   const toggleShuffle = useCallback(() => {

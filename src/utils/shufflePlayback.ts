@@ -247,3 +247,82 @@ export function pickNextShuffledTrack(
 
   return { nextTrack: null, nextState: workingState };
 }
+
+/**
+ * Prepends new explicit Play Next tracks in their visible order ahead of any
+ * existing pending Play Next IDs, matching applyPlayNext / applyBulkPlayNext
+ * insertion immediately after currentTrack. Deduplicates by canonical track
+ * identity and excludes currentTrack.
+ */
+export function prependPendingPlayNextIds(
+  existingPendingIds: readonly string[],
+  incomingTracks: readonly TrackItem[],
+  currentTrack: TrackItem | null,
+  queue: readonly TrackItem[]
+): string[] {
+  const incomingIds: string[] = [];
+  const incomingCanonical: TrackItem[] = [];
+
+  for (const track of incomingTracks) {
+    if (!isTrackPlayable(track)) continue;
+    if (currentTrack && isSameTrack(track, currentTrack)) continue;
+    if (incomingCanonical.some((t) => isSameTrack(t, track))) continue;
+    incomingCanonical.push(track);
+    incomingIds.push(track.id);
+  }
+
+  if (incomingIds.length === 0) return [...existingPendingIds];
+
+  const remaining = existingPendingIds.filter((id) => {
+    const resolved = queue.find((t) => matchesTrackId(t, id));
+    if (resolved) {
+      if (currentTrack && isSameTrack(resolved, currentTrack)) return false;
+      return !incomingCanonical.some((inc) => isSameTrack(inc, resolved));
+    }
+    return !incomingIds.includes(id);
+  });
+
+  return [...incomingIds, ...remaining];
+}
+
+/**
+ * Consumes the first eligible, playable track from pendingIds that exists in
+ * the current queue and is not currentTrack. Missing, removed, or unplayable
+ * entries are skipped safely.
+ */
+export function consumeNextPendingPlayNext(
+  pendingIds: readonly string[],
+  queue: readonly TrackItem[],
+  currentTrack: TrackItem | null
+): { nextTrack: TrackItem | null; remainingIds: string[] } {
+  for (let i = 0; i < pendingIds.length; i++) {
+    const candidate = queue.find((t) => matchesTrackId(t, pendingIds[i]));
+    if (
+      candidate &&
+      isTrackPlayable(candidate) &&
+      (!currentTrack || !isSameTrack(candidate, currentTrack))
+    ) {
+      return {
+        nextTrack: candidate,
+        remainingIds: pendingIds.slice(i + 1),
+      };
+    }
+  }
+  return { nextTrack: null, remainingIds: [] };
+}
+
+/**
+ * Removes a specific track (by canonical identity) from pendingIds without
+ * discarding other scheduled priority items.
+ */
+export function removeTrackFromPendingPlayNext(
+  pendingIds: readonly string[],
+  track: TrackItem,
+  queue: readonly TrackItem[]
+): string[] {
+  return pendingIds.filter((id) => {
+    if (matchesTrackId(track, id)) return false;
+    const resolved = queue.find((t) => matchesTrackId(t, id));
+    return !(resolved && isSameTrack(resolved, track));
+  });
+}
