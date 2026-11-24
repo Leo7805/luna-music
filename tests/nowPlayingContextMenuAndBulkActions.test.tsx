@@ -449,7 +449,8 @@ describe('Now Playing — Shared Context Menu, Selection Lifecycle & Bulk Action
 
     const css = readFileSync(resolve(process.cwd(), 'src/index.css'), 'utf8');
     expect(css).toContain('.track-row-current');
-    expect(css).toContain('inset 3px 0 0 0 var(--track-current-accent)');
+    expect(css).toContain('box-shadow: 0 4px 14px -4px var(--track-current-glow);');
+    expect(css).not.toContain('inset 3px 0 0 0 var(--track-current-accent)');
     expect(css).toContain('.track-row-selected');
     expect(css).toContain('--track-selected-bg:');
     expect(css).toContain('--track-selected-border:');

@@ -263,7 +263,7 @@ body {
   .track-row-current {
     background: var(--track-current-bg);
     border-color: var(--track-current-border);
-    box-shadow: inset 3px 0 0 0 var(--track-current-accent), 0 4px 14px -4px var(--track-current-glow);
+    box-shadow: 0 4px 14px -4px var(--track-current-glow);
   }
 
   .track-row-current:hover {
