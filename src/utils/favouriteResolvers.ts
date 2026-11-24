@@ -15,17 +15,13 @@ export function isFavouriteTrack(
   if (favourites.has(track.id)) return true;
   if (track.aliases && track.aliases.some((alias) => favourites.has(alias))) return true;
 
-  // Check legacy bare relative path matching (without folder prefix)
-  if (favourites.has(track.relativePath)) {
-    if (libraryTracks && libraryTracks.length > 0) {
-      const resolver = createTrackReferenceResolver(libraryTracks);
-      const res = resolver.resolve(track.relativePath, { allowRelativePathFallback: true });
-      return Boolean(res.track && res.track.id === track.id);
-    }
-    return true;
+  if (libraryTracks && libraryTracks.length > 0) {
+    const resolver = createTrackReferenceResolver(libraryTracks);
+    return Array.from(favourites).some(id => resolver.resolve(id, {
+      allowRelativePathFallback: true, allowNestedPathFallback: true,
+    }).track?.id === track.id);
   }
-
-  return false;
+  return favourites.has(track.relativePath);
 }
 
 export interface FavouriteResolutionResult {
@@ -88,6 +84,7 @@ export function mergeFavouriteSnapshot(
  *   shared unavailable placeholders for unresolved/ambiguous saved references.
  * - `unresolvedIds`: saved IDs not currently matched to an unambiguous Library track.
  * - `migratedMap`: alias/relativePath matches eligible for canonical ID migration.
+ *   Nested-source recovery remains transient because it does not prove file identity.
  */
 export function resolveFavouriteTracks(
   libraryTracks: TrackItem[],
@@ -103,9 +100,9 @@ export function resolveFavouriteTracks(
   const resolver = createTrackReferenceResolver(libraryTracks);
 
   for (const favId of favourites) {
-    const res = resolver.resolve(favId, { allowRelativePathFallback: true });
+    const res = resolver.resolve(favId, { allowRelativePathFallback: true, allowNestedPathFallback: true });
     if (res.track) {
-      if (res.matchedBy !== 'id' && res.track.id !== favId) {
+      if (res.matchedBy !== 'id' && res.matchedBy !== 'nestedPath' && res.track.id !== favId) {
         migratedMap.set(favId, res.track.id);
       }
       matchedFavIds.add(favId);

@@ -243,7 +243,9 @@ export const PlaylistsView: React.FC<PlaylistsViewProps> = ({
               }
             }}
             onRemoveTracksFromPlaylist={(trackIds) =>
-              onRemoveTracksFromPlaylist?.(selectedPlaylist.id, trackIds)
+              onRemoveTracksFromPlaylist?.(selectedPlaylist.id,
+                selectedPlaylist.tracks.filter((_, index) => trackIds.includes(resolvedTracks[index].id))
+                  .map(reference => reference.trackId))
             }
             onAddTracksToFavourites={onAddTracksToFavourites}
             onRemoveTracksFromFavourites={onRemoveTracksFromFavourites}

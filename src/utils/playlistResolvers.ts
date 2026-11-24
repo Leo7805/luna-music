@@ -37,7 +37,7 @@ export async function migratePlaylistsTrackIds(idMigrations: Map<string, string>
 /**
  * Resolves an ordered list of PlaylistTrackReferences against library tracks,
  * using the shared track reference resolver (canonical ID, verified aliases,
- * and unambiguous relativePath fallback).
+ * and unambiguous relativePath/nested-source recovery).
  * Does not prematurely mutate persisted Playlist Track IDs on relativePath fallback.
  * If a track is unresolved or ambiguous, creates a placeholder TrackItem with
  * status 'unreadable' preserving its saved metadata and Playlist order.
@@ -49,7 +49,7 @@ export function resolvePlaylistTracks(
   const resolver = createTrackReferenceResolver(libraryTracks);
 
   return references.map((ref) => {
-    const { track } = resolver.resolve(ref.trackId, { allowRelativePathFallback: true });
+    const { track } = resolver.resolve(ref.trackId, { allowRelativePathFallback: true, allowNestedPathFallback: true });
     if (track) {
       return track;
     }

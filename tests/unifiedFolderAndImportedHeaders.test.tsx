@@ -257,7 +257,7 @@ const mountApp = () => act(() => root.render(<App />));
 
 describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
   describe('1. Folder Detail Unified Header, Play All & Selection Reset', () => {
-    it('places Breadcrumb, direct track count, Play All and Select inside one main Header with no duplicate toolbar', () => {
+    it('places Breadcrumb, recursive track count, Play All and Select inside one main Header with no duplicate toolbar', () => {
       const t1 = createTrack('f1:Direct1.mp3', 'Direct1.mp3');
       const t2 = createTrack('f1:Direct2.mp3', 'Direct2.mp3');
       const tUnavail = createTrack('f1:Broken.mp3', 'Broken.mp3', 'Broken.mp3', 'unreadable');
@@ -273,7 +273,7 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
       const header = host.querySelector('main > header');
       expect(header).not.toBeNull();
       expect(header!.querySelector('[data-testid="folder-breadcrumb"]')?.textContent).toContain('hot-2026.11.19');
-      expect(header!.querySelector('[data-testid="header-subtitle"]')?.textContent).toBe('3 tracks');
+      expect(header!.querySelector('[data-testid="header-subtitle"]')?.textContent).toBe('1 folder · 4 tracks');
       expect(host.querySelectorAll('[data-testid="play-all-button"]')).toHaveLength(1);
       expect(host.querySelectorAll('[data-testid="toggle-select-mode"]')).toHaveLength(1);
       expect(byId('play-all-button')?.closest('header')).toBe(header);
@@ -300,7 +300,7 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
       // Navigate to Folder B via Sidebar -> selection and Select mode reset cleanly
       click(host.querySelector('[data-testid="root-folder-f2"] [role="button"]'));
       expect(byId('folder-breadcrumb')?.textContent).toContain('mp3');
-      expect(byId('header-subtitle')?.textContent).toBe('1 track');
+      expect(byId('header-subtitle')?.textContent).toBe('0 folders · 1 track');
       expect(byId('toggle-select-mode')?.textContent).toContain('Select');
       expect(byId('bulk-action-toolbar')).toBeNull();
 
@@ -321,9 +321,9 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
 
       mountApp();
 
-      // Subfolders-only folder: unified header shows 0 tracks + disabled Play All / Select, cards visible, NO table headings or legacy toolbar
+      // Subfolders-only folder: unified header shows recursive totals + disabled Play All / Select, cards visible, NO table headings or legacy toolbar
       expect(host.querySelectorAll('main > header')).toHaveLength(1);
-      expect(byId('header-subtitle')?.textContent).toBe('0 tracks');
+      expect(byId('header-subtitle')?.textContent).toBe('1 folder · 1 track');
       expect((byId('play-all-button') as HTMLButtonElement).disabled).toBe(true);
       expect((byId('toggle-select-mode') as HTMLButtonElement).disabled).toBe(true);
       expect(byId('tracklist-toolbar')).toBeNull();
@@ -334,12 +334,12 @@ describe('Phase 2: Unified Folder Detail & Imported Files Headers', () => {
       click(byId('folder-card-f1/Sub'));
       expect(byId('folder-breadcrumb')?.textContent).toContain('ParentOnly');
       expect(byId('folder-breadcrumb')?.textContent).toContain('Sub');
-      expect(byId('header-subtitle')?.textContent).toBe('1 track');
+      expect(byId('header-subtitle')?.textContent).toBe('0 folders · 1 track');
       expect((byId('play-all-button') as HTMLButtonElement).disabled).toBe(false);
 
       // Navigate to completely empty folder -> unified header + disabled actions + empty state
       click(host.querySelector('[data-testid="root-folder-f2"] [role="button"]'));
-      expect(byId('header-subtitle')?.textContent).toBe('0 tracks');
+      expect(byId('header-subtitle')?.textContent).toBe('0 folders · 0 tracks');
       expect((byId('play-all-button') as HTMLButtonElement).disabled).toBe(true);
       expect((byId('toggle-select-mode') as HTMLButtonElement).disabled).toBe(true);
       expect(byId('tracklist-toolbar')).toBeNull();

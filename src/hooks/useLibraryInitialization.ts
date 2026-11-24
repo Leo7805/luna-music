@@ -12,7 +12,6 @@ import {
 import {
   scanRootFolderHandle,
   verifyHandlePermission,
-  isFileSystemAccessSupported,
 } from '../services/directoryAccess';
 import {
   storeRegisteredFolders,
@@ -29,6 +28,7 @@ import {
   reconcileOverlappingTracks,
   mergeTrackMetadataAndSources,
 } from '../utils/musicTree';
+import { restoreFolderHandle } from '../utils/folderAccess';
 import { createFallbackMetadata } from '../utils/metadata';
 
 export interface UseLibraryInitializationProps {
@@ -73,11 +73,13 @@ export function useLibraryInitialization({
 
   // Load stored state and registered folders on mount
   useEffect(() => {
+    let cancelled = false;
     async function init() {
       const [storedState, metadataCache] = await Promise.all([
         getStoredPlaybackState(),
         getMetadataCache(),
       ]);
+      if (cancelled) return;
       if (storedState.favourites) {
         onSetInitialFavourites(new Set(storedState.favourites), storedState.favouriteSnapshots);
       }
@@ -86,8 +88,10 @@ export function useLibraryInitialization({
       let promptImportedFolders: ImportedFolder[] = [];
       const extractionBatches: Array<{ sourceId: string; tracks: TrackItem[] }> = [];
 
-      if (isFileSystemAccessSupported()) {
+      // Registration recovery must also work without a native directory picker.
+      {
         const storedFolders = await getStoredRegisteredFolders();
+        if (cancelled) return;
         // Check for legacy migration: remove legacy pseudo-folders created for individual file fallback.
         // Legitimate folders imported through FSA or HTML folder-input fallback (sourceType: 'input-fallback')
         // are strictly preserved, even if named 'Selected Audio' without a persistent directory handle.
@@ -110,14 +114,48 @@ export function useLibraryInitialization({
           for (const record of validStoredFolders) {
             if (record.handle) {
               const hasPerm = await verifyHandlePermission(record.handle, false);
+              if (cancelled) return;
               if (hasPerm) {
                 grantedFolders.push(record);
               } else {
                 promptFolders.push(record);
               }
+            } else {
+              promptFolders.push(record);
             }
           }
 
+          let existingTracksAccum: TrackItem[] = [];
+
+          if (grantedFolders.length > 0) {
+            setIsLoading(true);
+
+            for (const record of grantedFolders) {
+              try {
+                const scanned = await scanRootFolderHandle(record.handle!, record.id);
+                if (cancelled) return;
+                scanned.tracks = await reconcileOverlappingTracks(
+                  scanned.tracks,
+                  existingTracksAccum,
+                  scanned.id
+                );
+                const hydrated = applyCachedMetadataToTracks(scanned.tracks, metadataCache);
+                scanned.tracks = hydrated.hydratedTracks;
+                if (hydrated.tracksNeedingExtraction.length > 0) {
+                  extractionBatches.push({ sourceId: scanned.id, tracks: hydrated.tracksNeedingExtraction });
+                }
+                scanned.tree = buildFolderTree(scanned.name, scanned.tracks, scanned.id);
+                scanned.permissionStatus = 'granted';
+                loadedFolders.push(scanned);
+                existingTracksAccum = combineFlatPlaylists(loadedFolders);
+              } catch (err) {
+                if (cancelled) return;
+                promptFolders.push(record);
+                console.error(`Failed to load folder ${record.name}:`, err);
+              }
+            }
+            setIsLoading(false);
+          }
           if (promptFolders.length > 0) {
             setPendingFolders(promptFolders);
             setNeedsPermission(true);
@@ -143,34 +181,6 @@ export function useLibraryInitialization({
             permissionStatus: 'prompt',
           }));
 
-          let existingTracksAccum: TrackItem[] = [];
-
-          if (grantedFolders.length > 0) {
-            setIsLoading(true);
-
-            for (const record of grantedFolders) {
-              try {
-                const scanned = await scanRootFolderHandle(record.handle!, record.id);
-                scanned.tracks = await reconcileOverlappingTracks(
-                  scanned.tracks,
-                  existingTracksAccum,
-                  scanned.id
-                );
-                const hydrated = applyCachedMetadataToTracks(scanned.tracks, metadataCache);
-                scanned.tracks = hydrated.hydratedTracks;
-                if (hydrated.tracksNeedingExtraction.length > 0) {
-                  extractionBatches.push({ sourceId: scanned.id, tracks: hydrated.tracksNeedingExtraction });
-                }
-                scanned.tree = buildFolderTree(scanned.name, scanned.tracks, scanned.id);
-                scanned.permissionStatus = 'granted';
-                loadedFolders.push(scanned);
-                existingTracksAccum = combineFlatPlaylists(loadedFolders);
-              } catch (err) {
-                console.error(`Failed to load folder ${record.name}:`, err);
-              }
-            }
-            setIsLoading(false);
-          }
         }
       }
 
@@ -272,6 +282,7 @@ export function useLibraryInitialization({
         };
       }
 
+      if (cancelled) return;
       const allInitialFolders = [
         ...loadedFolders,
         ...promptImportedFolders,
@@ -306,6 +317,7 @@ export function useLibraryInitialization({
     }
 
     init();
+    return () => { cancelled = true; };
   }, []);
 
   // Request permission for previously stored handles
@@ -313,7 +325,6 @@ export function useLibraryInitialization({
     if (pendingFolders.length === 0) return;
 
     setIsLoading(true);
-    const metadataCache = await getMetadataCache();
     const stillPending: StoredFolderRecord[] = [];
     const newlyGrantedFolders: ImportedFolder[] = [];
     const grantedBatches: Array<{ sourceId: string; tracks: TrackItem[] }> = [];
@@ -321,11 +332,11 @@ export function useLibraryInitialization({
     let currentTracks = library ? library.flatPlaylist : [];
 
     for (const record of pendingFolders) {
-      if (!record.handle) continue;
       try {
-        const granted = await verifyHandlePermission(record.handle, true);
-        if (granted) {
-          const scanned = await scanRootFolderHandle(record.handle, record.id);
+        const handle = await restoreFolderHandle(record);
+        if (handle) {
+          const metadataCache = await getMetadataCache();
+          const scanned = await scanRootFolderHandle(handle, record.id);
           scanned.tracks = await reconcileOverlappingTracks(scanned.tracks, currentTracks, record.id);
           const hydrated = applyCachedMetadataToTracks(scanned.tracks, metadataCache);
           scanned.tracks = hydrated.hydratedTracks;
@@ -347,7 +358,10 @@ export function useLibraryInitialization({
     setNeedsPermission(stillPending.length > 0);
 
     if (newlyGrantedFolders.length > 0) {
-      const mergedFolders = [...(library?.folders || []), ...newlyGrantedFolders];
+      const recovered = new Map(newlyGrantedFolders.map(folder => [folder.id, folder]));
+      const existing = library?.folders || [];
+      const mergedFolders = [...existing.map(folder => recovered.get(folder.id) || folder),
+        ...newlyGrantedFolders.filter(folder => !existing.some(old => old.id === folder.id))];
       const unifiedTree = buildUnifiedMultiFolderTree(mergedFolders);
       const flatPlaylist = combineFlatPlaylists(mergedFolders);
 
@@ -376,13 +390,13 @@ export function useLibraryInitialization({
     async (folderId: string) => {
       const targetFolder = library?.folders.find((f) => f.id === folderId);
       const targetPending = pendingFolders.find((f) => f.id === folderId);
-      const handle = targetFolder?.handle || targetPending?.handle;
-      if (!handle) return;
+      const record = targetFolder || targetPending;
+      if (!record) return;
 
       setIsLoading(true);
       try {
-        const granted = await verifyHandlePermission(handle, true);
-        if (granted) {
+        const handle = await restoreFolderHandle(record);
+        if (handle) {
           const scanned = await scanRootFolderHandle(handle, folderId);
           const otherFolders = (library?.folders || []).filter((f) => f.id !== folderId);
           const otherTracks = otherFolders.flatMap((f) => f.tracks);

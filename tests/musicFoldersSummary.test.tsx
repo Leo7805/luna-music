@@ -141,7 +141,7 @@ describe('Music Folders summary in the actual App composition', () => {
     libraryData = library([folder('Root', [track('a:1', 'Direct.mp3'), track('a:2', 'Child.mp3', 'Disc/Child.mp3')])]);
     mount(); click(byId('folder-subfolders-section').querySelector<HTMLElement>('.group')!);
     expect(byId('folder-breadcrumb').textContent).toContain('Root');
-    expect(byId('header-subtitle').textContent).toBe('1 track');
+    expect(byId('header-subtitle').textContent).toBe('1 folder · 2 tracks');
     expect(byId('tracklist-toolbar')).toBeNull();
     expect(byId('play-all-button').closest('header')).not.toBeNull();
     expect(byId('toggle-select-mode').closest('header')).not.toBeNull();
@@ -223,6 +223,64 @@ describe('Music Folders summary in the actual App composition', () => {
     click(byId('folder-card-root/Z'));
     expect(onSelect).toHaveBeenCalledExactlyOnceWith(current.subfolders[1].relativePath);
     expect(byId('tracklist-count').textContent).toBe('0 tracks');
+  });
+
+  it('updates the document title from the root player state across playback transitions', () => {
+    vi.useFakeTimers();
+    const current = track('playing', 'Those Days With A Very Long Song Title.mp3');
+    try {
+      Object.assign(player, { currentTrack: current, isPlaying: true });
+      mount();
+      expect(document.title).toBe('Those Days With A Very Long Song Title');
+      act(() => vi.advanceTimersByTime(1200));
+      expect(document.title).not.toBe('Those Days With A Very Long Song Title');
+      Object.assign(player, { isPlaying: false }); mount();
+      expect(document.title).toBe('Those Days With A Very Long Song Title');
+      Object.assign(player, { isPlaying: true }); mount();
+      act(() => vi.advanceTimersByTime(1200));
+      Object.assign(player, { currentTrack: track('next', '《七年的爱》.mp3') }); mount();
+      expect(document.title).toBe('《七年的爱》');
+      act(() => vi.advanceTimersByTime(10000));
+      expect(document.title).toBe('《七年的爱》');
+      Object.assign(player, { currentTrack: null, isPlaying: false }); mount();
+      expect(document.title).toBe('Luna Music');
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      Object.assign(player, { currentTrack: null, isPlaying: false });
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows recursive folder totals at every navigation depth without changing overview or search semantics', () => {
+    libraryData = library([folder('physical', [
+      track('1', 'Song 1.mp3'), track('2', 'Song 2.mp3'),
+      track('3', 'Song 3.mp3', 'A/Song 3.mp3'),
+      track('4', 'Song 4.mp3', 'A/Nested/Song 4.mp3'),
+      track('5', 'Song 5.mp3', 'A/Nested/Song 5.mp3'),
+      track('6', 'Song 6.mp3', 'B/Song 6.mp3'),
+    ])]);
+    mount();
+    expect(byId('header-subtitle').textContent).toBe('1 folder · 6 tracks');
+    click(byId('folder-card-physical'));
+    expect(byId('header-subtitle').textContent).toBe('2 folders · 6 tracks');
+    expect(byId('folder-card-physical/A').textContent).toContain('3 tracks');
+    click(byId('folder-card-physical/A'));
+    expect(byId('header-subtitle').textContent).toBe('1 folder · 3 tracks');
+    search('Song 3');
+    expect(byId('header-subtitle').textContent).toBe('0 of 1 folder · 1 of 1 track');
+    search('');
+    expect(byId('header-subtitle').textContent).toBe('1 folder · 3 tracks');
+    click(byId('folder-card-physical/A/Nested'));
+    expect(byId('header-subtitle').textContent).toBe('0 folders · 2 tracks');
+  });
+
+  it('renders the reported six-child 433-track folder total from the canonical tree', () => {
+    const tracks = [31, 16, 3, 319, 36, 28].flatMap((count, n) =>
+      Array.from({ length: count }, (_, i) => track(`${n}:${i}`, `${i}.mp3`, `Child${n}/${i}.mp3`)));
+    libraryData = library([{ ...folder('physical', tracks), name: '5.Musics' }]);
+    mount(); click(byId('folder-card-physical'));
+    expect(byId('header-subtitle').textContent).toBe('6 folders · 433 tracks');
+    expect(byId('nav-badge-all').textContent).toBe('433');
   });
 
 });

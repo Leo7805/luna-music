@@ -453,4 +453,18 @@ describe('Phase 3: Unified Playlists Overview, Detail & Track Actions', () => {
       expect((byId('track-favourite-tOffline') as HTMLButtonElement).disabled).toBe(false);
     });
   });
+  it('removes recovered playlist entries by their original saved IDs in bulk', () => {
+    const current = { ...makeTrack('new:Parent/Song.mp3', 'Song', 180), relativePath: 'Parent/Song.mp3' };
+    mockTracks = [current];
+    initialPlaylists = [makePlaylist('p1', 'Recovered', ['old:Song.mp3', 'old:Song.mp3'])];
+    initialSelectedPlaylistId = 'p1';
+    mountApp();
+    click(byId('toggle-select-mode'));
+    click(byId('track-checkbox-new:Parent/Song.mp3'));
+    const remove = [...host.querySelectorAll<HTMLButtonElement>('[data-testid="bulk-action-toolbar"] button')]
+      .find(button => button.title === 'Remove from Playlist');
+    click(remove ?? null);
+    expect(calls.removeTracksFromPlaylist).toHaveBeenCalledWith('p1', ['old:Song.mp3', 'old:Song.mp3']);
+  });
+
 });

@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { FavouriteTrackSnapshot, TrackItem } from '../types/music';
 import { storePlaybackState } from '../services/idbStorage';
 import { resolveFavouriteTracks, isFavouriteTrack } from '../utils/musicTree';
+import { createTrackReferenceResolver } from '../utils/trackReferenceResolver';
 import { mergeFavouriteSnapshot } from '../utils/favouriteResolvers';
 
 export interface UseLibraryFavouritesProps {
@@ -177,6 +178,18 @@ export function useLibraryFavourites({
             }
           }
 
+          // Remove recovered nested-source references without persisting heuristic aliases.
+          if (track) {
+            const resolver = createTrackReferenceResolver(flatPlaylist);
+            for (const id of prev) {
+              if (resolver.resolve(id, { allowRelativePathFallback: true,
+                allowNestedPathFallback: true }).track?.id === track.id) {
+                next.delete(id);
+                delete nextSnaps[id];
+              }
+            }
+          }
+
           // 4. Remove any legacy ID that was unambiguously migrated to this canonical track
           for (const [oldId, mappedCanonicalId] of favouriteResolution.migratedMap.entries()) {
             if (mappedCanonicalId === canonicalId) {
@@ -208,7 +221,7 @@ export function useLibraryFavourites({
       let changed = false;
       for (const track of tracks) {
         const canonicalId = track.id;
-        if (!next.has(canonicalId)) {
+        if (!isFavouriteTrack(track, next, flatPlaylist)) {
           next.add(canonicalId);
           changed = true;
         }
@@ -226,7 +239,7 @@ export function useLibraryFavourites({
       }
       return prev;
     });
-  }, []);
+  }, [flatPlaylist]);
 
   // Bulk remove tracks from favourites (works for both available tracks and unavailable placeholders)
   const removeTracksFromFavourites = useCallback((tracks: TrackItem[]) => {
@@ -234,6 +247,16 @@ export function useLibraryFavourites({
       const next = new Set(prev);
       const nextSnaps: Record<string, FavouriteTrackSnapshot> = { ...snapshotsRef.current };
       let changed = false;
+      const selectedIds = new Set(tracks.map(track => track.id));
+      const resolver = createTrackReferenceResolver(flatPlaylist);
+      for (const id of prev) {
+        const resolved = resolver.resolve(id, { allowRelativePathFallback: true, allowNestedPathFallback: true });
+        if (resolved.track && selectedIds.has(resolved.track.id)) {
+          next.delete(id);
+          delete nextSnaps[id];
+          changed = true;
+        }
+      }
       for (const track of tracks) {
         const canonicalId = track.id;
         if (next.has(canonicalId)) {
@@ -265,7 +288,7 @@ export function useLibraryFavourites({
       }
       return prev;
     });
-  }, []);
+  }, [flatPlaylist]);
 
   // Remove favourites for specific track IDs
   const removeFavouritesForTrackIds = useCallback((trackIds: string[]) => {

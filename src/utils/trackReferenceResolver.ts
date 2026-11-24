@@ -1,6 +1,6 @@
 import { TrackItem } from '../types/music';
 
-export type TrackMatchType = 'id' | 'alias' | 'relativePath';
+export type TrackMatchType = 'id' | 'alias' | 'relativePath' | 'nestedPath';
 
 export interface TrackResolution {
   track: TrackItem | null;
@@ -10,6 +10,8 @@ export interface TrackResolution {
 
 export interface TrackResolveOptions {
   allowRelativePathFallback?: boolean;
+  /** Opt-in recovery after reopening a different directory level; never a verified alias. */
+  allowNestedPathFallback?: boolean;
 }
 
 export interface TrackReferenceResolver {
@@ -109,6 +111,26 @@ export function createTrackReferenceResolver(
             };
           }
           return { track: null, matchedBy: null, ambiguous: true };
+        }
+        // A source may be reopened as a parent or child directory. Require a complete
+        // path suffix at a directory boundary and reject multiple logical candidates.
+        // This is a recovery heuristic, not a verified alias or a persisted ID migration.
+        const sourcePrefix = savedTrackId.includes(':') ? savedTrackId.slice(0, savedTrackId.indexOf(':') + 1) : null;
+        const sourceStillPresent = options.allowNestedPathFallback && sourcePrefix && libraryTracks.some(track =>
+          track.id.startsWith(sourcePrefix) || track.aliases?.some(alias => alias.startsWith(sourcePrefix)) ||
+          track.folderIds?.includes(sourcePrefix.slice(0, -1)));
+        if (options.allowNestedPathFallback && !sourceStillPresent) {
+          const candidates = new Map<string, TrackItem>();
+          for (const track of libraryTracks) {
+            if (track.relativePath.endsWith(`/${relativePath}`) ||
+                relativePath.endsWith(`/${track.relativePath}`)) {
+              candidates.set(track.id, track);
+            }
+          }
+          if (candidates.size === 1) {
+            return { track: candidates.values().next().value!, matchedBy: 'nestedPath', ambiguous: false };
+          }
+          if (candidates.size > 1) return { track: null, matchedBy: null, ambiguous: true };
         }
       }
 

@@ -407,6 +407,17 @@ export function useFolderScanning({
       const parsed = parseFileList(files);
       if (parsed && parsed.folders.length > 0) {
         const newFolder = parsed.folders[0];
+        // Reselecting a unique handleless source restores its original namespace.
+        const candidates = (library?.folders || []).filter(folder =>
+          folder.sourceType === 'input-fallback' && !folder.handle &&
+          folder.permissionStatus !== 'granted' && folder.name === newFolder.name);
+        const previous = candidates.length === 1 ? candidates[0] : undefined;
+        if (previous) {
+          newFolder.id = previous.id;
+          newFolder.addedAt = previous.addedAt;
+          newFolder.tracks = newFolder.tracks.map(track => ({ ...track,
+            id: `${previous.id}:${track.relativePath}`, folderIds: [previous.id] }));
+        }
         const cache = await getMetadataCache();
         const { hydratedTracks, tracksNeedingExtraction } = applyCachedMetadataToTracks(
           newFolder.tracks,
@@ -414,7 +425,15 @@ export function useFolderScanning({
         );
         newFolder.tracks = hydratedTracks;
         newFolder.tree = buildFolderTree(newFolder.name, newFolder.tracks, newFolder.id);
-        const nextFolders = [...(library?.folders || []), newFolder];
+        const existing = library?.folders || [];
+        const nextFolders = previous
+          ? existing.map(folder => folder.id === newFolder.id ? newFolder : folder)
+          : [...existing, newFolder];
+        setPendingFolders(pending => {
+          const remaining = pending.filter(folder => folder.id !== newFolder.id);
+          setNeedsPermission(remaining.length > 0);
+          return remaining;
+        });
         const unifiedTree = buildUnifiedMultiFolderTree(nextFolders);
         const flatPlaylist = combineFlatPlaylists(nextFolders);
 
@@ -427,11 +446,12 @@ export function useFolderScanning({
           sourceType: 'input-fallback',
         }));
 
+        await storeRegisteredFolders(nextFolders);
         startIncrementalMetadataExtraction(tracksNeedingExtraction, newFolder.id);
       }
       setIsLoading(false);
     },
-    [library, onLibraryUpdated, startIncrementalMetadataExtraction]
+    [library, onLibraryUpdated, startIncrementalMetadataExtraction, setPendingFolders, setNeedsPermission]
   );
 
   return {

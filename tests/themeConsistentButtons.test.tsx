@@ -161,7 +161,7 @@ describe('Theme-Consistent Buttons & Option B Styling', () => {
     it('uses theme accent instead of hardcoded indigo', () => {
       const html = renderToStaticMarkup(<RecoveryBanner onRestore={vi.fn()} />);
 
-      expect(html).toContain('Grant Permission');
+      expect(html).toContain('Restore Access');
       expect(html).toContain('bg-[var(--accent-primary)]');
       expect(html).toContain('hover:bg-[var(--accent-hover)]');
       expect(html).not.toContain('bg-indigo-600');
