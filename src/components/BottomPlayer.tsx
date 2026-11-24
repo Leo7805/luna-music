@@ -117,11 +117,7 @@ export function BottomPlayer({
               aria-label={nowPlayingAction}
               aria-pressed={isNowPlayingViewOpen}
               title={nowPlayingAction}
-              className={`flex items-center gap-3 min-w-0 flex-1 text-left p-1.5 -ml-1.5 rounded-xl transition-colors duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 ${
-                isNowPlayingViewOpen
-                  ? 'bg-[var(--bg-active)]/80 dark:bg-white/[0.08]'
-                  : 'hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06]'
-              }`}
+              className="flex items-center gap-3 min-w-0 flex-1 text-left p-1.5 -ml-1.5 rounded-xl transition-colors duration-150 cursor-pointer hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30"
             >
               {/* Thumbnail */}
               <div
@@ -324,14 +320,20 @@ export function BottomPlayer({
           type="button"
           onClick={handleToggleNowPlayingView}
           data-testid="now-playing-toggle-button"
+          data-selected={isNowPlayingViewOpen ? 'true' : 'false'}
           aria-label={nowPlayingAction}
           aria-pressed={isNowPlayingViewOpen}
           title={nowPlayingAction}
-          className={`shrink-0 inline-flex items-center justify-center gap-2 p-2 lg:px-3 rounded-xl border text-xs font-semibold transition-colors duration-150 cursor-pointer active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--track-current-accent)]/60 text-[var(--track-current-accent)] bg-[var(--track-current-accent)]/10 hover:bg-[var(--track-current-accent)]/15 ${
-            isNowPlayingViewOpen ? 'border-[var(--track-current-accent)]/60' : 'border-[var(--track-current-border)]'
+          className={`shrink-0 inline-flex items-center justify-center gap-2 p-2 lg:px-3 rounded-xl border text-xs font-semibold transition-colors duration-150 cursor-pointer active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/50 dark:focus-visible:ring-white/30 ${
+            isNowPlayingViewOpen
+              ? 'bg-[var(--track-current-accent)]/12 dark:bg-indigo-500/20 text-[var(--track-current-accent)] dark:text-indigo-300 border-[var(--track-current-border)] dark:border-indigo-400/35 hover:bg-[var(--track-current-accent)]/16 dark:hover:bg-indigo-500/25'
+              : 'border-transparent text-[var(--text-secondary)] dark:text-slate-300 hover:text-[var(--text-primary)] dark:hover:text-white hover:bg-[var(--bg-hover)] dark:hover:bg-white/[0.06]'
           }`}
         >
-          <EqualizerIcon isPlaying={Boolean(currentTrack) && isPlaying} />
+          <EqualizerIcon
+            isPlaying={Boolean(currentTrack) && isPlaying}
+            barClassName="w-[2.5px] rounded-full bg-current"
+          />
           <span className="hidden lg:inline whitespace-nowrap">Now Playing</span>
         </button>
 

@@ -135,3 +135,44 @@ it('keeps responsive icon-only mode accessible on narrow screens', () => {
   expect(button.title).toBe('Open Now Playing');
   expect(button.querySelector('[data-playing]')?.className).toContain('shrink-0');
 });
+
+it('separates Now Playing selected appearance from isPlaying and keeps left track-info and footer neutral', () => {
+  const button = byTest('now-playing-toggle-button');
+  const trackInfo = byTest('bottom-track-info-button');
+  const footer = byTest('bottom-player');
+
+  // 1. Library open + playing -> unselected button, animated equalizer, neutral track-info
+  render({ isNowPlayingViewOpen: false, isPlaying: true });
+  const closedButtonClass = button.className;
+  const closedTrackInfoClass = trackInfo.className;
+  const closedFooterClass = footer.className;
+  expect(button.getAttribute('aria-pressed')).toBe('false');
+  expect(button.getAttribute('data-selected')).toBe('false');
+  expect(closedButtonClass).toContain('border-transparent');
+  expect(closedButtonClass).toContain('hover:bg-');
+  expect(closedButtonClass).toContain('focus-visible:ring-2');
+  expect(closedButtonClass).not.toContain('bg-[var(--track-current-accent)]');
+  expect(button.querySelector('[data-playing]')?.getAttribute('data-playing')).toBe('true');
+
+  // 2. Now Playing open + playing -> selected button, animated equalizer
+  render({ isNowPlayingViewOpen: true, isPlaying: true });
+  const openButtonClass = button.className;
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(button.getAttribute('data-selected')).toBe('true');
+  expect(openButtonClass).not.toBe(closedButtonClass);
+  expect(openButtonClass).toContain('bg-[var(--track-current-accent)]');
+  expect(openButtonClass).toContain('border-[var(--track-current-border)]');
+  expect(button.querySelector('[data-playing]')?.getAttribute('data-playing')).toBe('true');
+
+  // Left track-info & whole footer must NOT gain persistent selected styling
+  expect(trackInfo.className).toBe(closedTrackInfoClass);
+  expect(trackInfo.className).not.toContain('bg-[var(--bg-active)]');
+  expect(footer.className).toBe(closedFooterClass);
+
+  // 3. Now Playing open + paused -> still selected button, static equalizer
+  render({ isNowPlayingViewOpen: true, isPlaying: false });
+  expect(button.getAttribute('aria-pressed')).toBe('true');
+  expect(button.getAttribute('data-selected')).toBe('true');
+  expect(button.className).toBe(openButtonClass);
+  expect(button.querySelector('[data-playing]')?.getAttribute('data-playing')).toBe('false');
+});
