@@ -12,6 +12,7 @@ import { ErrorToast } from './components/ErrorToast';
 import { ArtworkRequestProvider } from './contexts/ArtworkRequestContext';
 import { useMusicLibrary } from './hooks/useMusicLibrary';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { usePlaylists } from './hooks/usePlaylists';
 import { useShortcuts } from './hooks/useShortcuts';
 import { useTheme } from './hooks/useTheme';
@@ -58,6 +59,7 @@ export function App() {
     needsPermission: library.needsPermission,
   });
 
+  useDocumentTitle(audioPlayer.currentTrack, audioPlayer.isPlaying);
   // Priority 1: Restore embedded artwork on demand for the currently playing track
   useEffect(() => {
     const cur = audioPlayer.currentTrack;
