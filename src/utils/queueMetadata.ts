@@ -51,10 +51,14 @@ export function reconcileQueueWithLibrary(
       cMeta.isMetadataLoaded && cMeta.album !== qMeta.album;
     const artworkChanged = Boolean(cMeta.artworkUrl && qMeta.artworkUrl !== cMeta.artworkUrl);
     const statusChanged = canonical.status !== qTrack.status;
+    const canonicalHasLyrics = Boolean(
+      canonical.lrcHandle || canonical.lrcFile || canonical.lrcContent
+    );
     const lyricsChanged =
-      (canonical.lrcHandle !== qTrack.lrcHandle && Boolean(canonical.lrcHandle)) ||
-      (canonical.lrcFile !== qTrack.lrcFile && Boolean(canonical.lrcFile)) ||
-      (canonical.lrcContent !== qTrack.lrcContent && Boolean(canonical.lrcContent));
+      canonicalHasLyrics &&
+      (canonical.lrcHandle !== qTrack.lrcHandle ||
+        canonical.lrcFile !== qTrack.lrcFile ||
+        canonical.lrcContent !== qTrack.lrcContent);
 
     if (
       !durationChanged &&
@@ -72,9 +76,9 @@ export function reconcileQueueWithLibrary(
     return {
       ...qTrack,
       status: canonical.status ?? qTrack.status,
-      lrcHandle: canonical.lrcHandle ?? qTrack.lrcHandle,
-      lrcFile: canonical.lrcFile ?? qTrack.lrcFile,
-      lrcContent: canonical.lrcContent ?? qTrack.lrcContent,
+      lrcHandle: canonicalHasLyrics ? canonical.lrcHandle : qTrack.lrcHandle,
+      lrcFile: canonicalHasLyrics ? canonical.lrcFile : qTrack.lrcFile,
+      lrcContent: canonicalHasLyrics ? canonical.lrcContent : qTrack.lrcContent,
       metadata: {
         ...qMeta,
         ...(cMeta.isMetadataLoaded ? cMeta : {}),

@@ -218,6 +218,7 @@ export function useLibraryInitialization({
             lastModified: rec.lastModified,
             handle: rec.handle,
             file: fileObj,
+            lrcHandle: rec.lrcHandle,
             status,
             metadata: rec.metadata || createFallbackMetadata(rec.name, rec.relativePath),
             folderIds: [IMPORTED_FILES_ROOT_ID],

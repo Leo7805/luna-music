@@ -355,6 +355,7 @@ export function useFolderScanning({
           size: t.size,
           lastModified: t.lastModified,
           handle: t.handle,
+          lrcHandle: t.lrcHandle,
           status: t.status,
           metadata: t.metadata,
           addedAt: Date.now(),

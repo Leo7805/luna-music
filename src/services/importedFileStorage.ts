@@ -17,7 +17,7 @@ export async function storeImportedFiles(records: StoredImportedFileRecord[]): P
       if (records.length === 0) {
         localStorage.removeItem(LOCAL_STORAGE_IMPORTED_FILES_KEY);
       } else {
-        const cached = records.map((r) => ({ ...r, handle: undefined }));
+        const cached = records.map((r) => ({ ...r, handle: undefined, lrcHandle: undefined }));
         localStorage.setItem(LOCAL_STORAGE_IMPORTED_FILES_KEY, JSON.stringify(cached));
       }
     }
@@ -37,6 +37,7 @@ export async function storeImportedFiles(records: StoredImportedFileRecord[]): P
       size: r.size,
       lastModified: r.lastModified,
       handle: r.handle,
+      lrcHandle: r.lrcHandle,
       status: r.status,
       metadata: r.metadata ? { ...r.metadata, artworkUrl: undefined } : undefined,
       addedAt: r.addedAt,

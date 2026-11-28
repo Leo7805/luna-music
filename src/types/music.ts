@@ -58,6 +58,7 @@ export interface StoredImportedFileRecord {
   size: number;
   lastModified: number;
   handle?: FileSystemFileHandle;
+  lrcHandle?: FileSystemFileHandle;
   status?: FileStatus;
   metadata?: TrackMetadata;
   addedAt: number;
